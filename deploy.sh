@@ -8,17 +8,19 @@
 set -euo pipefail
 
 # ── EDIT THESE ────────────────────────────────────────────────────────
-SSH_HOST="ubuntu@146.56.55.16"  # Oracle Cloud default user is 'ubuntu' (Ubuntu)
-                                # or 'opc' (Oracle Linux) — change if yours differs
-APP_DIR="/var/www/shubra"       # the git clone on the server
+SSH_HOST="ubuntu@146.56.55.16"       # Oracle Cloud, 'ubuntu' user
+SSH_KEY="$HOME/.ssh/id_oracle"       # Oracle Cloud key pair
+APP_DIR="/var/www/shubra"            # the git clone on the server
 BRANCH="main"
 # ──────────────────────────────────────────────────────────────────────
+
+SSH="ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new"
 
 echo "▶ Pushing local commits…"
 git push origin "$BRANCH"
 
 echo "▶ Deploying on server (pull → build → restart)…"
-ssh "$SSH_HOST" bash -s <<EOF
+$SSH "$SSH_HOST" bash -s <<EOF
   set -e
   cd "$APP_DIR"
   git pull origin "$BRANCH"
