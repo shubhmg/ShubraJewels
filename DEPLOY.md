@@ -13,7 +13,23 @@ Browser ──HTTPS──▶ nginx ──▶ 127.0.0.1:4200 (Express)
 
 ---
 
-## One-time setup (~15 min)
+## Fastest path: `setup-server.sh`
+
+On the server, one command does the whole bootstrap (clone → build → seed → PM2),
+and optionally nginx + HTTPS:
+```bash
+curl -fsSL https://raw.githubusercontent.com/shubhmg/ShubraJewels/main/setup-server.sh -o setup-server.sh
+bash setup-server.sh                              # first run writes server/.env, then stops
+nano /var/www/shubra/server/.env                  # fill MONGODB_URI password + admin creds
+bash setup-server.sh --nginx shop.yourdomain.com  # build, seed, start, nginx vhost + certbot HTTPS
+```
+Point your domain's DNS A-record at the server first, so certbot can validate.
+After this, deploy updates from your laptop with `bash deploy.sh`. The manual steps
+below are the same thing spelled out.
+
+---
+
+## One-time setup, manual (~15 min)
 
 `deploy.sh` uses **git pull on the server**, so the code must live in a git repo the
 server can clone. Do this once.
