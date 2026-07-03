@@ -20,10 +20,14 @@ router.patch(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const doc = await getSettings();
-    const { theme, ...rest } = req.body || {};
+    const { theme, homepage, ...rest } = req.body || {};
     Object.assign(doc, rest);
     if (theme && typeof theme === 'object') {
       doc.theme = { ...doc.theme.toObject(), ...theme };
+    }
+    if (homepage && typeof homepage === 'object') {
+      doc.homepage = homepage; // admin editor sends the full object (hero + ordered sections)
+      doc.markModified('homepage');
     }
     await doc.save();
     res.json({ success: true, data: doc });

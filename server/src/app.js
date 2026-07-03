@@ -23,6 +23,7 @@ import galleryRoutes from './modules/gallery/gallery.routes.js';
 import orderRoutes from './modules/order/order.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
 import uploadRoutes from './modules/upload/upload.routes.js';
+import adminRoutes from './modules/admin/admin.routes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -59,6 +60,7 @@ app.use('/api/gallery', galleryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);
 
 // In production, serve the built Vite app (dist/) for any non-API route.
 const distDir = resolve(__dirname, '../../dist');

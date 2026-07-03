@@ -70,6 +70,15 @@ Setting (singleton: slogan, taglines, whatsappNumber, freeShippingCity, socials,
 
 **All 6 phases complete.** Old admin pages (`Inventory.jsx`, `Customers.jsx`, `Reports.jsx`, `ProductForm.jsx`) are no longer routed and can be deleted. `src/data/mockData.js` is now only used by the one-time server seed — safe to remove from the web app.
 
+## Later additions
+
+- **Fully customizable homepage:** `Setting.homepage` = `{ hero:{ subheading, ctaLabel, ctaLink, showWhatsapp }, sections:[{ key, enabled, eyebrow, title, hindi, subtitle }] }`. Order of `sections` = render order. Defaults in `server/.../setting.model.js` `DEFAULT_HOMEPAGE` (mirrored on web in `src/lib/homepageDefault.js`). `Home.jsx` renders sections from `settings.homepage.sections` via a `renderers` map keyed by section key; the hero reads `homepage.hero`. Section components take an `h` prop for their headings. Admin editor: `pages/admin/Homepage.jsx` (hero fields + reorderable/toggleable section list with editable headings) → `PATCH /settings { homepage }` (route replaces the whole `homepage` object + `markModified`). `SettingsProvider` deep-merges homepage with defaults.
+- **Admin seed/clear:** `modules/admin/{seed.service.js,admin.routes.js}` — `POST /api/admin/seed` (fills empty collections; `?force=1` wipes+reseeds) and `POST /api/admin/clear` (deletes all content, keeps orders/settings/admin). Seed data + logic extracted from the CLI script into `seed.service.js` (shared). Buttons on admin Dashboard (`DemoDataCard`). CLI: `SKIP_ADMIN=1` seeds content without resetting the admin password.
+- **Dark mode removed:** light-only. `main.jsx` force-removes `dark`; theme toggles removed from Navbar/AdminLayout. (`dark:` classes remain in markup but never activate; `themeStore.js` unused.)
+- **Mobile header:** Navbar rewritten responsive (smaller brand/targets on mobile, closes on route change, wishlist moved into mobile menu).
+- **Custom dropdown:** `components/ui/Dropdown.jsx` (styled select replacement) used for the Products sort (replaced the native `<select>`).
+- **Admin orders:** status filter tabs (all/pending/confirmed/shipped/delivered/cancelled with counts) on `pages/admin/Orders.jsx`.
+
 ## Remaining (not code — go-live)
 - Set real WhatsApp number + brand/contact/socials in `/admin/settings`.
 - Replace seed placeholder images/videos with real uploads (admin drag-drop).

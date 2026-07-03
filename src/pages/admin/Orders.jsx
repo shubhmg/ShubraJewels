@@ -15,6 +15,7 @@ export function AdminOrders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(null)
+  const [filter, setFilter] = useState('all')
 
   const load = async () => {
     setLoading(true)
@@ -28,16 +29,37 @@ export function AdminOrders() {
     await api.patch(`/orders/${id}`, { status }, { auth: true })
   }
 
+  const countFor = (s) => (s === 'all' ? orders.length : orders.filter((o) => o.status === s).length)
+  const shown = filter === 'all' ? orders : orders.filter((o) => o.status === filter)
+
   return (
     <div>
       <AdminHeader title="Orders" subtitle={`${orders.length} orders`} />
+
+      {/* Status filter tabs */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {['all', ...STATUSES].map((s) => {
+          const active = filter === s
+          return (
+            <button
+              key={s}
+              onClick={() => setFilter(s)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold capitalize transition cursor-pointer border ${
+                active ? 'bg-gold-500 text-dark-950 border-gold-500' : 'bg-white dark:bg-stone-900 text-stone-500 border-cream-200 dark:border-stone-700 hover:border-gold-400'
+              }`}
+            >
+              {s} <span className={active ? 'opacity-70' : 'text-stone-400'}>({countFor(s)})</span>
+            </button>
+          )
+        })}
+      </div>
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gold-500" /></div>
-      ) : orders.length === 0 ? (
-        <p className="text-center py-20 text-stone-400">No orders yet.</p>
+      ) : shown.length === 0 ? (
+        <p className="text-center py-20 text-stone-400">{orders.length === 0 ? 'No orders yet.' : `No ${filter} orders.`}</p>
       ) : (
         <div className="grid gap-2">
-          {orders.map((o) => (
+          {shown.map((o) => (
             <div key={o._id} className="bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800 overflow-hidden">
               <div className="flex items-center gap-4 px-4 py-3 cursor-pointer" onClick={() => setOpen(open === o._id ? null : o._id)}>
                 <div className="flex-1 min-w-0">

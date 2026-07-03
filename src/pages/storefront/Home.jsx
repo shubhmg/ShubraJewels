@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Truck, Gift, Star, Quote } from 'lucide-react'
@@ -42,21 +42,29 @@ export function Home() {
   const under599 = all.filter((p) => p.price <= 599).slice(0, 4)
   const spotlight = all.find((p) => p.story)
 
+  // Each section keyed for admin-controlled order + enable + headings.
+  const renderers = {
+    offers: () => (offers.length > 0 ? <OfferStrip offers={offers} /> : null),
+    categories: (h) => (categories?.length > 0 ? <CategoryGrid categories={categories} h={h} /> : null),
+    featured: (h) => (showFeatured.length > 0 ? <FeaturedJhumkas products={showFeatured} h={h} /> : null),
+    story: () => (spotlight ? <StorySpotlight product={spotlight} settings={settings} /> : null),
+    collections: (h) => (collections?.length > 0 ? <RoyalCollections collections={collections} h={h} /> : null),
+    under599: (h) => (under599.length > 0 ? <Under599 products={under599} h={h} /> : null),
+    videos: (h) => (otherVideos.length > 0 ? <VideoSection videos={otherVideos} h={h} /> : null),
+    reviews: (h) => (reviews?.length > 0 ? <Reviews reviews={reviews} h={h} /> : null),
+    gallery: (h) => (gallery?.length > 0 ? <GalleryWall gallery={gallery} h={h} /> : null),
+  }
+
+  const sections = settings.homepage?.sections || []
+
   return (
     <div style={{ background: 'var(--cream)' }}>
       <Hero settings={settings} />
 
-      {offers.length > 0 && <OfferStrip offers={offers} />}
-      {categories?.length > 0 && <CategoryGrid categories={categories} />}
-
-      <FeaturedJhumkas products={showFeatured} />
-
-      {spotlight && <StorySpotlight product={spotlight} settings={settings} />}
-      {collections?.length > 0 && <RoyalCollections collections={collections} />}
-      {under599.length > 0 && <Under599 products={under599} />}
-      {otherVideos.length > 0 && <VideoSection videos={otherVideos} />}
-      {reviews?.length > 0 && <Reviews reviews={reviews} />}
-      {gallery?.length > 0 && <GalleryWall gallery={gallery} />}
+      {sections.filter((s) => s.enabled).map((s) => {
+        const r = renderers[s.key]
+        return r ? <Fragment key={s.key}>{r(s)}</Fragment> : null
+      })}
 
       <SloganBand settings={settings} />
     </div>
@@ -66,6 +74,7 @@ export function Home() {
 /* ── Hero ─────────────────────────────────────────────────────────── */
 function Hero({ settings }) {
   const t = settings.theme || {}
+  const hero = settings.homepage?.hero || {}
   return (
     <section className="relative min-h-[94vh] flex flex-col overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
       <Mandala size={560} className="absolute -right-44 -top-28 opacity-25" />
@@ -90,11 +99,11 @@ function Hero({ settings }) {
         <HeroLine><div className="eyebrow justify-center flex mb-4"><Motif size={20} />{settings.brandNameHindi} • {settings.freeShippingCity} में फ्री शिपिंग</div></HeroLine>
         <HeroLine><p className="font-hindi text-2xl md:text-3xl text-[var(--gold-light)]">{settings.slogan}</p></HeroLine>
         <HeroLine><h1 className="font-display text-white text-5xl md:text-7xl lg:text-8xl leading-[1.03] mt-2 tracking-tight">{settings.brandName}</h1></HeroLine>
-        <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-4 text-base md:text-lg">{settings.sloganEnglish} — handcrafted royal jhumkas inspired by the heritage of Rajasthan.</p></HeroLine>
+        {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-4 text-base md:text-lg">{hero.subheading}</p></HeroLine>}
         <HeroLine>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
-            <Magnetic><Link to="/products" className="btn-gold">Shop Jhumkas <ArrowRight size={17} /></Link></Magnetic>
-            <Magnetic><WhatsAppButton label="Order on WhatsApp" size="md" className="!px-6 !py-3" /></Magnetic>
+            <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={17} /></Link></Magnetic>
+            {hero.showWhatsapp !== false && <Magnetic><WhatsAppButton label="Order on WhatsApp" size="md" className="!px-6 !py-3" /></Magnetic>}
           </div>
         </HeroLine>
       </motion.div>
@@ -136,10 +145,10 @@ function OfferStrip({ offers }) {
 }
 
 /* ── Categories ───────────────────────────────────────────────────── */
-function CategoryGrid({ categories }) {
+function CategoryGrid({ categories, h = {} }) {
   return (
     <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow="Shop by Category" hindi="अपनी पसंद चुनें" title="Find Your Jhumka" /></Reveal>
+      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
       <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
         {categories.map((c) => (
           <StaggerItem key={c._id}>
@@ -163,11 +172,11 @@ function CategoryGrid({ categories }) {
 }
 
 /* ── Featured jhumkas ─────────────────────────────────────────────── */
-function FeaturedJhumkas({ products }) {
+function FeaturedJhumkas({ products, h = {} }) {
   return (
     <section className="section" style={{ background: 'color-mix(in srgb, var(--beige) 45%, var(--cream))' }}>
       <div className="container-wide">
-        <Reveal><SectionHeading eyebrow="Bestsellers" hindi="सबसे पसंदीदा" title="Loved by Our Customers" subtitle="Each jhumka carries a name and a story." /></Reveal>
+        <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
         <Stagger className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7">
           {products.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
         </Stagger>
@@ -210,10 +219,10 @@ function StorySpotlight({ product, settings }) {
 }
 
 /* ── Royal collections ────────────────────────────────────────────── */
-function RoyalCollections({ collections }) {
+function RoyalCollections({ collections, h = {} }) {
   return (
     <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow="Signature Collections" hindi="राजसी संग्रह" title="The Royal Collections" subtitle="Maharani, Rajputana, Banjara & more — worlds of their own." /></Reveal>
+      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
       <Stagger className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         {collections.map((c) => (
           <StaggerItem key={c._id}>
@@ -238,15 +247,15 @@ function RoyalCollections({ collections }) {
 }
 
 /* ── Under 599 ────────────────────────────────────────────────────── */
-function Under599({ products }) {
+function Under599({ products, h = {} }) {
   return (
     <section className="section" style={{ background: 'var(--ink)' }}>
       <div className="container-wide">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
           <div>
-            <div className="eyebrow"><Motif size={18} />Budget Beauties</div>
-            <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">₹599 से कम</p>
-            <h2 className="font-display text-white text-3xl md:text-5xl">Under ₹599</h2>
+            {h.eyebrow && <div className="eyebrow"><Motif size={18} />{h.eyebrow}</div>}
+            {h.hindi && <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">{h.hindi}</p>}
+            <h2 className="font-display text-white text-3xl md:text-5xl">{h.title || 'Under ₹599'}</h2>
           </div>
           <Magnetic><Link to="/products?under599=1" className="btn-outline-gold">See All <ArrowRight size={16} /></Link></Magnetic>
         </div>
@@ -259,10 +268,10 @@ function Under599({ products }) {
 }
 
 /* ── Videos ───────────────────────────────────────────────────────── */
-function VideoSection({ videos }) {
+function VideoSection({ videos, h = {} }) {
   return (
     <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow="Watch" hindi="हमारी दुनिया" title="Jhumkas in Motion" /></Reveal>
+      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
       <Stagger className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
         {videos.map((v) => (
           <StaggerItem key={v._id}><figure className="rounded-2xl overflow-hidden shadow-card bg-black">
@@ -281,11 +290,11 @@ function VideoSection({ videos }) {
 }
 
 /* ── Reviews ──────────────────────────────────────────────────────── */
-function Reviews({ reviews }) {
+function Reviews({ reviews, h = {} }) {
   return (
     <section className="section" style={{ background: 'color-mix(in srgb, var(--beige) 55%, var(--cream))' }}>
       <div className="container-wide">
-        <Reveal><SectionHeading eyebrow="Kind Words" hindi="ग्राहकों की राय" title="Customer Reviews" /></Reveal>
+        <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
         <Stagger className="grid md:grid-cols-3 gap-5">
           {reviews.slice(0, 6).map((r) => (
             <StaggerItem key={r._id}><div className="rounded-2xl p-6 bg-white shadow-card relative h-full">
@@ -314,10 +323,10 @@ function Reviews({ reviews }) {
 }
 
 /* ── Customer gallery ─────────────────────────────────────────────── */
-function GalleryWall({ gallery }) {
+function GalleryWall({ gallery, h = {} }) {
   return (
     <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow="#ShubraGirls" hindi="हमारा परिवार" title="Customer Gallery" subtitle="Our jhumkas, your moments." /></Reveal>
+      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
       <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {gallery.map((g) => (
           <StaggerItem key={g._id}><Tilt max={9} className="group relative block aspect-square rounded-2xl overflow-hidden shadow-card">

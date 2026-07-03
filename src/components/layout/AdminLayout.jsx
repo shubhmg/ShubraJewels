@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Package, Tags, Crown, Megaphone, Video, Star, Image as ImageIcon,
+  LayoutDashboard, Home as HomeIcon, Package, Tags, Crown, Megaphone, Video, Star, Image as ImageIcon,
   ShoppingCart, Settings, ChevronLeft, ChevronRight, ExternalLink, LogOut,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore.js'
@@ -10,6 +10,7 @@ import { getToken } from '../../lib/api.js'
 
 const NAV_ITEMS = [
   { to: '/admin',             icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/admin/homepage',    icon: HomeIcon,        label: 'Homepage'    },
   { to: '/admin/products',    icon: Package,         label: 'Products'    },
   { to: '/admin/categories',  icon: Tags,            label: 'Categories'  },
   { to: '/admin/collections', icon: Crown,           label: 'Collections' },

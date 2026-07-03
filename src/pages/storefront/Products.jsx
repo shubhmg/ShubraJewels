@@ -4,6 +4,7 @@ import { SlidersHorizontal, X } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { Stagger, StaggerItem } from '../../components/motion/Motion.jsx'
+import { Dropdown } from '../../components/ui/Dropdown.jsx'
 import { useProducts, useCategories, useCollections } from '../../hooks/useApi.js'
 
 const SORT_OPTIONS = [
@@ -93,15 +94,7 @@ export function Products() {
             </button>
             <span className="text-sm text-stone-500">{loading ? '…' : `${list.length} items`}</span>
           </div>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="px-4 py-2 rounded-full border bg-white text-sm focus:outline-none cursor-pointer"
-            style={{ borderColor: 'color-mix(in srgb, var(--gold) 40%, transparent)' }}
-            aria-label="Sort products"
-          >
-            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} />
         </div>
 
         <div className="flex gap-8">

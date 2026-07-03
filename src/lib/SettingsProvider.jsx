@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { api } from './api.js'
+import { DEFAULT_HOMEPAGE } from './homepageDefault.js'
 
 const SettingsContext = createContext(null)
 
@@ -23,6 +24,7 @@ const DEFAULTS = {
     maroon: '#7B1E2B', maroonDark: '#5A121C', gold: '#C9A84C',
     goldLight: '#E3C97A', beige: '#F6ECD9', cream: '#FBF6EC', ink: '#2A1A16',
   },
+  homepage: DEFAULT_HOMEPAGE,
 }
 
 // Push the (admin-editable) palette into CSS variables the whole app reads.
@@ -45,7 +47,10 @@ export function SettingsProvider({ children }) {
   const refresh = async () => {
     try {
       const data = await api.get('/settings')
-      const merged = { ...DEFAULTS, ...data, theme: { ...DEFAULTS.theme, ...(data.theme || {}) } }
+      const hp = data.homepage && data.homepage.sections?.length
+        ? { hero: { ...DEFAULTS.homepage.hero, ...(data.homepage.hero || {}) }, sections: data.homepage.sections }
+        : DEFAULTS.homepage
+      const merged = { ...DEFAULTS, ...data, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, homepage: hp }
       setSettings(merged)
       applyTheme(merged.theme)
     } catch {

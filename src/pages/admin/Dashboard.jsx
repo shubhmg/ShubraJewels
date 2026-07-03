@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Eye, Users, ShoppingCart, IndianRupee, Loader2, TrendingUp } from 'lucide-react'
+import { Eye, Users, ShoppingCart, IndianRupee, Loader2, TrendingUp, Database, Trash2, Sparkles } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { api } from '../../lib/api.js'
-import { AdminHeader } from '../../components/admin/AdminUI.jsx'
+import { AdminHeader, Btn } from '../../components/admin/AdminUI.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
@@ -106,6 +106,50 @@ export function AdminDashboard() {
           <p className="text-stone-400 text-sm">No orders yet.</p>
         )}
       </div>
+
+      <DemoDataCard />
+    </div>
+  )
+}
+
+// Seed / clear the sample content — handy for seeing what's DB-driven vs static.
+function DemoDataCard() {
+  const [busy, setBusy] = useState('')
+  const [msg, setMsg] = useState(null)
+
+  const seed = async () => {
+    setBusy('seed'); setMsg(null)
+    try {
+      const { seeded } = await api.post('/admin/seed', {}, { auth: true })
+      const parts = Object.entries(seeded).map(([k, v]) => `${v} ${k}`)
+      setMsg(parts.length ? `Added: ${parts.join(', ')}.` : 'Nothing to add — everything already has data.')
+    } catch (e) { setMsg(e.message) } finally { setBusy('') }
+  }
+
+  const clear = async () => {
+    if (!confirm('Delete ALL content — products, categories, collections, banners, videos, reviews, gallery?\n\nYour orders, settings and login are kept. This cannot be undone.')) return
+    setBusy('clear'); setMsg(null)
+    try {
+      const { cleared } = await api.post('/admin/clear', {}, { auth: true })
+      const total = Object.values(cleared).reduce((a, b) => a + b, 0)
+      setMsg(`Cleared ${total} items. The storefront now shows only static parts.`)
+    } catch (e) { setMsg(e.message) } finally { setBusy('') }
+  }
+
+  return (
+    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-5 mt-6">
+      <div className="flex items-center gap-2 mb-1">
+        <Database size={16} className="text-gold-500" />
+        <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50">Sample Data</h2>
+      </div>
+      <p className="text-sm text-stone-400 mb-4">
+        Seed fills empty sections with demo jhumkas. Clear empties everything DB-driven — whatever still shows on the site after clearing is hardcoded, not from the database.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Btn onClick={seed} disabled={!!busy}><Sparkles size={16} /> {busy === 'seed' ? 'Seeding…' : 'Seed sample data'}</Btn>
+        <Btn variant="danger" onClick={clear} disabled={!!busy}><Trash2 size={16} /> {busy === 'clear' ? 'Clearing…' : 'Clear all content'}</Btn>
+      </div>
+      {msg && <p className="text-sm text-stone-500 dark:text-stone-300 mt-3">{msg}</p>}
     </div>
   )
 }
