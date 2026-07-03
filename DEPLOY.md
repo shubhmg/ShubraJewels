@@ -15,17 +15,28 @@ Browser ──HTTPS──▶ nginx ──▶ 127.0.0.1:4200 (Express)
 
 ## Fastest path: `setup-server.sh`
 
+This project deploys to **shubrajewels.shop** on Oracle Cloud (`146.56.55.16`).
 On the server, one command does the whole bootstrap (clone → build → seed → PM2),
-and optionally nginx + HTTPS:
+and optionally nginx + HTTPS for both apex and `www`:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/shubhmg/ShubraJewels/main/setup-server.sh -o setup-server.sh
-bash setup-server.sh                              # first run writes server/.env, then stops
-nano /var/www/shubra/server/.env                  # fill MONGODB_URI password + admin creds
-bash setup-server.sh --nginx shop.yourdomain.com  # build, seed, start, nginx vhost + certbot HTTPS
+bash setup-server.sh                                # first run writes server/.env, then stops
+nano /var/www/shubra/server/.env                    # fill MONGODB_URI password + admin creds
+bash setup-server.sh --nginx shubrajewels.shop      # build, seed, start, nginx + certbot (apex + www)
 ```
-Point your domain's DNS A-record at the server first, so certbot can validate.
-After this, deploy updates from your laptop with `bash deploy.sh`. The manual steps
-below are the same thing spelled out.
+After this, deploy updates from your laptop with `bash deploy.sh`.
+
+**Oracle Cloud prerequisites (do once):**
+- **Open ports 80 & 443** in the VCN Security List *and* on the host:
+  ```bash
+  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  sudo netfilter-persistent save
+  ```
+- Install nginx + certbot if missing: `sudo apt install -y nginx certbot python3-certbot-nginx`
+- DNS is already set (apex `A → 146.56.55.16`, `www` CNAME → apex), so certbot will validate.
+
+The manual steps below are the same thing spelled out.
 
 ---
 

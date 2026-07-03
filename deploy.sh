@@ -8,7 +8,8 @@
 set -euo pipefail
 
 # ── EDIT THESE ────────────────────────────────────────────────────────
-SSH_HOST="user@your-server"     # e.g. root@203.0.113.10
+SSH_HOST="ubuntu@146.56.55.16"  # Oracle Cloud default user is 'ubuntu' (Ubuntu)
+                                # or 'opc' (Oracle Linux) — change if yours differs
 APP_DIR="/var/www/shubra"       # the git clone on the server
 BRANCH="main"
 # ──────────────────────────────────────────────────────────────────────

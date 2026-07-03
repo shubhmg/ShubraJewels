@@ -37,7 +37,11 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "✗ missing '$1' — install
 need git; need node; need npm
 command -v pm2 >/dev/null 2>&1 || { echo "▶ installing pm2…"; npm i -g pm2; }
 
-# 1. Clone or update
+# 1. Clone or update (ensure the target dir is owned by us, e.g. /var/www is root-owned)
+if [ ! -d "$APP_DIR" ]; then
+  $SUDO mkdir -p "$APP_DIR"
+  $SUDO chown -R "$(id -un):$(id -gn)" "$APP_DIR"
+fi
 if [ -d "$APP_DIR/.git" ]; then
   echo "▶ repo exists — pulling latest"
   git -C "$APP_DIR" pull origin "$BRANCH"
@@ -95,11 +99,17 @@ if [ -n "$NGINX_DOMAIN" ]; then
   if ! command -v nginx >/dev/null 2>&1; then
     echo "⚠ nginx not installed — skipping. Install nginx and re-run with --nginx $NGINX_DOMAIN"
   else
-    echo "▶ writing nginx vhost for $NGINX_DOMAIN…"
+    # Include the www.* variant automatically (unless the domain is already www.*)
+    case "$NGINX_DOMAIN" in
+      www.*) SERVER_NAMES="$NGINX_DOMAIN"; CERT_ARGS="-d $NGINX_DOMAIN" ;;
+      *)     SERVER_NAMES="$NGINX_DOMAIN www.$NGINX_DOMAIN"; CERT_ARGS="-d $NGINX_DOMAIN -d www.$NGINX_DOMAIN" ;;
+    esac
+
+    echo "▶ writing nginx vhost for $SERVER_NAMES…"
     VHOST="/etc/nginx/sites-available/shubra"
     $SUDO tee "$VHOST" >/dev/null <<EOF
 server {
-    server_name $NGINX_DOMAIN;
+    server_name $SERVER_NAMES;
     client_max_body_size 60M;              # allow video uploads
 
     location / {
@@ -113,13 +123,13 @@ server {
 EOF
     $SUDO ln -sf "$VHOST" /etc/nginx/sites-enabled/shubra
     $SUDO nginx -t && $SUDO systemctl reload nginx
-    echo "✔ nginx serving $NGINX_DOMAIN → 127.0.0.1:$PORT"
+    echo "✔ nginx serving $SERVER_NAMES → 127.0.0.1:$PORT"
 
     if command -v certbot >/dev/null 2>&1; then
       EMAIL=$(grep -E '^ADMIN_EMAIL=' "$ENV" | cut -d= -f2-)
       echo "▶ requesting HTTPS cert via certbot…"
-      $SUDO certbot --nginx -d "$NGINX_DOMAIN" --redirect --non-interactive --agree-tos -m "${EMAIL:-admin@$NGINX_DOMAIN}" || \
-        echo "⚠ certbot failed (DNS not pointing here yet?). Re-run: sudo certbot --nginx -d $NGINX_DOMAIN"
+      $SUDO certbot --nginx $CERT_ARGS --redirect --non-interactive --agree-tos -m "${EMAIL:-admin@$NGINX_DOMAIN}" || \
+        echo "⚠ certbot failed (DNS not pointing here yet?). Re-run: sudo certbot --nginx $CERT_ARGS"
     else
       echo "⚠ certbot not installed — for HTTPS: sudo apt install certbot python3-certbot-nginx && sudo certbot --nginx -d $NGINX_DOMAIN"
     fi
