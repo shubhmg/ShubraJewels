@@ -29,7 +29,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    // Default CSP blocks external images/media (img-src 'self'). We use uploaded
+    // media (/uploads) + external URLs (Unsplash placeholders, admin-pasted links)
+    // + Google Fonts, so allow https/data/blob for images, media, fonts & styles.
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+        'media-src': ["'self'", 'data:', 'blob:', 'https:'],
+        'font-src': ["'self'", 'data:', 'https:'],
+        'style-src': ["'self'", "'unsafe-inline'", 'https:'],
+        'connect-src': ["'self'", 'https:'],
+        'worker-src': ["'self'", 'blob:'],
+      },
+    },
+  })
+);
 app.use(compression());
 app.use(cors({ origin: env.nodeEnv === 'production' ? (process.env.CORS_ORIGIN || true) : true }));
 app.use(express.json({ limit: '5mb' }));
