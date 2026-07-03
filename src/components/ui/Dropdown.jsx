@@ -1,26 +1,50 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Check } from 'lucide-react'
 
 /**
  * Styled select-replacement. options: [{ value, label }].
- * Royal theme, closes on outside click / Escape.
+ * The menu renders in a portal with fixed positioning so it never gets clipped
+ * by an `overflow-hidden` ancestor (cards, modals, etc.).
  */
 export function Dropdown({ value, onChange, options, className = '', align = 'right' }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  const [pos, setPos] = useState(null)
+  const btnRef = useRef(null)
+  const menuRef = useRef(null)
   const current = options.find((o) => o.value === value)
 
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (!r) return
+    setPos({ top: r.bottom + 6, left: r.left, right: window.innerWidth - r.right, width: r.width })
+  }
+
+  useLayoutEffect(() => { if (open) place() }, [open])
+
   useEffect(() => {
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    if (!open) return
+    const onDoc = (e) => {
+      if (!btnRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false)
+    }
+    const onScroll = () => setOpen(false)
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDoc)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
     document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
-  }, [])
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
 
   return (
-    <div ref={ref} className={`relative ${className}`}>
+    <div className={`relative ${className}`}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center justify-between gap-2 min-w-[9.5rem] w-full px-4 py-2 rounded-full border bg-white text-sm font-medium cursor-pointer transition-colors"
@@ -32,11 +56,18 @@ export function Dropdown({ value, onChange, options, className = '', align = 'ri
         <ChevronDown size={15} className={`transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--maroon)' }} />
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <div
+          ref={menuRef}
           role="listbox"
-          className={`absolute z-30 mt-2 min-w-full w-max max-w-[16rem] rounded-2xl bg-white shadow-xl border overflow-hidden animate-slide-up ${align === 'right' ? 'right-0' : 'left-0'}`}
-          style={{ borderColor: 'color-mix(in srgb, var(--gold) 30%, transparent)' }}
+          className="fixed z-[80] rounded-2xl bg-white shadow-xl border overflow-hidden animate-slide-up max-h-72 overflow-y-auto"
+          style={{
+            top: pos.top,
+            ...(align === 'right' ? { right: pos.right } : { left: pos.left }),
+            minWidth: pos.width,
+            maxWidth: '18rem',
+            borderColor: 'color-mix(in srgb, var(--gold) 30%, transparent)',
+          }}
         >
           {options.map((o) => {
             const active = o.value === value
@@ -54,7 +85,8 @@ export function Dropdown({ value, onChange, options, className = '', align = 'ri
               </button>
             )
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
