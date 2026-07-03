@@ -1,0 +1,18 @@
+# deps
+node_modules
+server/node_modules
+
+# build output (built on the server during deploy)
+dist
+
+# secrets
+.env
+server/.env
+
+# uploaded media (lives only on the server, backed up separately)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# misc
+.DS_Store
+*.log

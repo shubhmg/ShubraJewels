@@ -1,0 +1,187 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ChevronRight, Check, ShoppingBag } from 'lucide-react'
+import { useCartStore } from '../../store/cartStore.js'
+import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
+import { Mandala, Motif } from '../../components/decor/Decor.jsx'
+import { api } from '../../lib/api.js'
+import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
+
+const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
+
+const EMPTY = { name: '', phone: '', email: '', line1: '', line2: '', city: '', state: '', pincode: '', notes: '' }
+
+export function Checkout() {
+  const settings = useSettings()
+  const { items, clearCart } = useCartStore()
+  const [form, setForm] = useState(EMPTY)
+  const [placing, setPlacing] = useState(false)
+  const [error, setError] = useState(null)
+  const [placed, setPlaced] = useState(null) // holds the created order
+
+  const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0)
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  const buildPayload = (channel) => ({
+    items: items.map((i) => ({ productId: i.id || i._id, qty: i.qty })),
+    customer: { name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim() },
+    address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, pincode: form.pincode },
+    channel,
+    notes: form.notes,
+  })
+
+  const validate = () => {
+    if (!form.name.trim()) return 'Please enter your name'
+    if (!form.phone.trim()) return 'Please enter your phone number'
+    return null
+  }
+
+  const placeOrder = async (channel) => {
+    const v = validate()
+    if (v) { setError(v); return null }
+    setError(null)
+    setPlacing(true)
+    try {
+      const order = await api.post('/orders', buildPayload(channel))
+      setPlaced(order)
+      clearCart()
+      return order
+    } catch (e) {
+      setError(e.message || 'Could not place order. Please try again.')
+      return null
+    } finally {
+      setPlacing(false)
+    }
+  }
+
+  const orderViaWhatsApp = async () => {
+    const order = await placeOrder('whatsapp')
+    if (!order) return
+    const lines = order.items.map((i) => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n')
+    const msg = `${settings.whatsappMessage || 'Hello! I would like to order:'}\n\nOrder ${order.orderNo}\n${lines}\n\nTotal: ${fmt(order.total)}\nName: ${order.customer.name}\nPhone: ${order.customer.phone}`
+    const link = whatsappLink(settings, msg)
+    if (link) window.open(link, '_blank')
+  }
+
+  /* ── Success ── */
+  if (placed) {
+    return (
+      <div className="pt-20 min-h-dvh flex items-center justify-center animate-fade-in" style={{ background: 'var(--cream)' }}>
+        <div className="text-center max-w-md px-4 py-16">
+          <div className="w-20 h-20 rounded-full grid place-items-center mx-auto mb-6" style={{ background: 'color-mix(in srgb, var(--maroon) 12%, transparent)' }}>
+            <Check size={34} style={{ color: 'var(--maroon)' }} />
+          </div>
+          <div className="eyebrow justify-center flex"><Motif size={18} />{settings.slogan}</div>
+          <h1 className="font-display text-3xl mt-2 mb-2" style={{ color: 'var(--ink)' }}>Order Placed!</h1>
+          <p className="text-stone-500">Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> has been received. We'll reach out on WhatsApp to confirm.</p>
+          <p className="text-sm mt-2" style={{ color: 'var(--maroon)' }}>Total: {fmt(placed.total)}</p>
+          <div className="mt-8 flex flex-wrap gap-3 justify-center">
+            <Link to="/products" className="btn-maroon">Continue Shopping</Link>
+            <WhatsAppButton message={`Hi! About my order ${placed.orderNo}…`} label="Message us" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── Empty ── */
+  if (items.length === 0) {
+    return (
+      <div className="pt-20 min-h-dvh flex items-center justify-center" style={{ background: 'var(--cream)' }}>
+        <div className="text-center py-20">
+          <ShoppingBag size={40} className="mx-auto text-stone-300 mb-4" />
+          <h2 className="font-display text-2xl mb-4" style={{ color: 'var(--ink)' }}>Your bag is empty</h2>
+          <Link to="/products" className="btn-maroon">Browse Jhumkas</Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="pt-16 min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
+      <div className="relative overflow-hidden" style={{ background: 'var(--maroon)' }}>
+        <Mandala size={300} className="absolute -right-16 -top-10 opacity-20" />
+        <div className="container-wide py-12 relative">
+          <div className="flex items-center gap-2 text-xs text-white/60 mb-2">
+            <Link to="/" className="hover:text-white">Home</Link><ChevronRight size={12} /><span className="text-white/90">Checkout</span>
+          </div>
+          <h1 className="font-display text-white text-4xl">Checkout</h1>
+        </div>
+      </div>
+
+      <div className="container-wide py-10">
+        <div className="grid lg:grid-cols-3 gap-10">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-card space-y-4">
+              <h2 className="font-display text-xl" style={{ color: 'var(--ink)' }}>Your Details</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Full Name *" value={form.name} onChange={(v) => set('name', v)} placeholder="Priya Sharma" />
+                <Field label="Phone *" value={form.phone} onChange={(v) => set('phone', v)} placeholder="98xxxxxxxx" />
+              </div>
+              <Field label="Email (optional)" type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="you@example.com" />
+
+              <h2 className="font-display text-xl pt-2" style={{ color: 'var(--ink)' }}>Shipping Address</h2>
+              <Field label="Address" value={form.line1} onChange={(v) => set('line1', v)} placeholder="House no., street" />
+              <Field label="Landmark / Area (optional)" value={form.line2} onChange={(v) => set('line2', v)} placeholder="Landmark, area" />
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="City" value={form.city} onChange={(v) => set('city', v)} placeholder={settings.freeShippingCity} />
+                <Field label="State" value={form.state} onChange={(v) => set('state', v)} placeholder="State" />
+                <Field label="PIN" value={form.pincode} onChange={(v) => set('pincode', v)} placeholder="1100xx" />
+              </div>
+              <Field label="Order notes (optional)" value={form.notes} onChange={(v) => set('notes', v)} placeholder="Anything we should know?" />
+
+              {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button onClick={() => placeOrder('web')} disabled={placing} className="btn-maroon flex-1 disabled:opacity-60">
+                  {placing ? 'Placing…' : `Place Order · ${fmt(subtotal)}`}
+                </button>
+                <button onClick={orderViaWhatsApp} disabled={placing} className="btn-whatsapp flex-1 disabled:opacity-60">
+                  Order on WhatsApp
+                </button>
+              </div>
+              <p className="text-xs text-stone-400 text-center">No online payment — we confirm your order and arrange delivery over WhatsApp.</p>
+            </div>
+          </div>
+
+          <aside className="bg-white rounded-2xl p-6 shadow-card h-fit space-y-4 sticky top-24">
+            <h3 className="font-display text-lg" style={{ color: 'var(--ink)' }}>Order Summary</h3>
+            <div className="space-y-3">
+              {items.map((item) => (
+                <div key={item.key} className="flex items-center gap-3">
+                  <img src={item.images?.[0]} alt={item.name} className="w-12 h-14 object-cover rounded-lg" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{item.name}</p>
+                    <p className="text-xs text-stone-400">Qty: {item.qty}</p>
+                  </div>
+                  <p className="text-sm font-semibold">{fmt(item.price * item.qty)}</p>
+                </div>
+              ))}
+            </div>
+            <div className="h-px" style={{ background: 'color-mix(in srgb, var(--gold) 30%, transparent)' }} />
+            <div className="flex justify-between text-sm text-stone-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+            <div className="flex justify-between text-sm text-stone-500"><span>Shipping</span><span className="text-emerald-600">Free in {settings.freeShippingCity}</span></div>
+            <div className="h-px" style={{ background: 'color-mix(in srgb, var(--gold) 30%, transparent)' }} />
+            <div className="flex justify-between font-semibold text-lg" style={{ color: 'var(--maroon)' }}><span>Total</span><span>{fmt(subtotal)}</span></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, value, onChange, placeholder, type = 'text' }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-stone-500">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full px-4 py-2.5 rounded-xl border bg-white text-sm focus:outline-none"
+        style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}
+      />
+    </label>
+  )
+}

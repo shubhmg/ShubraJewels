@@ -1,0 +1,249 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary:    #1C1917;
+    --color-secondary:  #44403C;
+    --color-accent:     #C9A84C;
+    --color-accent-light: #E3C97A;
+    --color-background: #FAFAF9;
+    --color-foreground: #0C0A09;
+    --color-muted:      #E7E5E4;
+    --color-border:     #D6D3D1;
+
+    /* Royal palette — overwritten at runtime by SettingsProvider (admin-editable) */
+    --maroon:      #7B1E2B;
+    --maroon-dark: #5A121C;
+    --gold:        #C9A84C;
+    --gold-light:  #E3C97A;
+    --beige:       #F6ECD9;
+    --cream:       #FBF6EC;
+    --ink:         #2A1A16;
+  }
+
+  html.dark {
+    --color-background: #0C0A09;
+    --color-foreground: #FAFAF9;
+    --color-muted:      #292524;
+    --color-border:     #292524;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    @apply font-sans antialiased bg-cream-50 text-dark-900 transition-colors duration-300;
+  }
+
+  html.dark body {
+    @apply bg-dark-950 text-cream-50;
+  }
+
+  h1, h2, h3, h4 { @apply font-serif; }
+
+  ::selection {
+    background-color: rgba(201, 168, 76, 0.25);
+    color: #1C1917;
+  }
+
+  :focus-visible {
+    outline: 2px solid #C9A84C;
+    outline-offset: 2px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  { @apply bg-cream-200 rounded-full; }
+  html.dark ::-webkit-scrollbar-thumb { background: #292524; }
+}
+
+@layer components {
+  /* Glass morphism card */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+
+  html:not(.dark) .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.9);
+  }
+
+  /* Gold shimmer text */
+  .gold-text {
+    background: linear-gradient(135deg, #C9A84C 0%, #E3C97A 40%, #C9A84C 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% auto;
+  }
+
+  /* Gold shimmer animated */
+  .gold-shimmer {
+    background: linear-gradient(90deg, #C9A84C 0%, #E3C97A 30%, #F5E3A3 50%, #E3C97A 70%, #C9A84C 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 3s linear infinite;
+  }
+
+  /* Product card image wrapper — zoom/fade handled per-img via Tailwind */
+  .product-img-wrap {
+    overflow: hidden;
+  }
+
+  /* Cart drawer overlay */
+  .drawer-overlay {
+    background: rgba(12, 10, 9, 0.6);
+    backdrop-filter: blur(4px);
+  }
+
+  /* Floating label input */
+  .float-label-wrapper { @apply relative; }
+  .float-label-wrapper input:focus + label,
+  .float-label-wrapper input:not(:placeholder-shown) + label {
+    @apply text-xs -top-2.5 left-2 px-1 text-gold-500;
+    background: var(--color-background);
+  }
+  .float-label-wrapper label {
+    @apply absolute left-3 top-3.5 text-sm text-stone-400 pointer-events-none transition-all duration-200 bg-transparent;
+  }
+
+  /* Nav link underline */
+  .nav-link {
+    @apply relative text-sm font-medium text-stone-600 hover:text-dark-900 transition-colors duration-200;
+  }
+  .nav-link::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-0 h-px bg-gold-500 transition-all duration-300;
+  }
+  .nav-link:hover::after,
+  .nav-link.active::after {
+    @apply w-full;
+  }
+
+  /* Bento grid item */
+  .bento-item {
+    @apply rounded-2xl p-5 glass-card transition-all duration-300 hover:shadow-glass-lg;
+  }
+
+  /* Status badge */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  /* Page section — content-visibility lets the browser skip layout/paint of
+     off-screen sections (big scroll win on long pages). `auto` in
+     contain-intrinsic-size remembers the last rendered height so the scrollbar
+     doesn't jump when scrolling back up. */
+  .section {
+    @apply py-16 md:py-24;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 700px;
+  }
+  .container-wide  { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+  .container-tight { @apply max-w-5xl  mx-auto px-4 sm:px-6 lg:px-8; }
+
+  /* ─── Royal / Rajasthani design language ─────────────────────────── */
+
+  /* Buttons */
+  .btn-maroon {
+    background: var(--maroon);
+    color: var(--cream);
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold tracking-wide transition-all duration-200 cursor-pointer;
+    box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--maroon) 70%, transparent);
+  }
+  .btn-maroon:hover { background: var(--maroon-dark); transform: translateY(-1px); }
+
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 50%, var(--gold) 100%);
+    color: var(--ink);
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold tracking-wide transition-all duration-200 cursor-pointer;
+    box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--gold) 70%, transparent);
+  }
+  .btn-gold:hover { transform: translateY(-1px); filter: brightness(1.04); }
+
+  .btn-whatsapp {
+    background: #25D366;
+    color: #06351b;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold transition-all duration-200 cursor-pointer;
+    box-shadow: 0 6px 20px -6px rgba(37,211,102,0.6);
+  }
+  .btn-whatsapp:hover { background: #1fbe5a; transform: translateY(-1px); }
+
+  .btn-outline-gold {
+    border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent);
+    color: var(--gold);
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold tracking-wide transition-all duration-200 cursor-pointer;
+  }
+  .btn-outline-gold:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
+
+  /* Maroon-tinted eyebrow label */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em];
+    color: var(--gold);
+  }
+
+  /* Gold shimmer bound to the editable var */
+  .royal-gold-text {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 45%, var(--gold) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Temple-arch gold frame around media */
+  .temple-frame {
+    position: relative;
+    border: 2px solid color-mix(in srgb, var(--gold) 55%, transparent);
+    border-radius: 44% 44% 12px 12px / 30% 30% 12px 12px;
+    overflow: hidden;
+  }
+  .temple-frame::after {
+    content: '';
+    position: absolute; inset: 6px;
+    border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+    border-radius: 44% 44% 8px 8px / 30% 30% 8px 8px;
+    pointer-events: none;
+  }
+
+  /* Mehendi/scallop divider (SVG-in-CSS, tinted gold) */
+  .mehendi-divider {
+    height: 22px;
+    background-repeat: repeat-x;
+    background-position: center;
+    background-size: 44px 22px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='22' viewBox='0 0 44 22'%3E%3Cg fill='none' stroke='%23C9A84C' stroke-width='1.2'%3E%3Cpath d='M2 16c6 0 6-10 20-10s14 10 20 10'/%3E%3Ccircle cx='22' cy='6' r='1.6' fill='%23C9A84C'/%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.9;
+  }
+
+  /* Subtle mandala corner backdrop */
+  .mandala-bg {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23C9A84C' stroke-opacity='0.25' stroke-width='1'%3E%3Ccircle cx='120' cy='120' r='30'/%3E%3Ccircle cx='120' cy='120' r='55'/%3E%3Ccircle cx='120' cy='120' r='80'/%3E%3Ccircle cx='120' cy='120' r='105'/%3E%3Cg%3E%3Cpath d='M120 15v210M15 120h210M40 40l160 160M200 40L40 200'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .writing-vertical { writing-mode: vertical-rl; }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
