@@ -3,11 +3,12 @@ import requireAdmin from '../../middleware/auth.js';
 import { upload } from '../../middleware/upload.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 import ApiError from '../../utils/ApiError.js';
-import env from '../../config/env.js';
 
 const router = express.Router();
 
-const toUrl = (filename) => `${env.publicUrl || ''}/uploads/${filename}`;
+// Always root-relative — /uploads is served on the same origin, so this works
+// behind any domain/proxy and can't be broken by a misconfigured PUBLIC_URL.
+const toUrl = (filename) => `/uploads/${filename}`;
 
 // ADMIN — single file
 router.post(
