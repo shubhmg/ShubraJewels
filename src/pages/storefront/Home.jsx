@@ -75,7 +75,7 @@ function ProductGridBlock({ all, config }) {
   switch (c.source) {
     case 'featured': { const f = all.filter((p) => p.isBestseller); list = f.length ? f : all; break }
     case 'new': list = all.filter((p) => p.isNewArrival); break
-    case 'under599': list = all.filter((p) => p.price <= 599); break
+    case 'under599': list = all.filter((p) => p.price <= (Number(c.maxPrice) || 599)); break
     case 'onSale': list = all.filter((p) => p.mrp > p.price); break
     case 'category': list = all.filter((p) => String(p.categoryId) === String(c.categoryId)); break
     case 'collection': list = all.filter((p) => (p.collectionIds || []).map(String).includes(String(c.collectionId))); break

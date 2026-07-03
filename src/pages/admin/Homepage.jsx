@@ -185,6 +185,9 @@ function BlockConfig({ block, cats, cols, setCfg }) {
           {c.source === 'collection' && (
             <Field field={{ label: 'Collection', type: 'select', options: [{ value: '', label: '— choose —' }, ...cols.map((x) => ({ value: x._id, label: x.name }))] }} value={c.collectionId || ''} onChange={(v) => setCfg('collectionId', v)} />
           )}
+          {c.source === 'under599' && (
+            <Field field={{ label: 'Max price (₹)', type: 'number', help: 'Show jhumkas at or below this price' }} value={c.maxPrice ?? 599} onChange={(v) => setCfg('maxPrice', v)} />
+          )}
           <Field field={{ label: 'Max items', type: 'number' }} value={c.limit ?? 8} onChange={(v) => setCfg('limit', v)} />
           <Field field={{ label: 'Dark background', type: 'toggle' }} value={c.dark} onChange={(v) => setCfg('dark', v)} />
         </div>

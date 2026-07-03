@@ -9,7 +9,7 @@ export const BLOCK_TYPES = {
   productGrid: {
     label: 'Product grid',
     hint: 'A row of jhumkas from a source you choose',
-    defaults: { eyebrow: '', title: 'Our Jhumkas', hindi: '', subtitle: '', source: 'featured', categoryId: '', collectionId: '', limit: 8, dark: false },
+    defaults: { eyebrow: '', title: 'Our Jhumkas', hindi: '', subtitle: '', source: 'featured', categoryId: '', collectionId: '', maxPrice: 599, limit: 8, dark: false },
   },
   categories: { label: 'Category tiles', hint: 'The “shop by category” grid', defaults: { eyebrow: 'Shop by Category', title: 'Find Your Jhumka', hindi: 'अपनी पसंद चुनें', subtitle: '' } },
   collections: { label: 'Collections showcase', hint: 'The royal-collection cards', defaults: { eyebrow: 'Signature Collections', title: 'The Royal Collections', hindi: 'राजसी संग्रह', subtitle: 'Maharani, Rajputana, Banjara & more.' } },
@@ -25,7 +25,7 @@ export const BLOCK_TYPES = {
 export const PRODUCT_SOURCES = [
   { value: 'featured', label: 'Bestsellers / featured' },
   { value: 'new', label: 'New arrivals' },
-  { value: 'under599', label: 'Under ₹599' },
+  { value: 'under599', label: 'Under a price…' },
   { value: 'onSale', label: 'On sale' },
   { value: 'category', label: 'A category…' },
   { value: 'collection', label: 'A collection…' },
