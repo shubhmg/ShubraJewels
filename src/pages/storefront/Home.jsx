@@ -33,41 +33,97 @@ export function Home() {
   const { data: gallery } = useGallery()
 
   const all = products || []
-  // The 3D jewel is the hero now, so every video (including the old hero video)
-  // shows in the "Jhumkas in Motion" section.
   const otherVideos = videos || []
   const offers = (banners || []).filter((b) => b.placement === 'offer')
-  const featured = all.filter((p) => p.isBestseller).slice(0, 8)
-  const showFeatured = featured.length ? featured : all.slice(0, 8)
-  const under599 = all.filter((p) => p.price <= 599).slice(0, 4)
   const spotlight = all.find((p) => p.story)
 
-  // Each section keyed for admin-controlled order + enable + headings.
-  const renderers = {
-    offers: () => (offers.length > 0 ? <OfferStrip offers={offers} /> : null),
-    categories: (h) => (categories?.length > 0 ? <CategoryGrid categories={categories} h={h} /> : null),
-    featured: (h) => (showFeatured.length > 0 ? <FeaturedJhumkas products={showFeatured} h={h} /> : null),
-    story: () => (spotlight ? <StorySpotlight product={spotlight} settings={settings} /> : null),
-    collections: (h) => (collections?.length > 0 ? <RoyalCollections collections={collections} h={h} /> : null),
-    under599: (h) => (under599.length > 0 ? <Under599 products={under599} h={h} /> : null),
-    videos: (h) => (otherVideos.length > 0 ? <VideoSection videos={otherVideos} h={h} /> : null),
-    reviews: (h) => (reviews?.length > 0 ? <Reviews reviews={reviews} h={h} /> : null),
-    gallery: (h) => (gallery?.length > 0 ? <GalleryWall gallery={gallery} h={h} /> : null),
+  // Render one homepage block by its type + config.
+  const renderBlock = (b) => {
+    const c = b.config || {}
+    switch (b.type) {
+      case 'banners': return offers.length > 0 ? <OfferStrip offers={offers} /> : null
+      case 'categories': return categories?.length > 0 ? <CategoryGrid categories={categories} h={c} /> : null
+      case 'productGrid': return <ProductGridBlock all={all} config={c} />
+      case 'story': return spotlight ? <StorySpotlight product={spotlight} settings={settings} /> : null
+      case 'collections': return collections?.length > 0 ? <RoyalCollections collections={collections} h={c} /> : null
+      case 'videos': return otherVideos.length > 0 ? <VideoSection videos={otherVideos} h={c} /> : null
+      case 'reviews': return reviews?.length > 0 ? <Reviews reviews={reviews} h={c} /> : null
+      case 'gallery': return gallery?.length > 0 ? <GalleryWall gallery={gallery} h={c} /> : null
+      case 'image': return <ImageBlock config={c} />
+      case 'text': return <TextBlock config={c} />
+      default: return null
+    }
   }
 
-  const sections = settings.homepage?.sections || []
+  const blocks = settings.homepage?.blocks || []
 
   return (
     <div style={{ background: 'var(--cream)' }}>
       <Hero settings={settings} />
 
-      {sections.filter((s) => s.enabled).map((s) => {
-        const r = renderers[s.key]
-        return r ? <Fragment key={s.key}>{r(s)}</Fragment> : null
-      })}
+      {blocks.filter((b) => b.enabled).map((b) => <Fragment key={b.id}>{renderBlock(b)}</Fragment>)}
 
       <SloganBand settings={settings} />
     </div>
+  )
+}
+
+/* ── Product grid block (source-driven) ───────────────────────────── */
+function ProductGridBlock({ all, config }) {
+  const c = config || {}
+  let list = [...all]
+  switch (c.source) {
+    case 'featured': { const f = all.filter((p) => p.isBestseller); list = f.length ? f : all; break }
+    case 'new': list = all.filter((p) => p.isNewArrival); break
+    case 'under599': list = all.filter((p) => p.price <= 599); break
+    case 'onSale': list = all.filter((p) => p.mrp > p.price); break
+    case 'category': list = all.filter((p) => String(p.categoryId) === String(c.categoryId)); break
+    case 'collection': list = all.filter((p) => (p.collectionIds || []).map(String).includes(String(c.collectionId))); break
+    default: break
+  }
+  list = list.slice(0, Number(c.limit) || 8)
+  if (!list.length) return null
+  const dark = c.dark
+  return (
+    <section className="section" style={{ background: dark ? 'var(--ink)' : 'color-mix(in srgb, var(--beige) 45%, var(--cream))' }}>
+      <div className="container-wide">
+        <Reveal><SectionHeading eyebrow={c.eyebrow} hindi={c.hindi} title={c.title} subtitle={c.subtitle} light={dark} /></Reveal>
+        <Stagger className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7">
+          {list.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
+        </Stagger>
+      </div>
+    </section>
+  )
+}
+
+/* ── Image block ──────────────────────────────────────────────────── */
+function ImageBlock({ config }) {
+  const c = config || {}
+  if (!c.url) return null
+  const img = <img src={c.url} alt={c.caption || ''} loading="lazy" decoding="async" className="w-full h-auto rounded-2xl shadow-card" />
+  return (
+    <section className="section container-wide">
+      <Reveal>
+        {c.link ? <Link to={c.link}>{img}</Link> : img}
+        {c.caption && <p className="text-center text-sm text-stone-500 mt-3">{c.caption}</p>}
+      </Reveal>
+    </section>
+  )
+}
+
+/* ── Text / heading block ─────────────────────────────────────────── */
+function TextBlock({ config }) {
+  const c = config || {}
+  const dark = c.dark
+  return (
+    <section className="section" style={{ background: dark ? 'var(--maroon)' : 'transparent' }}>
+      <div className="container-tight text-center">
+        <Reveal>
+          <SectionHeading eyebrow={c.eyebrow} hindi={c.hindi} title={c.title} light={dark} />
+          {c.body && <p className={`-mt-6 ${dark ? 'text-white/80' : 'text-stone-600'} max-w-2xl mx-auto leading-relaxed`}>{c.body}</p>}
+        </Reveal>
+      </div>
+    </section>
   )
 }
 

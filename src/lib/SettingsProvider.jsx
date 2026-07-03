@@ -47,8 +47,8 @@ export function SettingsProvider({ children }) {
   const refresh = async () => {
     try {
       const data = await api.get('/settings')
-      const hp = data.homepage && data.homepage.sections?.length
-        ? { hero: { ...DEFAULTS.homepage.hero, ...(data.homepage.hero || {}) }, sections: data.homepage.sections }
+      const hp = data.homepage && data.homepage.blocks?.length
+        ? { hero: { ...DEFAULTS.homepage.hero, ...(data.homepage.hero || {}) }, blocks: data.homepage.blocks }
         : DEFAULTS.homepage
       const merged = { ...DEFAULTS, ...data, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, homepage: hp }
       setSettings(merged)

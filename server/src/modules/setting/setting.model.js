@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
-// Default homepage layout — order of `sections` = render order on the site.
-// Headings here mirror the original hardcoded design so nothing changes until edited.
+// Default homepage = editable hero + an ordered list of composable BLOCKS.
+// Mirrors the original hardcoded design so nothing changes until edited.
 export const DEFAULT_HOMEPAGE = {
   hero: {
     subheading: 'Every jhumka tells a story — handcrafted royal jhumkas inspired by the heritage of Rajasthan.',
@@ -11,30 +11,18 @@ export const DEFAULT_HOMEPAGE = {
     background: 'jewel', // 'jewel' (3D) | 'image' | 'video'
     mediaUrl: '',
   },
-  sections: [
-    { key: 'offers', enabled: true, eyebrow: '', title: '', hindi: '', subtitle: '' },
-    { key: 'categories', enabled: true, eyebrow: 'Shop by Category', title: 'Find Your Jhumka', hindi: 'अपनी पसंद चुनें', subtitle: '' },
-    { key: 'featured', enabled: true, eyebrow: 'Bestsellers', title: 'Loved by Our Customers', hindi: 'सबसे पसंदीदा', subtitle: 'Each jhumka carries a name and a story.' },
-    { key: 'story', enabled: true, eyebrow: '', title: '', hindi: '', subtitle: '' },
-    { key: 'collections', enabled: true, eyebrow: 'Signature Collections', title: 'The Royal Collections', hindi: 'राजसी संग्रह', subtitle: 'Maharani, Rajputana, Banjara & more — worlds of their own.' },
-    { key: 'under599', enabled: true, eyebrow: 'Budget Beauties', title: 'Under ₹599', hindi: '₹599 से कम', subtitle: '' },
-    { key: 'videos', enabled: true, eyebrow: 'Watch', title: 'Jhumkas in Motion', hindi: 'हमारी दुनिया', subtitle: '' },
-    { key: 'reviews', enabled: true, eyebrow: 'Kind Words', title: 'Customer Reviews', hindi: 'ग्राहकों की राय', subtitle: '' },
-    { key: 'gallery', enabled: true, eyebrow: '#ShubraGirls', title: 'Customer Gallery', hindi: 'हमारा परिवार', subtitle: 'Our jhumkas, your moments.' },
+  blocks: [
+    { id: 'seed-banners', type: 'banners', enabled: true, config: {} },
+    { id: 'seed-categories', type: 'categories', enabled: true, config: { eyebrow: 'Shop by Category', title: 'Find Your Jhumka', hindi: 'अपनी पसंद चुनें', subtitle: '' } },
+    { id: 'seed-featured', type: 'productGrid', enabled: true, config: { eyebrow: 'Bestsellers', title: 'Loved by Our Customers', hindi: 'सबसे पसंदीदा', subtitle: 'Each jhumka carries a name and a story.', source: 'featured', limit: 8, dark: false } },
+    { id: 'seed-story', type: 'story', enabled: true, config: {} },
+    { id: 'seed-collections', type: 'collections', enabled: true, config: { eyebrow: 'Signature Collections', title: 'The Royal Collections', hindi: 'राजसी संग्रह', subtitle: 'Maharani, Rajputana, Banjara & more — worlds of their own.' } },
+    { id: 'seed-under599', type: 'productGrid', enabled: true, config: { eyebrow: 'Budget Beauties', title: 'Under ₹599', hindi: '₹599 से कम', subtitle: '', source: 'under599', limit: 4, dark: true } },
+    { id: 'seed-videos', type: 'videos', enabled: true, config: { eyebrow: 'Watch', title: 'Jhumkas in Motion', hindi: 'हमारी दुनिया', subtitle: '' } },
+    { id: 'seed-reviews', type: 'reviews', enabled: true, config: { eyebrow: 'Kind Words', title: 'Customer Reviews', hindi: 'ग्राहकों की राय', subtitle: '' } },
+    { id: 'seed-gallery', type: 'gallery', enabled: true, config: { eyebrow: '#ShubraGirls', title: 'Customer Gallery', hindi: 'हमारा परिवार', subtitle: 'Our jhumkas, your moments.' } },
   ],
 };
-
-const homeSectionSchema = new mongoose.Schema(
-  {
-    key: { type: String, required: true },
-    enabled: { type: Boolean, default: true },
-    eyebrow: { type: String, default: '' },
-    title: { type: String, default: '' },
-    hindi: { type: String, default: '' },
-    subtitle: { type: String, default: '' },
-  },
-  { _id: false }
-);
 
 /**
  * Single document holding all global, admin-editable site settings.
@@ -93,7 +81,8 @@ const settingSchema = new mongoose.Schema(
         background: { type: String, default: 'jewel' },
         mediaUrl: { type: String, default: '' },
       },
-      sections: { type: [homeSectionSchema], default: () => DEFAULT_HOMEPAGE.sections },
+      // Flexible block list — config shape varies by block type (see homepageDefault.js).
+      blocks: { type: [mongoose.Schema.Types.Mixed], default: () => DEFAULT_HOMEPAGE.blocks },
     },
   },
   { timestamps: true }
