@@ -1,4 +1,4 @@
-import { lazy, Suspense, Fragment } from 'react'
+import { lazy, Suspense, Fragment, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Truck, Gift, Star, Quote } from 'lucide-react'
@@ -80,13 +80,9 @@ function Hero({ settings }) {
       <Mandala size={560} className="absolute -right-44 -top-28 opacity-25" />
       <Mandala size={380} className="absolute -left-32 bottom-10 opacity-15" />
 
-      {/* 3D gold jhumka */}
+      {/* Hero background — 3D jewel, image, or video (admin-selectable) */}
       <div className="relative flex-1 min-h-[40vh] md:min-h-[48vh]">
-        {/* warm halo behind the jewel */}
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 50% 55% at 50% 45%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 70%)' }} />
-        <Suspense fallback={null}>
-          <HeroJewel gold={t.gold || '#C9A84C'} goldLight={t.goldLight || '#E3C97A'} className="absolute inset-0" />
-        </Suspense>
+        <HeroBackground hero={hero} t={t} />
       </div>
 
       {/* Text */}
@@ -110,6 +106,52 @@ function Hero({ settings }) {
 
       <div className="absolute bottom-0 left-0 right-0"><MehendiDivider /></div>
     </section>
+  )
+}
+
+// Hero background switch: 3D jewel (default), an uploaded image, or a video.
+function HeroBackground({ hero, t }) {
+  const bg = hero.background || 'jewel'
+  const url = hero.mediaUrl || ''
+  const videoRef = useRef(null)
+
+  // Pause the hero video when scrolled off-screen.
+  useEffect(() => {
+    if (bg !== 'video') return
+    const el = videoRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) el.play().catch(() => {}); else el.pause() },
+      { threshold: 0.1 }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [bg, url])
+
+  if (bg === 'image' && url) {
+    return (
+      <>
+        <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
+      </>
+    )
+  }
+  if (bg === 'video' && url) {
+    return (
+      <>
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" src={url} autoPlay muted loop playsInline />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
+      </>
+    )
+  }
+  // Default: 3D jewel
+  return (
+    <>
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 50% 55% at 50% 45%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 70%)' }} />
+      <Suspense fallback={null}>
+        <HeroJewel gold={t.gold || '#C9A84C'} goldLight={t.goldLight || '#E3C97A'} className="absolute inset-0" />
+      </Suspense>
+    </>
   )
 }
 

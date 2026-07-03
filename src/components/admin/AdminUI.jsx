@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { MediaUploader } from './MediaUploader.jsx'
+import { Dropdown } from '../ui/Dropdown.jsx'
 
 export function AdminHeader({ title, subtitle, children }) {
   return (
@@ -75,9 +76,13 @@ export function Field({ field, value, onChange }) {
         return <Toggle checked={!!value} onChange={onChange} />
       case 'select':
         return (
-          <select value={v} onChange={(e) => onChange(e.target.value)} className={inputCls}>
-            {options.map((o) => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
-          </select>
+          <Dropdown
+            value={v}
+            onChange={onChange}
+            align="left"
+            className="w-full"
+            options={options.map((o) => ({ value: o.value ?? o, label: o.label ?? o }))}
+          />
         )
       case 'multiselect':
         return (

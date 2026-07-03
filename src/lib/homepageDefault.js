@@ -6,6 +6,8 @@ export const DEFAULT_HOMEPAGE = {
     ctaLabel: 'Shop Jhumkas',
     ctaLink: '/products',
     showWhatsapp: true,
+    background: 'jewel', // 'jewel' (3D) | 'image' | 'video'
+    mediaUrl: '',
   },
   sections: [
     { key: 'offers', enabled: true, eyebrow: '', title: '', hindi: '', subtitle: '' },

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, ChevronDown, ChevronUp, Phone } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader } from '../../components/admin/AdminUI.jsx'
+import { Dropdown } from '../../components/ui/Dropdown.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
@@ -60,21 +61,20 @@ export function AdminOrders() {
       ) : (
         <div className="grid gap-2">
           {shown.map((o) => (
-            <div key={o._id} className="bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800 overflow-hidden">
+            <div key={o._id} className="bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800">
               <div className="flex items-center gap-4 px-4 py-3 cursor-pointer" onClick={() => setOpen(open === o._id ? null : o._id)}>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-dark-900 dark:text-cream-50">{o.orderNo} <span className="text-stone-400 font-normal">· {o.customer?.name}</span></p>
                   <p className="text-xs text-stone-400">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {o.items?.length} item(s) · {o.channel}</p>
                 </div>
                 <span className="font-semibold text-dark-900 dark:text-cream-50">{fmt(o.total)}</span>
-                <select
-                  value={o.status}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setStatus(o._id, e.target.value)}
-                  className={`text-xs px-2.5 py-1 rounded-full border-0 font-medium cursor-pointer ${STATUS_COLOR[o.status]}`}
-                >
-                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div onClick={(e) => e.stopPropagation()} className="capitalize">
+                  <Dropdown
+                    value={o.status}
+                    onChange={(v) => setStatus(o._id, v)}
+                    options={STATUSES.map((s) => ({ value: s, label: s }))}
+                  />
+                </div>
                 {open === o._id ? <ChevronUp size={16} className="text-stone-400" /> : <ChevronDown size={16} className="text-stone-400" />}
               </div>
               {open === o._id && (

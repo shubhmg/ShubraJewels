@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, Check, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Field, Toggle } from '../../components/admin/AdminUI.jsx'
+import { MediaUploader } from '../../components/admin/MediaUploader.jsx'
 import { useSettingsCtx } from '../../lib/SettingsProvider.jsx'
 import { DEFAULT_HOMEPAGE, SECTION_LABELS, SECTIONS_WITH_HEADINGS } from '../../lib/homepageDefault.js'
 
@@ -56,13 +57,28 @@ export function AdminHomepage() {
       {/* Hero */}
       <Card title="Hero">
         <div className="grid gap-4">
+          <Field
+            field={{ label: 'Background', type: 'select', options: [
+              { value: 'jewel', label: '3D gold jewel (animated)' },
+              { value: 'image', label: 'Image' },
+              { value: 'video', label: 'Video' },
+            ] }}
+            value={hp.hero.background || 'jewel'}
+            onChange={(v) => setHero('background', v)}
+          />
+          {hp.hero.background === 'image' && (
+            <MediaUploader label="Hero image" value={hp.hero.mediaUrl} onChange={(v) => setHero('mediaUrl', v)} accept="image" />
+          )}
+          {hp.hero.background === 'video' && (
+            <MediaUploader label="Hero video" value={hp.hero.mediaUrl} onChange={(v) => setHero('mediaUrl', v)} accept="video" />
+          )}
           <Field field={{ label: 'Sub-heading (under the brand name)', type: 'textarea' }} value={hp.hero.subheading} onChange={(v) => setHero('subheading', v)} />
           <div className="grid sm:grid-cols-2 gap-4">
             <Field field={{ label: 'Button label' }} value={hp.hero.ctaLabel} onChange={(v) => setHero('ctaLabel', v)} />
             <Field field={{ label: 'Button link' }} value={hp.hero.ctaLink} onChange={(v) => setHero('ctaLink', v)} />
           </div>
           <Field field={{ label: 'Show WhatsApp button in hero', type: 'toggle' }} value={hp.hero.showWhatsapp} onChange={(v) => setHero('showWhatsapp', v)} />
-          <p className="text-xs text-stone-400">The brand name and 3D jewel come from Settings. The slogan shown above them is edited on the Settings page.</p>
+          <p className="text-xs text-stone-400">The brand name comes from Settings; the slogan above it is edited on the Settings page.</p>
         </div>
       </Card>
 

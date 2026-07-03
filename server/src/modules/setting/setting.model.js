@@ -8,6 +8,8 @@ export const DEFAULT_HOMEPAGE = {
     ctaLabel: 'Shop Jhumkas',
     ctaLink: '/products',
     showWhatsapp: true,
+    background: 'jewel', // 'jewel' (3D) | 'image' | 'video'
+    mediaUrl: '',
   },
   sections: [
     { key: 'offers', enabled: true, eyebrow: '', title: '', hindi: '', subtitle: '' },
@@ -88,6 +90,8 @@ const settingSchema = new mongoose.Schema(
         ctaLabel: { type: String, default: DEFAULT_HOMEPAGE.hero.ctaLabel },
         ctaLink: { type: String, default: DEFAULT_HOMEPAGE.hero.ctaLink },
         showWhatsapp: { type: Boolean, default: true },
+        background: { type: String, default: 'jewel' },
+        mediaUrl: { type: String, default: '' },
       },
       sections: { type: [homeSectionSchema], default: () => DEFAULT_HOMEPAGE.sections },
     },

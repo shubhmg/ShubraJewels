@@ -3,6 +3,7 @@ import { Eye, Users, ShoppingCart, IndianRupee, Loader2, TrendingUp, Database, T
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn } from '../../components/admin/AdminUI.jsx'
+import { Dropdown } from '../../components/ui/Dropdown.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
@@ -30,9 +31,11 @@ export function AdminDashboard() {
   return (
     <div>
       <AdminHeader title="Dashboard" subtitle={`Last ${days} days · ${data.todayViews} views today`}>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-sm cursor-pointer">
-          {[7, 30, 90, 365].map((d) => <option key={d} value={d}>Last {d} days</option>)}
-        </select>
+        <Dropdown
+          value={days}
+          onChange={setDays}
+          options={[7, 30, 90, 365].map((d) => ({ value: d, label: `Last ${d} days` }))}
+        />
       </AdminHeader>
 
       {/* KPIs */}
