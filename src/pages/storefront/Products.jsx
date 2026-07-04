@@ -29,6 +29,8 @@ export function Products() {
   const [inStockOnly, setInStockOnly] = useState(false)
   const [showFilter, setShowFilter] = useState(false)
 
+  // Always start with filters hidden (never auto-open on desktop)
+  useEffect(() => { setShowFilter(false) }, [])
   useEffect(() => { window.scrollTo(0, 0) }, [categoryParam, collectionParam, under599])
 
   const setParam = (key, val) => {
