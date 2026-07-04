@@ -361,7 +361,7 @@ function Under599({ products, h = {} }) {
           <Magnetic><Link to="/products?under599=1" className="btn-outline-gold">See All <ArrowRight size={16} /></Link></Magnetic>
         </div>
         <Stagger className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7">
-          {products.map((p) => <StaggerItem key={p.id}><ProductCard product={p} dark /></StaggerItem>)}
+          {products.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
         </Stagger>
       </div>
     </section>

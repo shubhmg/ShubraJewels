@@ -19,7 +19,7 @@ function fields(p) {
   }
 }
 
-export function ProductCard({ product, dark = false }) {
+export function ProductCard({ product }) {
   const { toggle, has } = useWishlistStore()
   const f = fields(product)
   const wishlisted = has(f.id)
@@ -29,30 +29,25 @@ export function ProductCard({ product, dark = false }) {
     ? Math.round((1 - product.price / f.originalPrice) * 100)
     : 0
 
-  const textColor = dark ? '#fff' : 'var(--ink)'
-  const subColor  = dark ? 'rgba(255,255,255,0.55)' : undefined
-  const hindiColor = dark ? 'var(--gold-light)' : 'var(--maroon)'
-
   return (
-    <div className="group relative flex flex-col animate-fade-in">
-      <Link to={`/products/${f.id}`} className="block">
-        <div
-          className="product-img-wrap relative aspect-[3/4] rounded-2xl overflow-hidden"
-          style={{ background: 'color-mix(in srgb, var(--beige) 60%, white)' }}
-        >
-          <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+    <div className="group relative animate-fade-in rounded-2xl overflow-hidden shadow-sm" style={{ background: 'color-mix(in srgb, var(--beige) 45%, white)' }}>
 
-          {/* Badges — default size on web, smaller only on mobile */}
-          <div className="absolute top-3 left-3 flex flex-col gap-1 md:gap-1.5">
-            {f.isNew && <Badge variant="new" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">New</Badge>}
-            {product.isBestseller && <Badge variant="bestseller" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">Bestseller</Badge>}
-            {discount > 0 && <Badge variant="sale" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">-{discount}%</Badge>}
-            {!inStock && <Badge variant="default" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">Sold Out</Badge>}
+      {/* Image */}
+      <Link to={`/products/${f.id}`} className="block">
+        <div className="product-img-wrap relative aspect-[3/4] overflow-hidden">
+          <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+
+          {/* Badges */}
+          <div className="absolute top-2 left-2 flex flex-col gap-1">
+            {f.isNew        && <Badge variant="new"        className="!text-[10px] !px-2 !py-0.5">New</Badge>}
+            {product.isBestseller && <Badge variant="bestseller" className="!text-[10px] !px-2 !py-0.5">Best</Badge>}
+            {discount > 0   && <Badge variant="sale"       className="!text-[10px] !px-2 !py-0.5">-{discount}%</Badge>}
+            {!inStock        && <Badge variant="default"    className="!text-[10px] !px-2 !py-0.5">Sold Out</Badge>}
           </div>
         </div>
       </Link>
 
-      {/* Wishlist */}
+      {/* Wishlist — floats over the card */}
       <button
         onClick={() => toggle({ ...product, id: f.id })}
         className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm hover:scale-110 transition-transform duration-200 cursor-pointer"
@@ -61,37 +56,35 @@ export function ProductCard({ product, dark = false }) {
         <Heart size={13} className={wishlisted ? 'fill-rose-500 text-rose-500' : 'text-stone-400'} />
       </button>
 
-      {/* Info */}
-      <div className="mt-3 px-0.5">
+      {/* Info — sits on the card's own beige background, always light */}
+      <div className="px-3 py-3">
         {f.material && (
-          <p className="text-[10px] tracking-widest font-medium uppercase mb-0.5" style={{ color: subColor || 'rgb(161,155,150)' }}>
+          <p className="text-[10px] tracking-widest font-medium uppercase mb-0.5" style={{ color: 'rgb(120,110,100)' }}>
             {f.material}
           </p>
         )}
         <Link to={`/products/${f.id}`}>
           <h3
-            className="font-display text-base leading-snug transition-colors"
-            style={{ color: textColor, fontWeight: 700 }}
+            className="font-display text-sm leading-snug transition-colors hover:opacity-80"
+            style={{ color: 'var(--ink)', fontWeight: 700 }}
           >
             {product.name}
           </h3>
         </Link>
         {product.hindiName && (
-          <p className="font-hindi text-xs mt-0.5" style={{ color: hindiColor }}>
+          <p className="font-hindi text-xs mt-0.5" style={{ color: 'var(--maroon)' }}>
             {product.hindiName}
           </p>
         )}
         {f.rating > 0 && (
           <div className="mt-1">
-            <StarRating rating={f.rating} showCount count={f.reviews} size={11} textColor={subColor} />
+            <StarRating rating={f.rating} showCount count={f.reviews} size={11} />
           </div>
         )}
         <div className="flex items-baseline gap-2 mt-1.5">
-          <span className="font-bold text-sm" style={{ color: textColor }}>{fmt(product.price)}</span>
+          <span className="font-bold text-sm" style={{ color: 'var(--maroon)' }}>{fmt(product.price)}</span>
           {discount > 0 && (
-            <span className="text-xs line-through" style={{ color: subColor || 'rgb(161,155,150)' }}>
-              {fmt(f.originalPrice)}
-            </span>
+            <span className="text-xs line-through text-stone-400">{fmt(f.originalPrice)}</span>
           )}
         </div>
       </div>
