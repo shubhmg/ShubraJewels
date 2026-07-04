@@ -1,8 +1,8 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export const useCartStore = create(persist(
-  (set, get) => ({
+  (set) => ({
     items: [],
     isOpen: false,
 
@@ -28,9 +28,14 @@ export const useCartStore = create(persist(
     })),
 
     clearCart: () => set({ items: [] }),
-
-    get total()  { return get().items.reduce((s, i) => s + i.price * i.qty, 0) },
-    get count()  { return get().items.reduce((s, i) => s + i.qty, 0) },
   }),
-  { name: 'sj-cart', partialize: (s) => ({ items: s.items }) }
+  {
+    name: 'sj-cart',
+    storage: createJSONStorage(() => localStorage),
+    partialize: (s) => ({ items: s.items }),
+  }
 ))
+
+// Totals as plain selectors (components can also compute inline).
+export const cartCount = (items) => items.reduce((a, i) => a + i.qty, 0)
+export const cartTotal = (items) => items.reduce((a, i) => a + i.price * i.qty, 0)
