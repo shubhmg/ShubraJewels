@@ -82,7 +82,20 @@ router.get(
   })
 );
 
-// ADMIN — update status / notes
+// Adjust product stock by a signed multiplier (+1 restock, -1 deduct); clamps at 0.
+async function applyOrderStock(order, sign) {
+  for (const it of order.items) {
+    if (!it.productId) continue;
+    const p = await Product.findById(it.productId);
+    if (!p) continue;
+    p.stockQty = Math.max(0, (p.stockQty || 0) + sign * it.qty);
+    p.inStock = p.stockQty > 0;
+    await p.save();
+  }
+}
+
+// ADMIN — update status / notes. Stock is deducted when an order becomes
+// 'delivered', and added back if it later leaves 'delivered' (or is cancelled).
 router.patch(
   '/:id',
   requireAdmin,
@@ -94,8 +107,22 @@ router.patch(
     }).min(1),
   }),
   asyncHandler(async (req, res) => {
-    const order = await Order.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const order = await Order.findById(req.params.id);
     if (!order) throw ApiError.notFound('Order not found');
+
+    if (req.body.status !== undefined) order.status = req.body.status;
+    if (req.body.notes !== undefined) order.notes = req.body.notes;
+
+    const delivered = order.status === 'delivered';
+    if (delivered && !order.stockApplied) {
+      await applyOrderStock(order, -1);
+      order.stockApplied = true;
+    } else if (!delivered && order.stockApplied) {
+      await applyOrderStock(order, +1);
+      order.stockApplied = false;
+    }
+
+    await order.save();
     res.json({ success: true, data: order });
   })
 );

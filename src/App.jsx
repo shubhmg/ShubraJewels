@@ -21,6 +21,7 @@ import { AdminLogin }       from './pages/admin/Login.jsx'
 import { AdminDashboard }   from './pages/admin/Dashboard.jsx'
 import { AdminHomepage }    from './pages/admin/Homepage.jsx'
 import { AdminProducts }    from './pages/admin/Products.jsx'
+import { AdminInventory }   from './pages/admin/Inventory.jsx'
 import { AdminCategories }  from './pages/admin/Categories.jsx'
 import { AdminCollections } from './pages/admin/CollectionsAdmin.jsx'
 import { AdminBanners }     from './pages/admin/Banners.jsx'
@@ -71,6 +72,7 @@ const router = createBrowserRouter([
       { index: true,           element: <AdminDashboard />   },
       { path: 'homepage',      element: <AdminHomepage />    },
       { path: 'products',      element: <AdminProducts />    },
+      { path: 'inventory',     element: <AdminInventory />   },
       { path: 'categories',    element: <AdminCategories />  },
       { path: 'collections',   element: <AdminCollections /> },
       { path: 'banners',       element: <AdminBanners />     },

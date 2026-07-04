@@ -62,8 +62,8 @@ export function AdminOrders() {
         <div className="grid gap-2">
           {shown.map((o) => (
             <div key={o._id} className="bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800">
-              <div className="flex items-center gap-4 px-4 py-3 cursor-pointer" onClick={() => setOpen(open === o._id ? null : o._id)}>
-                <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 cursor-pointer" onClick={() => setOpen(open === o._id ? null : o._id)}>
+                <div className="flex-1 min-w-[55%]">
                   <p className="font-medium text-dark-900 dark:text-cream-50">{o.orderNo} <span className="text-stone-400 font-normal">· {o.customer?.name}</span></p>
                   <p className="text-xs text-stone-400">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {o.items?.length} item(s) · {o.channel}</p>
                 </div>

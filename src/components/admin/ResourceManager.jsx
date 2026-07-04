@@ -93,12 +93,12 @@ export function ResourceManager({ title, subtitle, endpoint, fields, columns, wi
                 {textCols[1] && <p className="text-xs text-stone-400 truncate">{formatCell(it[textCols[1]])}</p>}
               </div>
               {'isActive' in it && (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${it.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline ${it.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>
                   {it.isActive ? 'Active' : 'Hidden'}
                 </span>
               )}
               {'isApproved' in it && (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${it.isApproved ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline ${it.isApproved ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                   {it.isApproved ? 'Approved' : 'Pending'}
                 </span>
               )}

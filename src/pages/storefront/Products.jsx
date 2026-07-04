@@ -97,10 +97,15 @@ export function Products() {
           <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} />
         </div>
 
-        <div className="flex gap-8">
-          <aside className={`flex-shrink-0 transition-all duration-300 overflow-hidden ${showFilter ? 'w-64 opacity-100' : 'w-0 opacity-0'}`}>
-            <div className="w-64 pr-2">
-              <div className="sticky top-24 space-y-6">
+        <div className="md:flex md:gap-8">
+          {/* Filters — full-width panel on mobile, sticky sidebar on desktop */}
+          {showFilter && (
+            <aside className="md:w-64 md:flex-shrink-0 mb-6 md:mb-0">
+              <div className="md:sticky md:top-24 space-y-5 rounded-2xl md:rounded-none bg-white md:bg-transparent p-4 md:p-0 shadow-card md:shadow-none">
+                <div className="flex items-center justify-between md:hidden">
+                  <span className="font-display text-lg" style={{ color: 'var(--ink)' }}>Filters</span>
+                  <button onClick={() => setShowFilter(false)} className="text-stone-400 cursor-pointer"><X size={18} /></button>
+                </div>
                 <FilterGroup title="Category">
                   <Chip active={categoryParam === 'all' && !under599} onClick={() => { setParam('category', 'all'); setParam('under599', '') }}>All</Chip>
                   {(categories || []).map((c) => (
@@ -120,8 +125,8 @@ export function Products() {
                   In stock only
                 </label>
               </div>
-            </div>
-          </aside>
+            </aside>
+          )}
 
           <div className="flex-1 min-w-0">
             {list.length === 0 ? (
@@ -131,7 +136,7 @@ export function Products() {
                 <p className="text-stone-400 text-sm mt-1">Try a different filter.</p>
               </div>
             ) : (
-              <Stagger className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6" gap={0.05}>
+              <Stagger className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6" gap={0.05}>
                 {list.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
               </Stagger>
             )}

@@ -81,8 +81,8 @@ export function AdminProducts() {
                 <p className="font-medium text-dark-900 dark:text-cream-50 truncate">{p.name} {p.hindiName && <span className="font-hindi text-stone-400 text-sm">· {p.hindiName}</span>}</p>
                 <p className="text-xs text-stone-400">{catName(p.categoryId)} · {fmt(p.price)}{p.mrp > p.price ? ` · was ${fmt(p.mrp)}` : ''}</p>
               </div>
-              {p.isBestseller && <span className="text-xs px-2 py-0.5 rounded-full bg-gold-500/15 text-gold-600">Bestseller</span>}
-              <span className={`text-xs px-2 py-0.5 rounded-full ${p.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>{p.isActive ? 'Live' : 'Hidden'}</span>
+              {p.isBestseller && <span className="text-xs px-2 py-0.5 rounded-full bg-gold-500/15 text-gold-600 hidden md:inline">Bestseller</span>}
+              <span className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline ${p.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-stone-100 text-stone-400'}`}>{p.isActive ? 'Live' : 'Hidden'}</span>
               <button onClick={() => setEditing({ ...blank, ...p })} className="w-8 h-8 grid place-items-center rounded-lg text-stone-400 hover:text-gold-500 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"><Pencil size={15} /></button>
               <button onClick={() => remove(p._id)} className="w-8 h-8 grid place-items-center rounded-lg text-stone-400 hover:text-red-500 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"><Trash2 size={15} /></button>
             </div>

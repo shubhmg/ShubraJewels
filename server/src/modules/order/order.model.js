@@ -36,6 +36,8 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'],
       default: 'pending',
     },
+    // true once this order's items have been deducted from stock (on delivery).
+    stockApplied: { type: Boolean, default: false },
     notes: { type: String, default: '' },
   },
   { timestamps: true }
