@@ -110,6 +110,8 @@ router.patch(
     params: Joi.object({ id: objectId.required() }),
     body: Joi.object({
       status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled'),
+      paymentStatus: Joi.string().valid('unpaid', 'paid'),
+      paymentMethod: Joi.string().valid('none', 'razorpay', 'cod', 'whatsapp', 'cash', 'upi', 'bank'),
       notes: Joi.string().allow('').max(1000),
     }).min(1),
   }),
@@ -119,6 +121,7 @@ router.patch(
 
     if (req.body.status !== undefined) order.status = req.body.status;
     if (req.body.notes !== undefined) order.notes = req.body.notes;
+    if (req.body.paymentMethod !== undefined) order.paymentMethod = req.body.paymentMethod;
 
     const delivered = order.status === 'delivered';
     if (delivered && !order.stockApplied) {
@@ -129,8 +132,74 @@ router.patch(
       order.stockApplied = false;
     }
 
+    // Cash is collected on delivery — COD/WhatsApp orders become paid when delivered
+    // (and revert to unpaid if moved back). Razorpay orders are already paid.
+    if (delivered) {
+      if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
+    } else if (order.paymentMethod !== 'razorpay') {
+      order.paymentStatus = 'unpaid';
+    }
+
+    // Explicit payment status from admin wins (e.g. "mark paid" before delivery).
+    if (req.body.paymentStatus !== undefined) order.paymentStatus = req.body.paymentStatus;
+
     await order.save();
     res.json({ success: true, data: order });
+  })
+);
+
+// ADMIN — manually log an order (e.g. from WhatsApp) for bookkeeping + inventory.
+router.post(
+  '/manual',
+  requireAdmin,
+  validate({
+    body: Joi.object({
+      items: Joi.array().items(Joi.object({ productId: objectId.required(), qty: Joi.number().min(1).required() })).min(1).required(),
+      customer: Joi.object({
+        name: Joi.string().max(120).required(),
+        phone: Joi.string().max(20).required(),
+        email: Joi.string().email().allow('').default(''),
+      }).required(),
+      address: Joi.object({
+        line1: Joi.string().allow('').max(200), line2: Joi.string().allow('').max(200),
+        city: Joi.string().allow('').max(80), state: Joi.string().allow('').max(80), pincode: Joi.string().allow('').max(12),
+      }).default({}),
+      status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled').default('pending'),
+      paymentMethod: Joi.string().valid('cod', 'whatsapp', 'cash', 'upi', 'bank').default('whatsapp'),
+      paymentStatus: Joi.string().valid('unpaid', 'paid').default('unpaid'),
+      notes: Joi.string().allow('').max(1000),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const products = await Product.find({ _id: { $in: req.body.items.map((i) => i.productId) } }).lean();
+    const map = new Map(products.map((p) => [String(p._id), p]));
+    const items = req.body.items.map((i) => {
+      const p = map.get(String(i.productId));
+      if (!p) throw ApiError.badRequest('One or more products are no longer available');
+      return { productId: p._id, name: p.name, image: p.images?.[0] || '', price: p.price, qty: i.qty };
+    });
+    const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+
+    const order = new Order({
+      orderNo: await nextOrderNo(),
+      items,
+      customer: req.body.customer,
+      address: req.body.address || {},
+      subtotal, shipping: 0, total: subtotal,
+      channel: 'whatsapp',
+      status: req.body.status,
+      paymentMethod: req.body.paymentMethod,
+      paymentStatus: req.body.paymentStatus,
+      notes: req.body.notes || '',
+    });
+    // Deduct stock if logged as already delivered; delivered also implies paid.
+    if (order.status === 'delivered') {
+      await applyOrderStock(order, -1);
+      order.stockApplied = true;
+      if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
+    }
+    await order.save();
+    res.status(201).json({ success: true, data: order });
   })
 );
 
