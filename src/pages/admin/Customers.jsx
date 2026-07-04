@@ -19,7 +19,7 @@ export function AdminCustomers() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-2xl text-dark-900 dark:text-cream-50">Customers</h1>
+          <h1 className="font-semibold text-2xl text-dark-900 dark:text-cream-50">Customers</h1>
           <p className="text-sm text-stone-400 mt-0.5">{CUSTOMERS.length} registered customers</p>
         </div>
       </div>
@@ -33,7 +33,7 @@ export function AdminCustomers() {
           { label: 'Avg. LTV',      value: fmt(CUSTOMERS.reduce((a, c) => a + c.totalSpend, 0) / CUSTOMERS.length) },
         ].map(({ label, value }) => (
           <div key={label} className="bento-item text-center">
-            <p className="font-serif text-2xl font-bold text-dark-900 dark:text-cream-50">{value}</p>
+            <p className="font-semibold text-2xl font-bold text-dark-900 dark:text-cream-50">{value}</p>
             <p className="text-xs text-stone-400 mt-1">{label}</p>
           </div>
         ))}
@@ -46,13 +46,13 @@ export function AdminCustomers() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search customers…"
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-cream-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all"
+          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[color-mix(in_srgb,var(--gold)_18%,transparent)] bg-white dark:bg-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all"
           aria-label="Search customers"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 overflow-hidden">
+      <div className="admin-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px]" aria-label="Customers table">
             <thead className="bg-cream-50 dark:bg-stone-800/50 border-b border-cream-200 dark:border-stone-700">

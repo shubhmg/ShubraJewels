@@ -40,7 +40,7 @@ export function ProductForm() {
           <ArrowLeft size={18} />
         </button>
         <div>
-          <h1 className="font-serif text-2xl text-dark-900 dark:text-cream-50">
+          <h1 className="font-semibold text-2xl text-dark-900 dark:text-cream-50">
             {existing ? 'Edit Product' : 'Add New Product'}
           </h1>
           <p className="text-sm text-stone-400 mt-0.5">{existing ? existing.name : 'Create a new listing'}</p>
@@ -107,7 +107,7 @@ export function ProductForm() {
                 value={form.description}
                 onChange={set('description')}
                 placeholder="A timeless solitaire diamond set in lustrous 18K white gold…"
-                className="w-full px-4 py-2.5 rounded-xl border border-cream-200 dark:border-stone-700 bg-white dark:bg-stone-900 dark:text-cream-50 text-sm placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 resize-none transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-[color-mix(in_srgb,var(--gold)_18%,transparent)] bg-white dark:bg-stone-900 dark:text-cream-50 text-sm placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 resize-none transition-all"
               />
             </div>
             <div className="space-y-1.5">
@@ -117,7 +117,7 @@ export function ProductForm() {
                 value={form.careInstructions}
                 onChange={set('careInstructions')}
                 placeholder="Clean with mild soap and warm water…"
-                className="w-full px-4 py-2.5 rounded-xl border border-cream-200 dark:border-stone-700 bg-white dark:bg-stone-900 dark:text-cream-50 text-sm placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 resize-none transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-[color-mix(in_srgb,var(--gold)_18%,transparent)] bg-white dark:bg-stone-900 dark:text-cream-50 text-sm placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 resize-none transition-all"
               />
             </div>
           </div>
@@ -136,7 +136,7 @@ export function ProductForm() {
 
 function Section({ title, children }) {
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-5 space-y-4">
+    <div className="admin-card p-5 space-y-4">
       <h2 className="font-medium text-dark-900 dark:text-cream-50 text-sm border-b border-cream-200 dark:border-stone-800 pb-3">{title}</h2>
       {children}
     </div>

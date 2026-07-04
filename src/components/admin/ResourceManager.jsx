@@ -82,7 +82,7 @@ export function ResourceManager({ title, subtitle, endpoint, fields, columns, wi
       ) : (
         <div className="grid gap-2">
           {items.map((it) => (
-            <div key={it._id} className="flex items-center gap-4 bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800 px-4 py-3">
+            <div key={it._id} className="flex items-center gap-4 admin-row px-4 py-3">
               {imgKey && (
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800 flex-shrink-0">
                   {thumb(it) && <img src={thumb(it)} alt="" className="w-full h-full object-cover" />}

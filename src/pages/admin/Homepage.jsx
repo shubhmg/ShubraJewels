@@ -86,7 +86,7 @@ export function AdminHomepage() {
             const def = BLOCK_TYPES[b.type] || { label: b.type, hint: '' }
             const open = openId === b.id
             return (
-              <div key={b.id} className="rounded-xl border border-cream-200 dark:border-stone-700 overflow-hidden">
+              <div key={b.id} className="rounded-xl border border-[color-mix(in_srgb,var(--gold)_18%,transparent)] overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2.5 bg-stone-50 dark:bg-stone-800/50">
                   <div className="flex flex-col">
                     <button onClick={() => move(i, -1)} disabled={i === 0} className="text-stone-400 hover:text-gold-500 disabled:opacity-30 cursor-pointer"><ChevronUp size={14} /></button>
@@ -208,8 +208,8 @@ function Note({ children }) {
 
 function Card({ title, subtitle, children }) {
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-6 mb-5">
-      <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50">{title}</h2>
+    <div className="admin-card p-6 mb-5">
+      <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50">{title}</h2>
       {subtitle && <p className="text-xs text-stone-400 mb-4">{subtitle}</p>}
       <div className={subtitle ? '' : 'mt-4'}>{children}</div>
     </div>

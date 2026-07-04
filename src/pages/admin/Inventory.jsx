@@ -61,7 +61,7 @@ export function AdminInventory() {
             const n = p.stockQty || 0
             const t = tag(n)
             return (
-              <div key={p._id} className="flex items-center gap-3 bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800 p-3">
+              <div key={p._id} className="flex items-center gap-3 admin-row p-3">
                 <div className="w-11 h-11 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800 flex-shrink-0">
                   {p.images?.[0] && <img src={p.images[0]} alt="" className="w-full h-full object-cover" />}
                 </div>

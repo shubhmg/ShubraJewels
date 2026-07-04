@@ -73,7 +73,7 @@ export function AdminProducts() {
       ) : (
         <div className="grid gap-2">
           {filtered.map((p) => (
-            <div key={p._id} className="flex items-center gap-4 bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800 px-4 py-3">
+            <div key={p._id} className="flex items-center gap-4 admin-row px-4 py-3">
               <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800 flex-shrink-0">
                 {p.images?.[0] && <img src={p.images[0]} alt="" className="w-full h-full object-cover" />}
               </div>

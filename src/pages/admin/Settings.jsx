@@ -105,8 +105,8 @@ export function AdminSettings() {
 
 function Section({ title, subtitle, children }) {
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-6 mb-5">
-      <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50">{title}</h2>
+    <div className="admin-card p-6 mb-5">
+      <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50">{title}</h2>
       {subtitle && <p className="text-xs text-stone-400 mb-4">{subtitle}</p>}
       <div className={subtitle ? '' : 'mt-4'}>{children}</div>
     </div>

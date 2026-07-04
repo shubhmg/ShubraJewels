@@ -41,7 +41,7 @@ export function AdminReports() {
   return (
     <div className="space-y-5 animate-fade-in">
       <div>
-        <h1 className="font-serif text-2xl text-dark-900 dark:text-cream-50">Sales Reports</h1>
+        <h1 className="font-semibold text-2xl text-dark-900 dark:text-cream-50">Sales Reports</h1>
         <p className="text-sm text-stone-400 mt-0.5">Nov 2025 – May 2026 overview</p>
       </div>
 
@@ -55,7 +55,7 @@ export function AdminReports() {
         ].map(({ icon: Icon, label, value, sub }) => (
           <div key={label} className="bento-item">
             <Icon size={16} className="text-gold-500 mb-3" />
-            <p className="font-serif text-2xl font-bold text-dark-900 dark:text-cream-50">{value}</p>
+            <p className="font-semibold text-2xl font-bold text-dark-900 dark:text-cream-50">{value}</p>
             <p className="text-xs text-stone-400 mt-1">{label}</p>
             <p className="text-xs text-stone-500 mt-0.5">{sub}</p>
           </div>
@@ -64,7 +64,7 @@ export function AdminReports() {
 
       {/* Revenue trend */}
       <div className="bento-item">
-        <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50 mb-5">Revenue Trend</h2>
+        <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50 mb-5">Revenue Trend</h2>
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={REVENUE_DATA} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
             <defs>
@@ -85,7 +85,7 @@ export function AdminReports() {
       <div className="grid md:grid-cols-2 gap-4">
         {/* Orders bar */}
         <div className="bento-item">
-          <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50 mb-5">Monthly Orders</h2>
+          <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50 mb-5">Monthly Orders</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={REVENUE_DATA} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -99,7 +99,7 @@ export function AdminReports() {
 
         {/* Category pie */}
         <div className="bento-item">
-          <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50 mb-5">Sales by Category</h2>
+          <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50 mb-5">Sales by Category</h2>
           <div className="flex items-center gap-6">
             <ResponsiveContainer width={160} height={160}>
               <PieChart>
@@ -126,7 +126,7 @@ export function AdminReports() {
 
       {/* Top products table */}
       <div className="bento-item">
-        <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50 mb-4">Top Performing Products</h2>
+        <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50 mb-4">Top Performing Products</h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[500px]" aria-label="Top products table">
             <thead>

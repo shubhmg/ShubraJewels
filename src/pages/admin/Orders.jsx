@@ -59,52 +59,68 @@ export function AdminOrders() {
       ) : shown.length === 0 ? (
         <p className="text-center py-20 text-stone-400">{orders.length === 0 ? 'No orders yet.' : `No ${filter} orders.`}</p>
       ) : (
-        <div className="grid gap-2">
-          {shown.map((o) => (
-            <div key={o._id} className="bg-white dark:bg-stone-900 rounded-xl border border-cream-200 dark:border-stone-800">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 cursor-pointer" onClick={() => setOpen(open === o._id ? null : o._id)}>
-                <div className="flex-1 min-w-[55%]">
-                  <p className="font-medium text-dark-900 dark:text-cream-50">{o.orderNo} <span className="text-stone-400 font-normal">· {o.customer?.name}</span></p>
-                  <p className="text-xs text-stone-400">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {o.items?.length} item(s) · {o.channel}</p>
+        <div className="grid gap-3">
+          {shown.map((o) => {
+            const isOpen = open === o._id
+            const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
+            const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            return (
+              <div key={o._id} className="admin-row overflow-hidden">
+                <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setOpen(isOpen ? null : o._id)}>
+                  <div className="w-11 h-11 rounded-full grid place-items-center text-sm font-bold text-white shrink-0" style={{ background: 'var(--maroon)' }}>{initial}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-zinc-900">{o.orderNo}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${STATUS_COLOR[o.status]}`}>{o.status}</span>
+                    </div>
+                    <p className="text-sm text-zinc-700 truncate mt-0.5">{o.customer?.name}</p>
+                    <p className="text-xs text-zinc-400">{date} · {o.items?.length} item(s) · {o.channel}</p>
+                  </div>
+                  <div className="flex flex-col items-end shrink-0">
+                    <p className="font-bold text-lg leading-none" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</p>
+                    <span className="text-[11px] text-zinc-400 mt-1.5 flex items-center gap-0.5">
+                      {isOpen ? 'Hide' : 'Details'}{isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    </span>
+                  </div>
                 </div>
-                <span className="font-semibold text-dark-900 dark:text-cream-50">{fmt(o.total)}</span>
-                <div onClick={(e) => e.stopPropagation()} className="capitalize">
-                  <Dropdown
-                    value={o.status}
-                    onChange={(v) => setStatus(o._id, v)}
-                    options={STATUSES.map((s) => ({ value: s, label: s }))}
-                  />
-                </div>
-                {open === o._id ? <ChevronUp size={16} className="text-stone-400" /> : <ChevronDown size={16} className="text-stone-400" />}
-              </div>
-              {open === o._id && (
-                <div className="px-4 pb-4 pt-1 border-t border-cream-100 dark:border-stone-800 grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-stone-400 mb-2">Items</p>
-                    {o.items.map((it, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm py-1">
-                        {it.image && <img src={it.image} alt="" className="w-8 h-8 rounded object-cover" />}
-                        <span className="flex-1">{it.name} × {it.qty}</span>
-                        <span>{fmt(it.price * it.qty)}</span>
+
+                {isOpen && (
+                  <div className="border-t border-zinc-100 bg-zinc-50/60 p-4 space-y-4">
+                    <div className="space-y-2">
+                      {o.items.map((it, i) => (
+                        <div key={i} className="flex items-center gap-3 text-sm">
+                          <div className="w-9 h-9 rounded-lg overflow-hidden bg-white shrink-0 ring-1 ring-zinc-100">
+                            {it.image && <img src={it.image} alt="" className="w-full h-full object-cover" />}
+                          </div>
+                          <span className="flex-1 min-w-0 truncate text-zinc-700">{it.name}</span>
+                          <span className="text-zinc-400 text-xs">× {it.qty}</span>
+                          <span className="font-semibold text-zinc-900 w-20 text-right">{fmt(it.price * it.qty)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4 pt-3 border-t border-zinc-100">
+                      <div className="text-sm">
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">Customer</p>
+                        <p className="font-medium text-zinc-800">{o.customer?.name}</p>
+                        <a href={`tel:${o.customer?.phone}`} className="inline-flex items-center gap-1.5 mt-0.5" style={{ color: 'var(--maroon)' }}><Phone size={12} />{o.customer?.phone}</a>
+                        {o.customer?.email && <p className="text-zinc-500">{o.customer.email}</p>}
+                        {(o.address?.line1 || o.address?.city) && (
+                          <p className="text-zinc-500 mt-2">{[o.address.line1, o.address.line2, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</p>
+                        )}
+                        {o.notes && <p className="text-zinc-500 mt-2 italic">“{o.notes}”</p>}
                       </div>
-                    ))}
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">Update status</p>
+                        <Dropdown value={o.status} onChange={(v) => setStatus(o._id, v)} align="left" options={STATUSES.map((s) => ({ value: s, label: s }))} />
+                        <p className="text-[11px] text-zinc-400 mt-2">Marking <b>Delivered</b> deducts these items from stock.</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm">
-                    <p className="text-xs uppercase tracking-wide text-stone-400 mb-2">Customer</p>
-                    <p className="font-medium">{o.customer?.name}</p>
-                    <a href={`tel:${o.customer?.phone}`} className="flex items-center gap-1.5 text-gold-600 mt-0.5"><Phone size={12} />{o.customer?.phone}</a>
-                    {o.customer?.email && <p className="text-stone-500">{o.customer.email}</p>}
-                    {(o.address?.line1 || o.address?.city) && (
-                      <p className="text-stone-500 mt-2">
-                        {[o.address.line1, o.address.line2, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}
-                      </p>
-                    )}
-                    {o.notes && <p className="text-stone-500 mt-2 italic">“{o.notes}”</p>}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

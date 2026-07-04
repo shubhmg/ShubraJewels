@@ -39,22 +39,22 @@ export function AdminDashboard() {
       </AdminHeader>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
         {kpis.map(({ icon: Icon, label, value, tint }) => (
-          <div key={label} className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-5">
-            <div className={`w-10 h-10 rounded-xl grid place-items-center mb-3 ${tint}`}><Icon size={18} /></div>
-            <p className="text-2xl font-bold text-dark-900 dark:text-cream-50">{value}</p>
-            <p className="text-xs text-stone-400 mt-0.5">{label}</p>
+          <div key={label} className="admin-card p-4 md:p-5 transition-transform hover:-translate-y-0.5">
+            <div className={`w-11 h-11 rounded-2xl grid place-items-center mb-3 ${tint}`}><Icon size={20} /></div>
+            <p className="text-2xl md:text-3xl font-bold leading-none" style={{ color: 'var(--maroon)' }}>{value}</p>
+            <p className="text-[11px] text-zinc-400 mt-2 font-semibold uppercase tracking-wide">{label}</p>
           </div>
         ))}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Visitors chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-5">
+        <div className="lg:col-span-2 admin-card p-5">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={16} className="text-gold-500" />
-            <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50">Visitors</h2>
+            <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50">Visitors</h2>
           </div>
           {data.series?.length ? (
             <ResponsiveContainer width="100%" height={240}>
@@ -77,8 +77,8 @@ export function AdminDashboard() {
         </div>
 
         {/* Top pages */}
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-5">
-          <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50 mb-4">Top Pages</h2>
+        <div className="admin-card p-5">
+          <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50 mb-4">Top Pages</h2>
           <div className="space-y-2">
             {(data.topPages || []).map((p) => (
               <div key={p.path} className="flex items-center justify-between text-sm">
@@ -92,8 +92,8 @@ export function AdminDashboard() {
       </div>
 
       {/* Recent orders */}
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-5 mt-6">
-        <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50 mb-4">Recent Orders</h2>
+      <div className="admin-card p-5 mt-6">
+        <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50 mb-4">Recent Orders</h2>
         {orders.length ? (
           <div className="divide-y divide-cream-100 dark:divide-stone-800">
             {orders.map((o) => (
@@ -140,10 +140,10 @@ function DemoDataCard() {
   }
 
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-cream-200 dark:border-stone-800 p-5 mt-6">
+    <div className="admin-card p-5 mt-6">
       <div className="flex items-center gap-2 mb-1">
         <Database size={16} className="text-gold-500" />
-        <h2 className="font-serif text-lg text-dark-900 dark:text-cream-50">Sample Data</h2>
+        <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50">Sample Data</h2>
       </div>
       <p className="text-sm text-stone-400 mb-4">
         Seed fills empty sections with demo jhumkas. Clear empties everything DB-driven — whatever still shows on the site after clearing is hardcoded, not from the database.
