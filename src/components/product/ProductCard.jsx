@@ -83,7 +83,7 @@ export function ProductCard({ product, dark = false }) {
         )}
         {f.rating > 0 && (
           <div className="mt-1">
-            <StarRating rating={f.rating} showCount count={f.reviews} size={11} />
+            <StarRating rating={f.rating} showCount count={f.reviews} size={11} textColor={subColor} />
           </div>
         )}
         <div className="flex items-baseline gap-2 mt-1.5">
