@@ -154,7 +154,7 @@ function BlockConfig({ block, cats, cols, setCfg }) {
 
   if (t === 'image') {
     return (
-      <div className="grid gap-3">
+      <div className="space-y-3">
         <MediaUploader label="Image" value={c.url} onChange={(v) => setCfg('url', v)} accept="image" />
         <Field field={{ label: 'Link (optional)' }} value={c.link} onChange={(v) => setCfg('link', v)} />
         <Field field={{ label: 'Caption (optional)' }} value={c.caption} onChange={(v) => setCfg('caption', v)} />
@@ -164,7 +164,7 @@ function BlockConfig({ block, cats, cols, setCfg }) {
 
   if (t === 'text') {
     return (
-      <div className="grid gap-3">
+      <div className="space-y-3">
         <div className="grid sm:grid-cols-2 gap-3">
           <Field field={{ label: 'Eyebrow' }} value={c.eyebrow} onChange={(v) => setCfg('eyebrow', v)} />
           <Field field={{ label: 'Hindi line' }} value={c.hindi} onChange={(v) => setCfg('hindi', v)} />
@@ -178,7 +178,7 @@ function BlockConfig({ block, cats, cols, setCfg }) {
 
   if (t === 'productGrid') {
     return (
-      <div className="grid gap-3">
+      <div className="space-y-3">
         {Headings}
         <div className="grid sm:grid-cols-2 gap-3">
           <Field field={{ label: 'Show products from', type: 'select', options: PRODUCT_SOURCES }} value={c.source || 'featured'} onChange={(v) => setCfg('source', v)} />

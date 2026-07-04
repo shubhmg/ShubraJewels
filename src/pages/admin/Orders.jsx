@@ -59,7 +59,7 @@ export function AdminOrders() {
       ) : shown.length === 0 ? (
         <p className="text-center py-20 text-stone-400">{orders.length === 0 ? 'No orders yet.' : `No ${filter} orders.`}</p>
       ) : (
-        <div className="grid gap-3">
+        <div className="space-y-3">
           {shown.map((o) => {
             const isOpen = open === o._id
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'

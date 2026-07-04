@@ -56,7 +56,7 @@ export function AdminInventory() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gold-500" /></div>
       ) : (
-        <div className="grid gap-2">
+        <div className="space-y-2">
           {filtered.map((p) => {
             const n = p.stockQty || 0
             const t = tag(n)

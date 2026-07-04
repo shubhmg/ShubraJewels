@@ -71,7 +71,7 @@ export function AdminProducts() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gold-500" /></div>
       ) : (
-        <div className="grid gap-2">
+        <div className="space-y-2">
           {filtered.map((p) => (
             <div key={p._id} className="flex items-center gap-4 admin-row px-4 py-3">
               <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 dark:bg-stone-800 flex-shrink-0">

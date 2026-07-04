@@ -80,7 +80,7 @@ export function ResourceManager({ title, subtitle, endpoint, fields, columns, wi
           <Btn variant="outline" className="mt-4" onClick={() => setEditing(blank())}><Plus size={16} /> Add the first one</Btn>
         </div>
       ) : (
-        <div className="grid gap-2">
+        <div className="space-y-2">
           {items.map((it) => (
             <div key={it._id} className="flex items-center gap-4 admin-row px-4 py-3">
               {imgKey && (
