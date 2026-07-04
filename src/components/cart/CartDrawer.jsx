@@ -81,18 +81,18 @@ export function CartDrawer() {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="px-6 py-4 border-t border-cream-200 dark:border-stone-800 space-y-4">
-            <div className="flex justify-between text-sm text-stone-500">
-              <span>Subtotal</span>
-              <span className="font-semibold text-dark-900 dark:text-cream-50">{fmt(total)}</span>
+          <div className="px-6 pt-4 pb-6 border-t border-cream-200 dark:border-stone-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-stone-600 dark:text-stone-400">Subtotal</span>
+              <span className="text-base font-semibold text-dark-900 dark:text-cream-50">{fmt(total)}</span>
             </div>
-            <p className="text-xs text-stone-400">Shipping & taxes calculated at checkout.</p>
-            <Link to="/checkout" onClick={closeCart}>
+            <p className="text-xs text-stone-400">Shipping &amp; taxes calculated at checkout.</p>
+            <Link to="/checkout" onClick={closeCart} className="block w-full">
               <Button variant="gold" size="lg" className="w-full">
                 Proceed to Checkout
               </Button>
             </Link>
-            <button onClick={closeCart} className="w-full text-sm text-stone-400 hover:text-dark-900 dark:hover:text-cream-50 transition-colors cursor-pointer">
+            <button onClick={closeCart} className="block w-full text-center text-sm text-stone-400 hover:text-dark-900 dark:hover:text-cream-50 transition-colors cursor-pointer py-1">
               Continue Shopping
             </button>
           </div>
