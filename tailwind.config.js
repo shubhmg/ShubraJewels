@@ -40,10 +40,10 @@ export default {
         },
       },
       fontFamily: {
-        // Luxe pairing: Playfair Display serif + Inter body + Mukta for Hindi
-        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        // Luxe pairing: Bodoni Moda display + Inter body + Mukta for Hindi
+        serif: ['"Bodoni Moda"', 'Georgia', 'serif'],
         sans:  ['Inter', 'system-ui', 'sans-serif'],
-        display: ['"Playfair Display"', 'Georgia', 'serif'],
+        display: ['"Bodoni Moda"', 'Georgia', 'serif'],
         hindi:   ['Mukta', 'Inter', 'sans-serif'],
         mukta:   ['Mukta', 'Inter', 'sans-serif'],
       },
