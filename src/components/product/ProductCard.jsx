@@ -42,12 +42,12 @@ export function ProductCard({ product, dark = false }) {
         >
           <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
 
-          {/* Badges — compact, smaller on mobile */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1">
-            {f.isNew && <Badge variant="new" className="!text-[10px] !px-2 !py-0.5">New</Badge>}
-            {product.isBestseller && <Badge variant="bestseller" className="!text-[10px] !px-2 !py-0.5">Best</Badge>}
-            {discount > 0 && <Badge variant="sale" className="!text-[10px] !px-2 !py-0.5">-{discount}%</Badge>}
-            {!inStock && <Badge variant="default" className="!text-[10px] !px-2 !py-0.5">Sold Out</Badge>}
+          {/* Badges — default size on web, smaller only on mobile */}
+          <div className="absolute top-3 left-3 flex flex-col gap-1 md:gap-1.5">
+            {f.isNew && <Badge variant="new" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">New</Badge>}
+            {product.isBestseller && <Badge variant="bestseller" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">Bestseller</Badge>}
+            {discount > 0 && <Badge variant="sale" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">-{discount}%</Badge>}
+            {!inStock && <Badge variant="default" className="!text-[10px] !px-2 md:!text-xs md:!px-2.5">Sold Out</Badge>}
           </div>
         </div>
       </Link>
