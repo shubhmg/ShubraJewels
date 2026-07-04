@@ -40,7 +40,7 @@
     @apply bg-dark-950 text-cream-50;
   }
 
-  h1, h2, h3, h4 { @apply font-serif; }
+  h1, h2, h3, h4 { @apply font-serif; font-weight: 800; }
 
   ::selection {
     background-color: rgba(201, 168, 76, 0.25);
@@ -97,6 +97,11 @@
   /* Product card image wrapper — zoom/fade handled per-img via Tailwind */
   .product-img-wrap {
     overflow: hidden;
+  }
+
+  /* Force extrabold on all display-font elements (headings, pull quotes, etc.) */
+  .font-display {
+    font-weight: 800;
   }
 
   /* Cart drawer overlay */
