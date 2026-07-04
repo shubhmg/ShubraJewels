@@ -41,8 +41,8 @@ export function Collections() {
             const count = countFor(c._id)
             return (
               <div key={c._id} className="rounded-3xl overflow-hidden shadow-card" style={{ background: 'white' }}>
-                <div className={`grid md:grid-cols-2 gap-0 ${isEven ? '' : 'md:[&>*:first-child]:order-2'}`}>
-                  <div className="relative aspect-[4/3] md:aspect-auto min-h-[260px] overflow-hidden">
+                <div className={`grid md:grid-cols-2 gap-0 md:max-h-[380px] ${isEven ? '' : 'md:[&>*:first-child]:order-2'}`}>
+                  <div className="relative aspect-[4/3] max-h-[280px] md:max-h-none md:aspect-auto md:h-[380px] overflow-hidden">
                     {c.image
                       ? <img src={c.image} alt={c.name} className="w-full h-full object-cover" loading="lazy" />
                       : <div className="w-full h-full" style={{ background: c.accentColor }} />}
