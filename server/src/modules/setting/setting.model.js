@@ -57,6 +57,7 @@ const settingSchema = new mongoose.Schema(
 
     // Socials
     instagram: { type: String, default: '' },
+    instagramUrl: { type: String, default: '' },
     facebook: { type: String, default: '' },
     youtube: { type: String, default: '' },
 

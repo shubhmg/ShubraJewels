@@ -19,7 +19,7 @@ const DEFAULTS = {
   shippingNote: 'Free shipping in Delhi. Pan-India delivery available.',
   aboutShort: 'Handcrafted jhumkas inspired by the royal heritage of Rajasthan.',
   phone: '', email: '',
-  instagram: '', facebook: '', youtube: '',
+  instagram: '', instagramUrl: '', facebook: '', youtube: '',
   theme: {
     maroon: '#7B1E2B', maroonDark: '#5A121C', gold: '#C9A84C',
     goldLight: '#E3C97A', beige: '#F6ECD9', cream: '#FBF6EC', ink: '#2A1A16',
@@ -51,7 +51,8 @@ export function SettingsProvider({ children }) {
       const hp = data.homepage && data.homepage.blocks?.length
         ? { hero: { ...DEFAULTS.homepage.hero, ...(data.homepage.hero || {}) }, blocks: data.homepage.blocks }
         : DEFAULTS.homepage
-      const merged = { ...DEFAULTS, ...data, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, payments: { ...DEFAULTS.payments, ...(data.payments || {}) }, homepage: hp }
+      const social = data.instagramUrl || data.instagram || ''
+      const merged = { ...DEFAULTS, ...data, instagramUrl: social, instagram: social, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, payments: { ...DEFAULTS.payments, ...(data.payments || {}) }, homepage: hp }
       setSettings(merged)
       applyTheme(merged.theme)
     } catch {
@@ -77,6 +78,24 @@ export function useSettings() {
 
 export function useSettingsCtx() {
   return useContext(SettingsContext) || { settings: DEFAULTS, loaded: false, refresh: () => {} }
+}
+
+export function instagramUrl(settings) {
+  return settings?.instagramUrl || settings?.instagram || ''
+}
+
+export function instagramHandle(settings) {
+  const url = instagramUrl(settings)
+  if (!url) return ''
+  const value = url.trim()
+  try {
+    const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
+    const path = new URL(withProtocol).pathname.split('/').filter(Boolean)
+    return path[0] ? `@${path[0]}` : ''
+  } catch {
+    const handle = value.replace(/^@/, '').split(/[/?#]/)[0]
+    return handle ? `@${handle}` : ''
+  }
 }
 
 // Build a wa.me link with a pre-filled message from settings.

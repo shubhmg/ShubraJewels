@@ -1,0 +1,40 @@
+Feature: Indirect "we're also on Instagram" presence for the ShubraJewels storefront + admin.
+
+Repo: /Users/shubhamgajra/WebstormProjects/ShubraJewels
+Stack: Vite + React + Tailwind + Zustand (web, src/) and Express + Mongoose ESM (server/, `shubra` DB, port 4200). Backend modules follow the pattern server/src/modules/<name>/{model,routes,controller,service,validation}.js. Admin writes are JWT-guarded via requireAdmin. Uploads go through POST /api/upload (multer -> returns /uploads/xxx). The homepage is a block builder: Setting.homepage.blocks[] rendered by type in the storefront Home page. Everything on the site is admin-editable -- keep that principle.
+
+FIRST: explore before coding. Read the existing Gallery module (model/routes/validation), the storefront gallery section component, the admin Gallery page, the Footer, the Settings model, and the admin Settings page, plus src/components/admin/AdminUI.jsx and src/components/ui/Dropdown.jsx. Match their exact style, naming, and component usage. Do NOT introduce new heavy dependencies.
+
+HARD CONSTRAINTS (this must stay lean and indirect):
+- NO Instagram API, no oEmbed, no access tokens, no auto-sync.
+- NO Instagram embeds/iframes, NO lightbox/player, NO CSP changes.
+- This is NOT a "Follow us / Watch reels" CTA section. It's an ambient, tasteful "we're also on Instagram" presence woven into what already exists.
+
+WHAT TO BUILD:
+
+1) Reuse the existing Customer Gallery AS the Instagram/community wall (do not build a separate reels feature).
+   - GalleryItem model: add two OPTIONAL fields -- `link` (String, an Instagram post URL) and `productId` (ObjectId ref Product, optional). Update the gallery validation schema and admin CRUD to accept/persist them. Ensure the public GET gallery returns them.
+   - Storefront gallery section: reframe its header as an ambient Instagram wall -- a small Instagram glyph + the @handle (derive the handle from settings.instagramUrl; no separate handle field). Keep it calm/editorial, gold-on-maroon in the existing design language. No loud button.
+
+2) Per-tile behaviour (the product-linking part -- this matters):
+   - If a tile has `productId`: the tile links to `/products/:id` and shows a subtle "Shop this look" chip (always visible on mobile, hover-reveal on desktop). This is the primary action.
+   - Additionally, if the tile has `link`: show a small Instagram glyph in a corner that opens the post in a new tab (target="_blank", rel noopener), with stopPropagation so it doesn't trigger the product link.
+   - If only `link` (no product): the whole tile opens the Instagram post in a new tab.
+   - If neither: static image, as today.
+
+3) Ambient handle everywhere Instagram is currently absent:
+   - Settings model: add one field `instagramUrl` (String). Add an input for it on the admin Settings page.
+   - Footer: add a small Instagram icon + @handle linking to settings.instagramUrl (hidden if empty). Use lucide-react's Instagram icon.
+
+4) Admin Gallery editor additions:
+   - Add an optional Product picker (Dropdown of products, reuse src/components/ui/Dropdown.jsx) and an optional "Instagram post URL" text field to each gallery item's editor. Keep existing image upload, caption, active toggle, and reorder untouched.
+
+OUT OF SCOPE / DO NOT ADD: a dedicated reels/videos block, homepage block-builder changes, whisper/marquee strips, header changes, followers counts. Skip anything not listed above.
+
+VERIFY:
+- `npm run build` (web) is clean; server starts without errors.
+- Admin: set instagramUrl in Settings; tag a gallery tile to a product; paste an IG post URL on another tile; reorder still works.
+- Storefront: gallery shows the @handle + IG glyph; a product-tagged tile links to its product page and shows "Shop this look"; the corner IG glyph opens the post; footer shows the IG icon/handle. No console errors, no scroll-perf regression.
+- If the repo keeps a README/CLAUDE-style doc, update it to note the new gallery fields (link, productId) and settings.instagramUrl.
+
+Keep the diff small and in the existing style. 

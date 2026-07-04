@@ -1,15 +1,17 @@
 import { Link } from 'react-router-dom'
 import { Instagram, Facebook, Youtube, Mail, Phone, MapPin } from 'lucide-react'
-import { useSettings } from '../../lib/SettingsProvider.jsx'
+import { instagramHandle, instagramUrl, useSettings } from '../../lib/SettingsProvider.jsx'
 import { useCategories } from '../../hooks/useApi.js'
 import { Motif, MehendiDivider } from '../decor/Decor.jsx'
 
 export function Footer() {
   const settings = useSettings()
   const { data: categories } = useCategories()
+  const igUrl = instagramUrl(settings)
+  const igHandle = instagramHandle(settings)
 
   const socials = [
-    { icon: Instagram, url: settings.instagram },
+    { icon: Instagram, url: igUrl },
     { icon: Facebook, url: settings.facebook },
     { icon: Youtube, url: settings.youtube },
   ].filter((s) => s.url)
@@ -27,6 +29,12 @@ export function Footer() {
             </div>
             <p className="font-hindi text-[var(--gold-light)]">{settings.slogan}</p>
             <p className="text-sm leading-relaxed">{settings.aboutShort}</p>
+            {igUrl && igHandle && (
+              <a href={igUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs font-semibold tracking-wide hover:text-[var(--gold-light)] transition-colors">
+                <Instagram size={14} className="text-[var(--gold-light)]" />
+                {igHandle}
+              </a>
+            )}
             {socials.length > 0 && (
               <div className="flex items-center gap-3 pt-1">
                 {socials.map(({ icon: Icon, url }, i) => (

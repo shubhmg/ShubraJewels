@@ -132,7 +132,7 @@ export function AdminSettings() {
 
       <Section title="Social Links">
         <div className="grid sm:grid-cols-3 gap-4">
-          <Field field={{ label: 'Instagram URL' }} value={s.instagram} onChange={(v) => set('instagram', v)} />
+          <Field field={{ label: 'Instagram URL' }} value={s.instagramUrl || s.instagram || ''} onChange={(v) => setS((p) => ({ ...p, instagramUrl: v, instagram: v }))} />
           <Field field={{ label: 'Facebook URL' }} value={s.facebook} onChange={(v) => set('facebook', v)} />
           <Field field={{ label: 'YouTube URL' }} value={s.youtube} onChange={(v) => set('youtube', v)} />
         </div>
@@ -248,4 +248,3 @@ function Section({ title, subtitle, children }) {
     </div>
   )
 }
-

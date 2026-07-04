@@ -1,13 +1,13 @@
 import { lazy, Suspense, Fragment, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Truck, Gift, Star, Quote } from 'lucide-react'
+import { ArrowRight, Truck, Gift, Star, Quote, Instagram } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { SectionHeading } from '../../components/ui/SectionHeading.jsx'
 import { Mandala, MehendiDivider, TempleFrame, Motif, EarringMotif } from '../../components/decor/Decor.jsx'
 import { Reveal, Stagger, StaggerItem, Tilt, Magnetic } from '../../components/motion/Motion.jsx'
-import { useSettings } from '../../lib/SettingsProvider.jsx'
+import { instagramHandle, instagramUrl, useSettings } from '../../lib/SettingsProvider.jsx'
 
 // Three.js hero is heavy — code-split it so it doesn't bloat the main bundle.
 const HeroJewel = lazy(() => import('../../components/motion/HeroJewel.jsx').then((m) => ({ default: m.HeroJewel })))
@@ -48,7 +48,7 @@ export function Home() {
       case 'collections': return collections?.length > 0 ? <RoyalCollections collections={collections} h={c} /> : null
       case 'videos': return otherVideos.length > 0 ? <VideoSection videos={otherVideos} h={c} /> : null
       case 'reviews': return reviews?.length > 0 ? <Reviews reviews={reviews} h={c} /> : null
-      case 'gallery': return gallery?.length > 0 ? <GalleryWall gallery={gallery} h={c} /> : null
+      case 'gallery': return gallery?.length > 0 ? <GalleryWall gallery={gallery} h={c} settings={settings} /> : null
       case 'image': return <ImageBlock config={c} />
       case 'text': return <TextBlock config={c} />
       default: return null
@@ -424,26 +424,72 @@ function Reviews({ reviews, h = {} }) {
 }
 
 /* ── Customer gallery ─────────────────────────────────────────────── */
-function GalleryWall({ gallery, h = {} }) {
+function GalleryWall({ gallery, h = {}, settings }) {
+  const igUrl = instagramUrl(settings)
+  const handle = instagramHandle(settings)
+
   return (
     <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
+      <Reveal>
+        <div className="text-center mx-auto max-w-2xl mb-10 md:mb-14">
+          {handle && (
+            <a href={igUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide mb-4" style={{ background: 'var(--maroon)', color: 'var(--gold-light)' }}>
+              <Instagram size={14} />
+              {handle}
+            </a>
+          )}
+          {h.hindi && <p className="font-hindi text-lg md:text-xl" style={{ color: 'var(--maroon)' }}>{h.hindi}</p>}
+          <h2 className="font-display text-3xl md:text-5xl mt-1 leading-tight" style={{ color: 'var(--ink)' }}>{h.title || 'Styled by the Shubra Community'}</h2>
+          <p className="mt-3 text-sm md:text-base text-stone-500">{h.subtitle || 'Customer moments, quietly gathered from our world.'}</p>
+        </div>
+      </Reveal>
       <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {gallery.map((g) => (
-          <StaggerItem key={g._id}><Tilt max={9} className="group relative block aspect-square rounded-2xl overflow-hidden shadow-card">
-            <img src={g.image} alt={g.caption || g.customerName} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-            {(g.caption || g.customerName) && (
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3" style={{ background: 'linear-gradient(180deg, transparent, rgba(42,26,22,0.75))' }}>
-                <p className="text-white text-xs">
-                  {g.customerName && <span className="font-semibold">{g.customerName}</span>}
-                  {g.caption && <span className="block opacity-90">{g.caption}</span>}
-                </p>
-              </div>
-            )}
-          </Tilt></StaggerItem>
+          <StaggerItem key={g._id}><GalleryTile item={g} /></StaggerItem>
         ))}
       </Stagger>
     </section>
+  )
+}
+
+function GalleryTile({ item }) {
+  const productId = item.productId?._id || item.productId
+  const hasProduct = !!productId
+  const hasPost = !!item.link
+  const productTo = hasProduct ? `/products/${productId}` : ''
+
+  return (
+    <Tilt max={9} className="group relative block aspect-square rounded-2xl overflow-hidden shadow-card bg-stone-100">
+      <img src={item.image} alt={item.caption || item.customerName} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      {hasProduct && <Link to={productTo} aria-label="Shop this look" className="absolute inset-0 z-10" />}
+      {!hasProduct && hasPost && <a href={item.link} target="_blank" rel="noopener noreferrer" aria-label="Open Instagram post" className="absolute inset-0 z-10" />}
+      {hasPost && (
+        <a
+          href={item.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open Instagram post"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-2 right-2 z-20 w-8 h-8 rounded-full grid place-items-center bg-white/90 shadow-sm transition hover:bg-white"
+          style={{ color: 'var(--maroon)' }}
+        >
+          <Instagram size={15} />
+        </a>
+      )}
+      {(item.caption || item.customerName) && (
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3 pointer-events-none" style={{ background: 'linear-gradient(180deg, transparent, rgba(42,26,22,0.75))' }}>
+          <p className="text-white text-xs">
+            {item.customerName && <span className="font-semibold">{item.customerName}</span>}
+            {item.caption && <span className="block opacity-90">{item.caption}</span>}
+          </p>
+        </div>
+      )}
+      {hasProduct && (
+        <span className="absolute left-2 bottom-2 z-20 rounded-full px-3 py-1 text-[11px] font-semibold opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: 'var(--maroon)', color: 'var(--gold-light)' }}>
+          Shop this look
+        </span>
+      )}
+    </Tilt>
   )
 }
 

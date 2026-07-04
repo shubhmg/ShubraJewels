@@ -38,7 +38,7 @@ Admin seed creds (from `server/.env`): `admin@shubrajewels.in` / `shubra@admin`.
 
 ## Data models (all admin-editable)
 
-Setting (singleton: slogan, taglines, whatsappNumber, freeShippingCity, socials, **theme{maroon,maroonDark,gold,goldLight,beige,cream,ink}**), Category, Collection (royal: accentColor, tagline), Product (name, hindiName, **story**, price, mrp, categoryId, collectionIds[], images[], video, material, weight, stock, badges, rating), Banner (placement topStrip/hero/offer), Video (isHero), Review (isApproved/isFeatured), GalleryItem, Order, Visit.
+Setting (singleton: slogan, taglines, whatsappNumber, freeShippingCity, socials incl. instagramUrl, **theme{maroon,maroonDark,gold,goldLight,beige,cream,ink}**), Category, Collection (royal: accentColor, tagline), Product (name, hindiName, **story**, price, mrp, categoryId, collectionIds[], images[], video, material, weight, stock, badges, rating), Banner (placement topStrip/hero/offer), Video (isHero), Review (isApproved/isFeatured), GalleryItem (image/caption/customerName plus optional Instagram `link` and linked `productId`), Order, Visit.
 
 ## Frontend (`src/`)
 
@@ -80,7 +80,7 @@ Setting (singleton: slogan, taglines, whatsappNumber, freeShippingCity, socials,
 - **Admin orders:** status filter tabs (all/pending/confirmed/shipped/delivered/cancelled with counts) on `pages/admin/Orders.jsx`.
 
 ## Remaining (not code — go-live)
-- Set real WhatsApp number + brand/contact/socials in `/admin/settings`.
+- Set real WhatsApp number + brand/contact/socials in `/admin/settings` (`instagramUrl` powers the footer handle and gallery wall label).
 - Replace seed placeholder images/videos with real uploads (admin drag-drop).
 - Change admin password (seeded `shubra@admin`) via `POST /api/auth/change-password` (or reseed with new `.env`).
 - Deploy: build web (`npm run build`), run `server/` with `NODE_ENV=production` (serves `dist/` + `/uploads`) under PM2 on the Natraj2 box; nginx vhost + domain; ensure `server/uploads/` persists.
