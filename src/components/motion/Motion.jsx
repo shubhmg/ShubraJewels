@@ -74,7 +74,7 @@ export function Tilt({ children, className, style, max = 9, scale = 1.02 }) {
       onMouseMove={onMove}
       onMouseLeave={reset}
       className={className}
-      style={{ transition: 'transform .3s cubic-bezier(.16,1,.3,1)', transformStyle: 'preserve-3d', willChange: 'transform', ...style }}
+      style={{ transition: 'transform .3s cubic-bezier(.16,1,.3,1)', willChange: 'transform', WebkitBackfaceVisibility: 'hidden', ...style }}
     >
       {children}
     </div>
