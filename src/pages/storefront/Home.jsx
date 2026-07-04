@@ -151,7 +151,7 @@ function Hero({ settings }) {
         animate="show"
         variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
       >
-        <HeroLine><div className="eyebrow justify-center flex mb-4"><Motif size={20} />{hero.eyebrow || `${settings.brandNameHindi} • ${settings.freeShippingCity} में फ्री शिपिंग`}</div></HeroLine>
+        <HeroLine><div className="eyebrow justify-center flex mb-4"><Motif size={20} />{hero.eyebrow || settings.brandNameHindi}</div></HeroLine>
         <HeroLine><p className="font-hindi text-2xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
         <HeroLine><h1 className="font-display text-white text-5xl md:text-7xl lg:text-8xl leading-[1.03] mt-2 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
         {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-4 text-base md:text-lg">{hero.subheading}</p></HeroLine>}
