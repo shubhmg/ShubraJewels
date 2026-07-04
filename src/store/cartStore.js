@@ -32,5 +32,5 @@ export const useCartStore = create(persist(
     get total()  { return get().items.reduce((s, i) => s + i.price * i.qty, 0) },
     get count()  { return get().items.reduce((s, i) => s + i.qty, 0) },
   }),
-  { name: 'sj-cart' }
+  { name: 'sj-cart', partialize: (s) => ({ items: s.items }) }
 ))

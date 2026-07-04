@@ -41,6 +41,7 @@ router.post(
         pincode: Joi.string().allow('').max(12),
       }).default({}),
       channel: Joi.string().valid('web', 'whatsapp').default('web'),
+      paymentMethod: Joi.string().valid('cod', 'whatsapp', 'none').optional(),
       notes: Joi.string().allow('').max(1000),
     }),
   }),
@@ -66,6 +67,8 @@ router.post(
       shipping: 0,
       total: subtotal,
       channel: req.body.channel || 'web',
+      paymentMethod: req.body.paymentMethod || (req.body.channel === 'whatsapp' ? 'whatsapp' : 'cod'),
+      paymentStatus: 'unpaid', // COD / WhatsApp orders are collected later
       notes: req.body.notes || '',
     });
 

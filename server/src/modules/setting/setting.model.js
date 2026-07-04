@@ -74,6 +74,12 @@ const settingSchema = new mongoose.Schema(
     // Free-form key facts for footer / about
     aboutShort: { type: String, default: 'Handcrafted jhumkas inspired by the royal heritage of Rajasthan.' },
 
+    // Which checkout payment methods are offered
+    payments: {
+      razorpay: { type: Boolean, default: true }, // pay online
+      cod: { type: Boolean, default: true },       // pay on delivery
+    },
+
     // Fully admin-editable homepage layout (hero + ordered sections)
     homepage: {
       hero: {

@@ -75,6 +75,14 @@ export function AdminSettings() {
         </div>
       </Section>
 
+      <Section title="Payment Methods" subtitle="Which checkout options customers see.">
+        <div className="space-y-1">
+          <Field field={{ label: 'Pay online (Razorpay — UPI, cards, netbanking)', type: 'toggle' }} value={s.payments?.razorpay !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, razorpay: v } }))} />
+          <Field field={{ label: 'Pay on delivery (COD)', type: 'toggle' }} value={s.payments?.cod !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, cod: v } }))} />
+          <p className="text-xs text-zinc-400 pt-1">WhatsApp ordering is always available.</p>
+        </div>
+      </Section>
+
       <Section title="Social Links">
         <div className="grid sm:grid-cols-3 gap-4">
           <Field field={{ label: 'Instagram URL' }} value={s.instagram} onChange={(v) => set('instagram', v)} />

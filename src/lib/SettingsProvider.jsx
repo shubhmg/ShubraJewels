@@ -25,6 +25,7 @@ const DEFAULTS = {
     goldLight: '#E3C97A', beige: '#F6ECD9', cream: '#FBF6EC', ink: '#2A1A16',
   },
   homepage: DEFAULT_HOMEPAGE,
+  payments: { razorpay: true, cod: true },
 }
 
 // Push the (admin-editable) palette into CSS variables the whole app reads.
@@ -50,7 +51,7 @@ export function SettingsProvider({ children }) {
       const hp = data.homepage && data.homepage.blocks?.length
         ? { hero: { ...DEFAULTS.homepage.hero, ...(data.homepage.hero || {}) }, blocks: data.homepage.blocks }
         : DEFAULTS.homepage
-      const merged = { ...DEFAULTS, ...data, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, homepage: hp }
+      const merged = { ...DEFAULTS, ...data, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, payments: { ...DEFAULTS.payments, ...(data.payments || {}) }, homepage: hp }
       setSettings(merged)
       applyTheme(merged.theme)
     } catch {

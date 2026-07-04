@@ -210,18 +210,24 @@ export function Checkout() {
 
               {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-              <button onClick={payOnline} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60">
-                {placing ? 'Processing…' : `Pay Online · ${fmt(subtotal)}`}
-              </button>
+              {settings.payments?.razorpay !== false && (
+                <button onClick={payOnline} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60">
+                  {placing ? 'Processing…' : `Pay Online · ${fmt(subtotal)}`}
+                </button>
+              )}
               <div className="flex flex-col sm:flex-row gap-3">
                 <button onClick={orderViaWhatsApp} disabled={placing} className="btn-whatsapp flex-1 disabled:opacity-60">
                   Order on WhatsApp
                 </button>
-                <button onClick={() => placeOrder('web')} disabled={placing} className="btn-outline-gold flex-1 disabled:opacity-60">
-                  Pay on delivery
-                </button>
+                {settings.payments?.cod !== false && (
+                  <button onClick={() => placeOrder('web')} disabled={placing} className="btn-outline-gold flex-1 disabled:opacity-60">
+                    Pay on delivery
+                  </button>
+                )}
               </div>
-              <p className="text-xs text-stone-400 text-center">Secure payments by Razorpay (UPI, cards, netbanking) · or order over WhatsApp / pay on delivery.</p>
+              <p className="text-xs text-stone-400 text-center">
+                {settings.payments?.razorpay !== false ? 'Secure payments by Razorpay (UPI, cards, netbanking) · ' : ''}order over WhatsApp{settings.payments?.cod !== false ? ' / pay on delivery' : ''}.
+              </p>
             </div>
           </div>
 

@@ -6,7 +6,6 @@ import { StarRating } from '../ui/StarRating.jsx'
 import { useCartStore } from '../../store/cartStore.js'
 import { useWishlistStore } from '../../store/wishlistStore.js'
 import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
-import { Tilt } from '../motion/Motion.jsx'
 
 const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0)
 
@@ -53,24 +52,11 @@ export function ProductCard({ product }) {
   return (
     <div className="group relative flex flex-col animate-fade-in">
       <Link to={`/products/${f.id}`} className="block">
-        <Tilt
-          max={7}
+        <div
           className="product-img-wrap relative aspect-[3/4] rounded-2xl overflow-hidden"
           style={{ background: 'color-mix(in srgb, var(--beige) 60%, white)' }}
         >
           <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-          {f.images[1] && (
-            <img
-              src={f.images[1]}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-spring"
-              loading="lazy"
-              decoding="async"
-            />
-          )}
-
-          <div className="absolute inset-0 group-hover:bg-[rgba(42,26,22,0.18)] transition-all duration-300" />
 
           {/* Quick action bar — always visible on mobile (icon-only), slides up on hover on desktop */}
           <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3 transition-transform duration-300 ease-spring translate-y-0 md:translate-y-full md:group-hover:translate-y-0">
@@ -115,7 +101,7 @@ export function ProductCard({ product }) {
             {discount > 0 && <Badge variant="sale">-{discount}%</Badge>}
             {!inStock && <Badge variant="default">Sold Out</Badge>}
           </div>
-        </Tilt>
+        </div>
       </Link>
 
       {/* Wishlist */}

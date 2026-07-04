@@ -12,6 +12,14 @@ const STATUS_COLOR = {
   cancelled: 'bg-red-50 text-red-600',
 }
 
+// Payment badge (label + classes) from an order's payment fields.
+function payBadge(o) {
+  if (o.paymentStatus === 'paid') return { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
+  if (o.paymentMethod === 'cod') return { label: 'COD', cls: 'bg-amber-100 text-amber-700' }
+  if (o.paymentMethod === 'whatsapp') return { label: 'WhatsApp', cls: 'bg-green-100 text-green-700' }
+  return { label: 'Unpaid', cls: 'bg-zinc-100 text-zinc-500' }
+}
+
 export function AdminOrders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -72,6 +80,7 @@ export function AdminOrders() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-zinc-900">{o.orderNo}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${STATUS_COLOR[o.status]}`}>{o.status}</span>
+                      {(() => { const b = payBadge(o); return <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${b.cls}`}>{b.label}</span> })()}
                     </div>
                     <p className="text-sm text-zinc-700 truncate mt-0.5">{o.customer?.name}</p>
                     <p className="text-xs text-zinc-400">{date} · {o.items?.length} item(s) · {o.channel}</p>
