@@ -14,6 +14,7 @@ const orderItemSchema = new mongoose.Schema(
 const orderSchema = new mongoose.Schema(
   {
     orderNo: { type: String, unique: true },
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
     items: { type: [orderItemSchema], default: [] },
     customer: {
       name: { type: String, required: true },
@@ -38,6 +39,11 @@ const orderSchema = new mongoose.Schema(
     },
     // true once this order's items have been deducted from stock (on delivery).
     stockApplied: { type: Boolean, default: false },
+    // Payment
+    paymentMethod: { type: String, enum: ['none', 'razorpay', 'cod', 'whatsapp'], default: 'none' },
+    paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
+    razorpayOrderId: { type: String, default: '' },
+    razorpayPaymentId: { type: String, default: '' },
     notes: { type: String, default: '' },
   },
   { timestamps: true }

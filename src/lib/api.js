@@ -1,5 +1,6 @@
 // Tiny fetch wrapper for the Shubra API. Dev uses Vite proxy (/api -> :4200).
 const TOKEN_KEY = 'sj-admin-token'
+const CUST_KEY = 'sj-customer-token'
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY) || ''
@@ -8,11 +9,19 @@ export function setToken(t) {
   if (t) localStorage.setItem(TOKEN_KEY, t)
   else localStorage.removeItem(TOKEN_KEY)
 }
+export function getCustomerToken() {
+  return localStorage.getItem(CUST_KEY) || ''
+}
+export function setCustomerToken(t) {
+  if (t) localStorage.setItem(CUST_KEY, t)
+  else localStorage.removeItem(CUST_KEY)
+}
 
-async function request(method, path, body, { auth = false, isForm = false } = {}) {
+async function request(method, path, body, { auth = false, custAuth = false, isForm = false } = {}) {
   const headers = {}
   if (!isForm) headers['Content-Type'] = 'application/json'
   if (auth) headers.Authorization = `Bearer ${getToken()}`
+  else if (custAuth) headers.Authorization = `Bearer ${getCustomerToken()}`
 
   const res = await fetch(`/api${path}`, {
     method,
@@ -42,6 +51,7 @@ export function normalizeProduct(p) {
 export const api = {
   get:   (path, opts)       => request('GET', path, null, opts),
   post:  (path, body, opts) => request('POST', path, body, opts),
+  put:   (path, body, opts) => request('PUT', path, body, opts),
   patch: (path, body, opts) => request('PATCH', path, body, opts),
   del:   (path, opts)       => request('DELETE', path, null, opts),
 

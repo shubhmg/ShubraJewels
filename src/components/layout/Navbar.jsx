@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
-import { ShoppingBag, Heart, Search, Menu, X } from 'lucide-react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { ShoppingBag, Heart, Search, Menu, X, User } from 'lucide-react'
 import { useCartStore } from '../../store/cartStore.js'
 import { useWishlistStore } from '../../store/wishlistStore.js'
+import { useCustomerStore } from '../../store/customerStore.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
 import { SearchModal } from '../search/SearchModal.jsx'
+import { AuthModal } from '../auth/AuthModal.jsx'
 
 const NAV = [
   { to: '/collections', label: 'Collections' },
@@ -17,8 +19,13 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
   const settings = useSettings()
   const location = useLocation()
+  const navigate = useNavigate()
+  const { customer, fetchMe, isAuthed } = useCustomerStore()
+  useEffect(() => { fetchMe() }, []) // eslint-disable-line
+  const onAccount = () => (isAuthed() ? navigate('/account') : setAuthOpen(true))
   const heroBg = !scrolled && location.pathname === '/' && !mobileOpen
   const cartCount = useCartStore((s) => s.items.reduce((a, i) => a + i.qty, 0))
   const wishCount = useWishlistStore((s) => s.items.length)
@@ -43,6 +50,7 @@ export function Navbar() {
   return (
     <>
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
 
       <header className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 transform-gpu ${
         solid ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-cream-200/80' : 'bg-transparent'
@@ -82,6 +90,11 @@ export function Navbar() {
               </Link>
               <IconBtn heroBg={heroBg} onClick={openCart} aria-label={`Cart (${cartCount})`}>
                 <ShoppingBag size={18} />{cartCount > 0 && <Dot>{cartCount}</Dot>}
+              </IconBtn>
+              <IconBtn heroBg={heroBg} onClick={onAccount} aria-label="Account">
+                {isAuthed() ? (
+                  <span className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-bold" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{(customer?.name || customer?.email || 'U')[0]?.toUpperCase()}</span>
+                ) : <User size={18} />}
               </IconBtn>
               <Link to="/admin" className="hidden md:flex ml-2">
                 <button className={`px-4 py-2 rounded-full border text-xs font-semibold transition-colors cursor-pointer ${heroBg ? 'border-gold-400/50 text-gold-300 hover:text-gold-200' : 'border-gold-500/40 text-gold-600 hover:bg-gold-500/10'}`}>Admin</button>

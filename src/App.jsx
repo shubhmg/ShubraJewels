@@ -15,6 +15,7 @@ import { Wishlist }      from './pages/storefront/Wishlist.jsx'
 import { Checkout }      from './pages/storefront/Checkout.jsx'
 import { About }         from './pages/storefront/About.jsx'
 import { Contact }       from './pages/storefront/Contact.jsx'
+import { Account }       from './pages/storefront/Account.jsx'
 
 // Admin pages
 import { AdminLogin }       from './pages/admin/Login.jsx'
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
       { path: '/checkout',          element: <Checkout />      },
       { path: '/about',             element: <About />         },
       { path: '/contact',           element: <Contact />       },
+      { path: '/account',           element: <Account />       },
     ],
   },
   { path: '/admin/login', element: <AdminLogin /> },

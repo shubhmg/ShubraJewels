@@ -4,6 +4,7 @@ import Order from './order.model.js';
 import Product from '../product/product.model.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
+import { optionalCustomer } from '../../middleware/customerAuth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 import ApiError from '../../utils/ApiError.js';
 
@@ -17,8 +18,10 @@ async function nextOrderNo() {
 }
 
 // PUBLIC — place an order. Prices are re-read from the DB (never trust client totals).
+// If a signed-in customer places it, the order is linked to their account.
 router.post(
   '/',
+  optionalCustomer,
   validate({
     body: Joi.object({
       items: Joi.array()
@@ -55,6 +58,7 @@ router.post(
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
     const order = await Order.create({
       orderNo: await nextOrderNo(),
+      customerId: req.customer?.id || null,
       items,
       customer: req.body.customer,
       address: req.body.address || {},

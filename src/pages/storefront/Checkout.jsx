@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, Check, ShoppingBag } from 'lucide-react'
+import { ChevronRight, Check, ShoppingBag, User } from 'lucide-react'
 import { useCartStore } from '../../store/cartStore.js'
+import { useCustomerStore } from '../../store/customerStore.js'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
+import { AuthModal } from '../../components/auth/AuthModal.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { api } from '../../lib/api.js'
+import { loadRazorpay } from '../../lib/razorpay.js'
 import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
@@ -14,13 +17,31 @@ const EMPTY = { name: '', phone: '', email: '', line1: '', line2: '', city: '', 
 export function Checkout() {
   const settings = useSettings()
   const { items, clearCart } = useCartStore()
+  const { customer, isAuthed, fetchMe } = useCustomerStore()
   const [form, setForm] = useState(EMPTY)
   const [placing, setPlacing] = useState(false)
   const [error, setError] = useState(null)
   const [placed, setPlaced] = useState(null) // holds the created order
+  const [authOpen, setAuthOpen] = useState(false)
 
   const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  // Prefill from the signed-in customer.
+  useEffect(() => { if (isAuthed()) fetchMe() }, []) // eslint-disable-line
+  useEffect(() => {
+    if (customer) setForm((f) => ({
+      ...f,
+      name: f.name || customer.name || '',
+      phone: f.phone || customer.phone || '',
+      email: f.email || customer.email || '',
+      line1: f.line1 || customer.address?.line1 || '',
+      line2: f.line2 || customer.address?.line2 || '',
+      city: f.city || customer.address?.city || '',
+      state: f.state || customer.address?.state || '',
+      pincode: f.pincode || customer.address?.pincode || '',
+    }))
+  }, [customer])
 
   const buildPayload = (channel) => ({
     items: items.map((i) => ({ productId: i.id || i._id, qty: i.qty })),
@@ -42,7 +63,8 @@ export function Checkout() {
     setError(null)
     setPlacing(true)
     try {
-      const order = await api.post('/orders', buildPayload(channel))
+      // custAuth links the order to the customer's account when signed in.
+      const order = await api.post('/orders', buildPayload(channel), { custAuth: true })
       setPlaced(order)
       clearCart()
       return order
@@ -50,6 +72,50 @@ export function Checkout() {
       setError(e.message || 'Could not place order. Please try again.')
       return null
     } finally {
+      setPlacing(false)
+    }
+  }
+
+  // Razorpay Standard Checkout: create order → open modal → verify → save order.
+  const payOnline = async () => {
+    const v = validate()
+    if (v) { setError(v); return }
+    setError(null)
+    setPlacing(true)
+    try {
+      const itemsPayload = items.map((i) => ({ productId: i.id || i._id, qty: i.qty }))
+      const ro = await api.post('/payments/create-order', { items: itemsPayload })
+      const ok = await loadRazorpay()
+      if (!ok) throw new Error('Could not load payment gateway')
+
+      const rzp = new window.Razorpay({
+        key: ro.keyId,
+        order_id: ro.orderId,
+        amount: ro.amount,
+        currency: ro.currency,
+        name: settings.brandName,
+        description: 'Jhumka order',
+        prefill: { name: form.name, email: form.email, contact: form.phone },
+        theme: { color: settings.theme?.maroon || '#7B1E2B' },
+        modal: { ondismiss: () => setPlacing(false) },
+        handler: async (resp) => {
+          try {
+            const order = await api.post('/payments/verify', {
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              ...buildPayload('web'),
+            }, { custAuth: true })
+            setPlaced(order); clearCart()
+          } catch (e) {
+            setError(e.message || 'Payment verification failed. If money was deducted, contact us.')
+          } finally { setPlacing(false) }
+        },
+      })
+      rzp.on('payment.failed', (r) => { setError(r?.error?.description || 'Payment failed. Please try again.'); setPlacing(false) })
+      rzp.open()
+    } catch (e) {
+      setError(e.message || 'Could not start payment.')
       setPlacing(false)
     }
   }
@@ -112,6 +178,18 @@ export function Checkout() {
       <div className="container-wide py-10">
         <div className="grid lg:grid-cols-3 gap-10">
           <div className="lg:col-span-2 space-y-6">
+            {/* Sign-in prompt (optional — guest checkout allowed) */}
+            <div className="bg-white rounded-2xl p-4 shadow-card flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--maroon) 12%, transparent)', color: 'var(--maroon)' }}><User size={17} /></div>
+              {isAuthed() ? (
+                <p className="text-sm text-stone-600">Signed in as <span className="font-semibold" style={{ color: 'var(--ink)' }}>{customer?.email}</span> — this order will be saved to your account.</p>
+              ) : (
+                <p className="text-sm text-stone-600 flex-1">
+                  <button onClick={() => setAuthOpen(true)} className="font-semibold underline underline-offset-2" style={{ color: 'var(--maroon)' }}>Sign in</button> to track this order & save your bag — or continue as guest below.
+                </p>
+              )}
+            </div>
+
             <div className="bg-white rounded-2xl p-6 shadow-card space-y-4">
               <h2 className="font-display text-xl" style={{ color: 'var(--ink)' }}>Your Details</h2>
               <div className="grid grid-cols-2 gap-4">
@@ -132,15 +210,18 @@ export function Checkout() {
 
               {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button onClick={() => placeOrder('web')} disabled={placing} className="btn-maroon flex-1 disabled:opacity-60">
-                  {placing ? 'Placing…' : `Place Order · ${fmt(subtotal)}`}
-                </button>
+              <button onClick={payOnline} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60">
+                {placing ? 'Processing…' : `Pay Online · ${fmt(subtotal)}`}
+              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button onClick={orderViaWhatsApp} disabled={placing} className="btn-whatsapp flex-1 disabled:opacity-60">
                   Order on WhatsApp
                 </button>
+                <button onClick={() => placeOrder('web')} disabled={placing} className="btn-outline-gold flex-1 disabled:opacity-60">
+                  Pay on delivery
+                </button>
               </div>
-              <p className="text-xs text-stone-400 text-center">No online payment — we confirm your order and arrange delivery over WhatsApp.</p>
+              <p className="text-xs text-stone-400 text-center">Secure payments by Razorpay (UPI, cards, netbanking) · or order over WhatsApp / pay on delivery.</p>
             </div>
           </div>
 
@@ -166,6 +247,7 @@ export function Checkout() {
           </aside>
         </div>
       </div>
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   )
 }

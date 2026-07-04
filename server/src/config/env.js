@@ -24,6 +24,11 @@ const env = {
     email: process.env.ADMIN_EMAIL || 'admin@shubrajewels.in',
     password: process.env.ADMIN_PASSWORD || 'shubra@admin',
   },
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+  },
 };
 
 export default env;
