@@ -4,6 +4,9 @@ import mongoose from 'mongoose';
 // Mirrors the original hardcoded design so nothing changes until edited.
 export const DEFAULT_HOMEPAGE = {
   hero: {
+    eyebrow: '',
+    slogan: '',
+    heading: '',
     subheading: 'Every jhumka tells a story — handcrafted royal jhumkas inspired by the heritage of Rajasthan.',
     ctaLabel: 'Shop Jhumkas',
     ctaLink: '/products',
@@ -74,6 +77,9 @@ const settingSchema = new mongoose.Schema(
     // Fully admin-editable homepage layout (hero + ordered sections)
     homepage: {
       hero: {
+        eyebrow: { type: String, default: '' },
+        slogan: { type: String, default: '' },
+        heading: { type: String, default: '' },
         subheading: { type: String, default: DEFAULT_HOMEPAGE.hero.subheading },
         ctaLabel: { type: String, default: DEFAULT_HOMEPAGE.hero.ctaLabel },
         ctaLink: { type: String, default: DEFAULT_HOMEPAGE.hero.ctaLink },

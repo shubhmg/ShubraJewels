@@ -66,3 +66,33 @@ export function Motif({ className = '', size = 26 }) {
 export function TempleFrame({ children, className = '' }) {
   return <div className={`temple-frame ${className}`}>{children}</div>
 }
+
+// Solid jhumka-earring silhouette — used as a scattered background motif.
+export function EarringMotif({ size = 120, className = '', style, color = 'var(--gold)' }) {
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size * 1.2}
+      viewBox="0 0 40 48"
+      className={className}
+      style={style}
+      fill={color}
+    >
+      {/* ear hook */}
+      <path d="M20 2c-2.5 0-4.4 1.9-4.4 4.2h2.4c0-1.1.9-2 2-2s2 .9 2 2 -.9 2-2 2v2.2c2.5 0 4.4-1.9 4.4-4.2S22.5 2 20 2z" />
+      {/* stud */}
+      <circle cx="20" cy="12.4" r="2.2" />
+      {/* bell */}
+      <path d="M20 15c-8.4 0-12.4 8.2-12.4 15 0 1 .8 1.8 1.8 1.8h21.2c1 0 1.8-.8 1.8-1.8 0-6.8-4-15-12.4-15z" />
+      {/* skirt of drop-bells */}
+      <circle cx="9.6" cy="34.4" r="1.7" />
+      <circle cx="14.8" cy="35.8" r="1.7" />
+      <circle cx="20" cy="36.2" r="1.7" />
+      <circle cx="25.2" cy="35.8" r="1.7" />
+      <circle cx="30.4" cy="34.4" r="1.7" />
+      {/* central drop */}
+      <circle cx="20" cy="43" r="2.6" />
+    </svg>
+  )
+}

@@ -37,6 +37,9 @@ export const makeBlock = (type) => ({ id: uid(), type, enabled: true, config: { 
 // Default layout mirrors the original hardcoded homepage.
 export const DEFAULT_HOMEPAGE = {
   hero: {
+    eyebrow: '',   // small top line (falls back to brand + free-shipping city)
+    slogan: '',    // Hindi line (falls back to Settings slogan)
+    heading: '',   // big title (falls back to Settings brand name)
     subheading: 'Every jhumka tells a story — handcrafted royal jhumkas inspired by the heritage of Rajasthan.',
     ctaLabel: 'Shop Jhumkas',
     ctaLink: '/products',

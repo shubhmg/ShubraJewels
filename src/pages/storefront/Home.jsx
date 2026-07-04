@@ -5,7 +5,7 @@ import { ArrowRight, Truck, Gift, Star, Quote } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { SectionHeading } from '../../components/ui/SectionHeading.jsx'
-import { Mandala, MehendiDivider, TempleFrame, Motif } from '../../components/decor/Decor.jsx'
+import { Mandala, MehendiDivider, TempleFrame, Motif, EarringMotif } from '../../components/decor/Decor.jsx'
 import { Reveal, Stagger, StaggerItem, Tilt, Magnetic } from '../../components/motion/Motion.jsx'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
 
@@ -132,9 +132,12 @@ function Hero({ settings }) {
   const t = settings.theme || {}
   const hero = settings.homepage?.hero || {}
   return (
-    <section className="relative min-h-[94vh] flex flex-col overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
-      <Mandala size={560} className="absolute -right-44 -top-28 opacity-25" />
-      <Mandala size={380} className="absolute -left-32 bottom-10 opacity-15" />
+    <section className="relative min-h-[94vh] flex flex-col overflow-hidden pt-16 md:pt-24" style={{ background: 'var(--maroon-dark)' }}>
+      {/* Scattered jhumka silhouettes (replaces the mandala) */}
+      <EarringMotif size={150} className="absolute right-[7%] top-[9%] rotate-12" style={{ opacity: 0.1 }} />
+      <EarringMotif size={95} className="absolute left-[8%] top-[22%] -rotate-12" style={{ opacity: 0.08 }} />
+      <EarringMotif size={120} className="absolute left-[13%] bottom-[16%] rotate-6" style={{ opacity: 0.07 }} />
+      <EarringMotif size={72} className="absolute right-[15%] bottom-[24%] -rotate-6" style={{ opacity: 0.09 }} />
 
       {/* Hero background — 3D jewel, image, or video (admin-selectable) */}
       <div className="relative flex-1 min-h-[40vh] md:min-h-[48vh]">
@@ -148,9 +151,9 @@ function Hero({ settings }) {
         animate="show"
         variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
       >
-        <HeroLine><div className="eyebrow justify-center flex mb-4"><Motif size={20} />{settings.brandNameHindi} • {settings.freeShippingCity} में फ्री शिपिंग</div></HeroLine>
-        <HeroLine><p className="font-hindi text-2xl md:text-3xl text-[var(--gold-light)]">{settings.slogan}</p></HeroLine>
-        <HeroLine><h1 className="font-display text-white text-5xl md:text-7xl lg:text-8xl leading-[1.03] mt-2 tracking-tight">{settings.brandName}</h1></HeroLine>
+        <HeroLine><div className="eyebrow justify-center flex mb-4"><Motif size={20} />{hero.eyebrow || `${settings.brandNameHindi} • ${settings.freeShippingCity} में फ्री शिपिंग`}</div></HeroLine>
+        <HeroLine><p className="font-hindi text-2xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
+        <HeroLine><h1 className="font-display text-white text-5xl md:text-7xl lg:text-8xl leading-[1.03] mt-2 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
         {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-4 text-base md:text-lg">{hero.subheading}</p></HeroLine>}
         <HeroLine>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-8">

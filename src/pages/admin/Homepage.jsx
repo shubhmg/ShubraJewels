@@ -67,6 +67,9 @@ export function AdminHomepage() {
           ] }} value={hp.hero.background || 'jewel'} onChange={(v) => setHero('background', v)} />
           {hp.hero.background === 'image' && <MediaUploader label="Hero image" value={hp.hero.mediaUrl} onChange={(v) => setHero('mediaUrl', v)} accept="image" />}
           {hp.hero.background === 'video' && <MediaUploader label="Hero video" value={hp.hero.mediaUrl} onChange={(v) => setHero('mediaUrl', v)} accept="video" />}
+          <Field field={{ label: 'Top line (eyebrow)', help: 'Leave blank to use brand + free-shipping city' }} value={hp.hero.eyebrow} onChange={(v) => setHero('eyebrow', v)} />
+          <Field field={{ label: 'Hindi line', help: 'Leave blank to use the Settings slogan' }} value={hp.hero.slogan} onChange={(v) => setHero('slogan', v)} />
+          <Field field={{ label: 'Big title', help: 'Leave blank to use the brand name' }} value={hp.hero.heading} onChange={(v) => setHero('heading', v)} />
           <Field field={{ label: 'Sub-heading', type: 'textarea' }} value={hp.hero.subheading} onChange={(v) => setHero('subheading', v)} />
           <div className="grid sm:grid-cols-2 gap-4">
             <Field field={{ label: 'Button label' }} value={hp.hero.ctaLabel} onChange={(v) => setHero('ctaLabel', v)} />
