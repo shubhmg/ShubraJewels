@@ -1,19 +1,63 @@
-import { useEffect, useState } from 'react'
-import { Loader2, Check } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Loader2, Check, Palette } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Field } from '../../components/admin/AdminUI.jsx'
 import { MediaUploader } from '../../components/admin/MediaUploader.jsx'
 import { useSettingsCtx } from '../../lib/SettingsProvider.jsx'
 
 const THEME_KEYS = [
-  { key: 'maroon', label: 'Maroon (primary)' },
-  { key: 'maroonDark', label: 'Maroon dark' },
-  { key: 'gold', label: 'Gold' },
-  { key: 'goldLight', label: 'Gold light' },
-  { key: 'beige', label: 'Beige' },
-  { key: 'cream', label: 'Cream (background)' },
-  { key: 'ink', label: 'Ink (text)' },
+  { key: 'maroon',    label: 'Primary (maroon)' },
+  { key: 'maroonDark',label: 'Primary dark' },
+  { key: 'gold',      label: 'Accent (gold)' },
+  { key: 'goldLight', label: 'Accent light' },
+  { key: 'beige',     label: 'Beige' },
+  { key: 'cream',     label: 'Background (cream)' },
+  { key: 'ink',       label: 'Text (ink)' },
 ]
+
+const PRESETS = [
+  {
+    name: 'Royal Maroon',
+    desc: 'Classic Rajasthani royalty',
+    colors: { maroon: '#7B1E2B', maroonDark: '#5A121C', gold: '#C9A84C', goldLight: '#E3C97A', beige: '#F6ECD9', cream: '#FBF6EC', ink: '#2A1A16' },
+  },
+  {
+    name: 'Mughal Emerald',
+    desc: 'Lush Mughal garden courts',
+    colors: { maroon: '#1B4332', maroonDark: '#0F2D22', gold: '#D4A853', goldLight: '#E8C47A', beige: '#EEF4EF', cream: '#F5FAF5', ink: '#0D2318' },
+  },
+  {
+    name: 'Rajputana Indigo',
+    desc: 'Blue pottery of Rajasthan',
+    colors: { maroon: '#1E3A6B', maroonDark: '#102147', gold: '#C9A84C', goldLight: '#E3C97A', beige: '#EEF2F8', cream: '#F4F7FC', ink: '#0D1B35' },
+  },
+  {
+    name: 'Banjara Rose',
+    desc: 'Vibrant tribal jewellery',
+    colors: { maroon: '#8B2252', maroonDark: '#6B1640', gold: '#D4A853', goldLight: '#EBC87A', beige: '#F9EDF3', cream: '#FCF4F8', ink: '#2D0E1E' },
+  },
+  {
+    name: 'Meenakari Teal',
+    desc: 'Enamel-craft sophistication',
+    colors: { maroon: '#1B5563', maroonDark: '#0F3642', gold: '#C9A84C', goldLight: '#E3C97A', beige: '#EAF4F6', cream: '#F2F9FA', ink: '#0C2A33' },
+  },
+  {
+    name: 'Saffron Temple',
+    desc: 'Warmth of festival lights',
+    colors: { maroon: '#B85C00', maroonDark: '#8B3D00', gold: '#E8B030', goldLight: '#F5CE70', beige: '#FDF0DC', cream: '#FEF8EF', ink: '#2C1800' },
+  },
+  {
+    name: 'Oxidised Noir',
+    desc: 'Dark oxidised silver tones',
+    colors: { maroon: '#3A3A3A', maroonDark: '#222222', gold: '#B8A898', goldLight: '#D4C8BC', beige: '#F0EFED', cream: '#F8F7F5', ink: '#1A1A1A' },
+  },
+]
+
+function matchPreset(theme) {
+  return PRESETS.findIndex((p) =>
+    Object.entries(p.colors).every(([k, v]) => (theme?.[k] || '').toLowerCase() === v.toLowerCase())
+  )
+}
 
 export function AdminSettings() {
   const { refresh } = useSettingsCtx()
@@ -25,12 +69,13 @@ export function AdminSettings() {
 
   const set = (k, v) => setS((p) => ({ ...p, [k]: v }))
   const setTheme = (k, v) => setS((p) => ({ ...p, theme: { ...p.theme, [k]: v } }))
+  const applyPreset = (preset) => setS((p) => ({ ...p, theme: { ...p.theme, ...preset.colors } }))
 
   const save = async () => {
     setSaving(true)
     try {
       await api.patch('/settings', s, { auth: true })
-      await refresh() // re-applies theme + brand across the site immediately
+      await refresh()
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } finally {
       setSaving(false)
@@ -38,6 +83,8 @@ export function AdminSettings() {
   }
 
   if (!s) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gold-500" /></div>
+
+  const activePreset = matchPreset(s.theme)
 
   return (
     <div className="max-w-3xl">
@@ -91,21 +138,102 @@ export function AdminSettings() {
         </div>
       </Section>
 
-      <Section title="Theme Colours" subtitle="These retint the entire storefront live.">
-        <div className="grid sm:grid-cols-2 gap-4">
-          {THEME_KEYS.map(({ key, label }) => (
-            <Field key={key} field={{ label, type: 'color' }} value={s.theme?.[key]} onChange={(v) => setTheme(key, v)} />
-          ))}
+      {/* ── Theme ──────────────────────────────────────────────────── */}
+      <Section title="Theme & Colours" subtitle="Pick a preset or fine-tune each colour individually. Changes apply live after saving.">
+
+        {/* Preset grid */}
+        <div className="mb-6">
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Palette size={13} /> Preset Palettes
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {PRESETS.map((preset, i) => {
+              const isActive = activePreset === i
+              return (
+                <button
+                  key={preset.name}
+                  onClick={() => applyPreset(preset)}
+                  className="group relative text-left rounded-2xl border-2 p-3 transition-all duration-200 cursor-pointer hover:shadow-md"
+                  style={{
+                    borderColor: isActive ? preset.colors.maroon : 'transparent',
+                    background: preset.colors.cream,
+                    boxShadow: isActive ? `0 0 0 2px ${preset.colors.maroon}` : undefined,
+                  }}
+                  title={`Apply ${preset.name}`}
+                >
+                  {/* Mini palette strip */}
+                  <div className="flex gap-1 mb-2.5">
+                    {[preset.colors.maroon, preset.colors.gold, preset.colors.beige, preset.colors.ink].map((c, ci) => (
+                      <div key={ci} className="flex-1 h-5 rounded-md first:rounded-l-xl last:rounded-r-xl" style={{ background: c }} />
+                    ))}
+                  </div>
+                  <p className="text-xs font-bold leading-tight" style={{ color: preset.colors.ink }}>{preset.name}</p>
+                  <p className="text-[10px] opacity-60 leading-tight mt-0.5" style={{ color: preset.colors.ink }}>{preset.desc}</p>
+                  {isActive && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: preset.colors.maroon }}>
+                      <Check size={11} color="#fff" />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
-        <div className="mt-4 flex gap-2 flex-wrap">
-          {THEME_KEYS.map(({ key }) => (
-            <div key={key} className="w-10 h-10 rounded-lg border border-stone-200 dark:border-stone-700" style={{ background: s.theme?.[key] }} title={key} />
-          ))}
+
+        {/* Individual pickers */}
+        <div>
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Fine-tune Individual Colours</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {THEME_KEYS.map(({ key, label }) => (
+              <ColorPicker
+                key={key}
+                label={label}
+                value={s.theme?.[key] || '#000000'}
+                onChange={(v) => setTheme(key, v)}
+              />
+            ))}
+          </div>
         </div>
       </Section>
 
       <div className="flex justify-end mt-6">
         <Btn onClick={save} disabled={saving}>{saved ? <><Check size={16} /> Saved</> : saving ? 'Saving…' : 'Save Changes'}</Btn>
+      </div>
+    </div>
+  )
+}
+
+/* Large, clickable color picker with swatch + hex input */
+function ColorPicker({ label, value, onChange }) {
+  const ref = useRef(null)
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+      {/* Big swatch — clicking opens the native color picker */}
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        className="relative w-12 h-12 rounded-xl flex-shrink-0 border-2 border-white shadow-md ring-1 ring-zinc-200 cursor-pointer transition-transform hover:scale-105"
+        style={{ background: value }}
+        title="Click to pick colour"
+      >
+        <input
+          ref={ref}
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{label}</p>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full font-mono text-sm px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100"
+          placeholder="#7B1E2B"
+          maxLength={7}
+        />
       </div>
     </div>
   )
@@ -120,3 +248,4 @@ function Section({ title, subtitle, children }) {
     </div>
   )
 }
+
