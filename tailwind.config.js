@@ -40,10 +40,10 @@ export default {
         },
       },
       fontFamily: {
-        // Luxe pairing: Bodoni Moda display + Inter body + Mukta for Hindi
-        serif: ['"Bodoni Moda"', 'Georgia', 'serif'],
+        // Google Sans feel: Plus Jakarta Sans for display headings, Inter for body
+        serif: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         sans:  ['Inter', 'system-ui', 'sans-serif'],
-        display: ['"Bodoni Moda"', 'Georgia', 'serif'],
+        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         hindi:   ['Mukta', 'Inter', 'sans-serif'],
         mukta:   ['Mukta', 'Inter', 'sans-serif'],
       },
