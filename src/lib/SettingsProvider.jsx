@@ -53,8 +53,8 @@ export function SettingsProvider({ children }) {
         : DEFAULTS.homepage
       const social = data.instagramUrl || data.instagram || ''
       const merged = { ...DEFAULTS, ...data, instagramUrl: social, instagram: social, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, payments: { ...DEFAULTS.payments, ...(data.payments || {}) }, homepage: hp }
-      setSettings(merged)
       applyTheme(merged.theme)
+      setSettings(merged)
     } catch {
       applyTheme(DEFAULTS.theme)
     } finally {
@@ -62,12 +62,20 @@ export function SettingsProvider({ children }) {
     }
   }
 
-  useEffect(() => { applyTheme(DEFAULTS.theme); refresh() }, [])
+  useEffect(() => { refresh() }, [])
 
   return (
     <SettingsContext.Provider value={{ settings, loaded, refresh }}>
-      {children}
+      {loaded ? children : <SettingsBoot />}
     </SettingsContext.Provider>
+  )
+}
+
+function SettingsBoot() {
+  return (
+    <div className="min-h-dvh grid place-items-center" style={{ background: '#FBF6EC' }}>
+      <div className="w-8 h-8 rounded-full border-2 border-stone-200 border-t-stone-500 animate-spin" aria-label="Loading site settings" />
+    </div>
   )
 }
 
