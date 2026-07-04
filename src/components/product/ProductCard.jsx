@@ -58,17 +58,16 @@ export function ProductCard({ product }) {
         >
           <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
 
-          {/* Quick action bar — always visible on mobile (icon-only), slides up on hover on desktop */}
-          <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3 transition-transform duration-300 ease-spring translate-y-0 md:translate-y-full md:group-hover:translate-y-0">
-            <div className="flex gap-1.5 sm:gap-2">
+          {/* Quick action bar — unified dark glass, slides up on hover desktop / always visible mobile */}
+          <div className="absolute inset-x-0 bottom-0 p-2.5 transition-transform duration-300 ease-spring translate-y-0 md:translate-y-full md:group-hover:translate-y-0">
+            <div className="flex gap-1.5 p-1.5 rounded-2xl" style={{ background: 'rgba(12,8,6,0.68)', backdropFilter: 'blur(10px)' }}>
               <button
                 onClick={handleAddToCart}
                 disabled={!inStock || adding}
-                className="flex-1 flex items-center justify-center gap-1.5 h-9 sm:h-10 rounded-lg sm:rounded-xl text-xs font-semibold backdrop-blur-sm transition-all duration-200 disabled:opacity-60 cursor-pointer"
-                style={{ background: 'var(--maroon)', color: 'var(--cream)' }}
+                className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-xl text-xs font-semibold text-white/90 hover:text-white transition-all duration-200 disabled:opacity-50 cursor-pointer hover:bg-white/10"
                 aria-label="Add to cart"
               >
-                <ShoppingBag size={15} />
+                <ShoppingBag size={13} />
                 <span className="hidden sm:inline">{adding ? 'Added!' : inStock ? 'Add to Bag' : 'Sold Out'}</span>
               </button>
               {wa && (
@@ -77,19 +76,18 @@ export function ProductCard({ product }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-1 sm:flex-none sm:w-10 flex items-center justify-center h-9 sm:h-10 rounded-lg sm:rounded-xl backdrop-blur-sm transition-all duration-200"
-                  style={{ background: '#25D366', color: '#06351b' }}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
                   aria-label="Order on WhatsApp"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm4.6 12.16c-.25-.13-1.47-.72-1.7-.81-.23-.08-.4-.13-.56.13-.17.25-.65.8-.79.97-.15.17-.29.19-.54.06-.25-.13-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.39.11-.51.11-.11.25-.29.38-.43.12-.15.16-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.42h-.48c-.17 0-.44.06-.67.31s-.88.86-.88 2.07c0 1.22.9 2.4 1.02 2.56.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.43.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.23-.17-.48-.29Z" /></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm4.6 12.16c-.25-.13-1.47-.72-1.7-.81-.23-.08-.4-.13-.56.13-.17.25-.65.8-.79.97-.15.17-.29.19-.54.06-.25-.13-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.39.11-.51.11-.11.25-.29.38-.43.12-.15.16-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.42h-.48c-.17 0-.44.06-.67.31s-.88.86-.88 2.07c0 1.22.9 2.4 1.02 2.56.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.43.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.23-.17-.48-.29Z" /></svg>
                 </a>
               )}
               <Link
                 to={`/products/${f.id}`}
-                className="flex-1 sm:flex-none sm:w-10 flex items-center justify-center h-9 sm:h-10 rounded-lg sm:rounded-xl bg-white/90 backdrop-blur-sm hover:bg-white transition-all duration-200"
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
                 aria-label="Quick view"
               >
-                <Eye size={16} style={{ color: 'var(--ink)' }} />
+                <Eye size={14} />
               </Link>
             </div>
           </div>
@@ -114,18 +112,18 @@ export function ProductCard({ product }) {
       </button>
 
       {/* Info */}
-      <div className="mt-4 space-y-1 px-0.5">
-        {f.material && <p className="text-[11px] text-stone-400 tracking-wide font-medium uppercase">{f.material}</p>}
+      <div className="mt-3 px-0.5">
+        {f.material && <p className="text-[10px] text-stone-400 tracking-widest font-medium uppercase mb-0.5">{f.material}</p>}
         <Link to={`/products/${f.id}`}>
-          <h3 className="font-display text-lg leading-snug transition-colors" style={{ color: 'var(--ink)' }}>
+          <h3 className="font-display text-base font-bold leading-snug transition-colors" style={{ color: 'var(--ink)', fontWeight: 700 }}>
             {product.name}
           </h3>
         </Link>
-        {product.hindiName && <p className="font-hindi text-sm" style={{ color: 'var(--maroon)' }}>{product.hindiName}</p>}
-        {f.rating > 0 && <StarRating rating={f.rating} showCount count={f.reviews} size={12} />}
-        <div className="flex items-baseline gap-2 pt-1">
-          <span className="font-semibold text-base" style={{ color: 'var(--ink)' }}>{fmt(product.price)}</span>
-          {discount > 0 && <span className="text-sm text-stone-400 line-through">{fmt(f.originalPrice)}</span>}
+        {product.hindiName && <p className="font-hindi text-xs mt-0.5" style={{ color: 'var(--maroon)' }}>{product.hindiName}</p>}
+        {f.rating > 0 && <div className="mt-1"><StarRating rating={f.rating} showCount count={f.reviews} size={11} /></div>}
+        <div className="flex items-baseline gap-2 mt-1.5">
+          <span className="font-bold text-sm" style={{ color: 'var(--ink)' }}>{fmt(product.price)}</span>
+          {discount > 0 && <span className="text-xs text-stone-400 line-through">{fmt(f.originalPrice)}</span>}
         </div>
       </div>
     </div>
