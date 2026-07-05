@@ -8,6 +8,7 @@ import ApiError from '../../utils/ApiError.js';
 import { requireCustomer, signCustomer } from '../../middleware/customerAuth.js';
 import Customer from './customer.model.js';
 import Order from '../order/order.model.js';
+import Review from '../review/review.model.js';
 
 const router = express.Router();
 const objectId = Joi.string().hex().length(24);
@@ -101,6 +102,56 @@ router.get('/orders', requireCustomer, asyncHandler(async (req, res) => {
   const orders = await Order.find({ customerId: req.customer.id }).sort({ createdAt: -1 }).lean();
   res.json({ success: true, data: orders });
 }));
+
+/* ── Post-purchase reviews ────────────────────────────────────────── */
+// A customer may review a product only if they received it in a delivered
+// order. One review per customer+product (re-submitting edits it). Verified
+// reviews auto-publish; admin can hide later. Product ratings are computed
+// from these on read (see product.routes.js).
+router.get('/reviews', requireCustomer, asyncHandler(async (req, res) => {
+  const reviews = await Review.find({ customerId: req.customer.id }).select('productId rating text').lean();
+  res.json({ success: true, data: reviews });
+}));
+
+router.post(
+  '/reviews',
+  requireCustomer,
+  validate({
+    body: Joi.object({
+      productId: objectId.required(),
+      rating: Joi.number().integer().min(1).max(5).required(),
+      text: Joi.string().allow('').max(1000).default(''),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const { productId, rating, text } = req.body;
+
+    // Verify a delivered order of this customer contains the product.
+    const order = await Order.findOne({
+      customerId: req.customer.id,
+      status: 'delivered',
+      'items.productId': productId,
+    }).sort({ createdAt: -1 }).lean();
+    if (!order) throw ApiError.forbidden('You can only review items from a delivered order');
+
+    const customer = await Customer.findById(req.customer.id).lean();
+    const review = await Review.findOneAndUpdate(
+      { customerId: req.customer.id, productId },
+      {
+        name: customer?.name || 'Verified Buyer',
+        rating,
+        text,
+        productId,
+        customerId: req.customer.id,
+        orderId: order._id,
+        verifiedPurchase: true,
+        isApproved: true,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.status(201).json({ success: true, data: review });
+  })
+);
 
 /* ── Cart sync (bag follows the customer) ─────────────────────────── */
 router.put(

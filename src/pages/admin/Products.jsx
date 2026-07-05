@@ -5,7 +5,7 @@ import { AdminHeader, Btn, Modal, Field } from '../../components/admin/AdminUI.j
 import { MultiImageUploader, MediaUploader } from '../../components/admin/MediaUploader.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
-const blank = { name: '', hindiName: '', sku: '', price: '', mrp: '', story: '', description: '', categoryId: '', collectionIds: [], images: [], video: '', material: '', weight: '', tags: [], stockQty: 0, isNewArrival: false, isBestseller: false, isActive: true }
+const blank = { name: '', hindiName: '', sku: '', price: '', mrp: '', story: '', description: '', categoryId: '', collectionIds: [], images: [], video: '', material: '', weight: '', tags: [], stockQty: 0, isNewArrival: false, isBestseller: false, isActive: true, ratingAvg: 0, ratingCount: 0 }
 
 export function AdminProducts() {
   const [products, setProducts] = useState([])
@@ -34,10 +34,12 @@ export function AdminProducts() {
     setSaving(true); setError(null)
     try {
       const payload = { ...editing }
-      ;['_id', 'createdAt', 'updatedAt', '__v', 'slug', 'inStock', 'isOnSale', 'ratingAvg', 'ratingCount', 'id', 'originalPrice'].forEach((k) => delete payload[k])
+      ;['_id', 'createdAt', 'updatedAt', '__v', 'slug', 'inStock', 'isOnSale', 'id', 'originalPrice', 'reviewCount', 'isRealRating'].forEach((k) => delete payload[k])
       payload.price = Number(payload.price) || 0
       payload.mrp = Number(payload.mrp) || 0
       payload.stockQty = Number(payload.stockQty) || 0
+      payload.ratingAvg = Number(payload.ratingAvg) || 0
+      payload.ratingCount = Number(payload.ratingCount) || 0
       if (!payload.categoryId) delete payload.categoryId
       if (editing._id) await api.patch(`/products/${editing._id}`, payload, { auth: true })
       else await api.post('/products', payload, { auth: true })
@@ -127,6 +129,20 @@ export function AdminProducts() {
             <Field field={{ label: 'New arrival', type: 'toggle' }} value={editing.isNewArrival} onChange={(v) => set('isNewArrival', v)} />
             <Field field={{ label: 'Bestseller', type: 'toggle' }} value={editing.isBestseller} onChange={(v) => set('isBestseller', v)} />
             <Field field={{ label: 'Active (visible on site)', type: 'toggle' }} value={editing.isActive} onChange={(v) => set('isActive', v)} />
+
+            {/* Starter rating — the hardcoded fallback shown until real reviews take over */}
+            <div className="sm:col-span-2 rounded-xl p-3.5" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--maroon)' }}>Starter rating</p>
+              <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
+                Shown only until this product earns <b>30 genuine verified-purchase reviews</b>. After that, real customer
+                ratings take over automatically and these values are ignored.
+                {editing._id && ` Currently ${editing.reviewCount || 0} / 30 genuine reviews${(editing.reviewCount || 0) >= 30 ? ' — real ratings are now live.' : '.'}`}
+              </p>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Field field={{ label: 'Rating (0–5)', type: 'number' }} value={editing.ratingAvg} onChange={(v) => set('ratingAvg', v)} />
+                <Field field={{ label: 'Rating count', type: 'number' }} value={editing.ratingCount} onChange={(v) => set('ratingCount', v)} />
+              </div>
+            </div>
           </div>
         )}
         {error && <p className="text-sm text-red-500 mt-3">{error}</p>}

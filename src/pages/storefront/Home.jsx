@@ -223,23 +223,24 @@ function HeroBackground({ hero, t }) {
 function OfferStrip({ offers }) {
   return (
     <section className="container-wide my-10 md:my-14 relative z-20">
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-2.5 md:gap-4">
         {offers.slice(0, 2).map((o, i) => (
           <div
             key={o._id}
-            className="relative rounded-2xl overflow-hidden p-6 md:p-7 flex items-center gap-4 shadow-card animate-slide-up"
+            className="relative rounded-2xl overflow-hidden p-3 md:p-7 flex items-center gap-2.5 md:gap-4 shadow-card animate-slide-up"
             style={{ background: o.bgColor || (i === 0 ? 'var(--maroon)' : 'var(--gold)'), color: i === 0 ? 'var(--cream)' : 'var(--ink)' }}
           >
-            <div className="shrink-0 w-12 h-12 rounded-full grid place-items-center" style={{ background: 'rgba(255,255,255,0.18)' }}>
-              {i === 0 ? <Gift size={22} /> : <Truck size={22} />}
+            <div className="shrink-0 w-8 h-8 md:w-12 md:h-12 rounded-full grid place-items-center" style={{ background: 'rgba(255,255,255,0.18)' }}>
+              {i === 0 ? <Gift size={16} className="md:hidden" /> : <Truck size={16} className="md:hidden" />}
+              {i === 0 ? <Gift size={22} className="hidden md:block" /> : <Truck size={22} className="hidden md:block" />}
             </div>
-            <div className="flex-1">
-              {o.hindiText && <p className="font-hindi text-sm opacity-90">{o.hindiText}</p>}
-              <p className="font-display text-xl md:text-2xl leading-tight">{o.text}</p>
-              {o.subtext && <p className="text-sm opacity-85 mt-0.5">{o.subtext}</p>}
+            <div className="flex-1 min-w-0">
+              {o.hindiText && <p className="font-hindi text-[11px] md:text-sm opacity-90 truncate">{o.hindiText}</p>}
+              <p className="font-display text-sm md:text-2xl leading-tight">{o.text}</p>
+              {o.subtext && <p className="text-[11px] md:text-sm opacity-85 mt-0.5 line-clamp-2 md:line-clamp-none">{o.subtext}</p>}
             </div>
             {o.ctaLabel && (
-              <Link to={o.ctaLink || '/products'} className="shrink-0 text-sm font-semibold underline underline-offset-4">
+              <Link to={o.ctaLink || '/products'} className="shrink-0 text-xs md:text-sm font-semibold underline underline-offset-4 hidden sm:inline">
                 {o.ctaLabel}
               </Link>
             )}

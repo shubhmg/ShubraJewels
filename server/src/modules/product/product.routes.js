@@ -1,6 +1,8 @@
 import express from 'express';
 import Joi from 'joi';
+import mongoose from 'mongoose';
 import Product from './product.model.js';
+import Review from '../review/review.model.js';
 import Category from '../category/category.model.js';
 import Collection from '../collection/collection.model.js';
 import validate from '../../middleware/validate.js';
@@ -34,12 +36,41 @@ const base = {
   isNewArrival: Joi.boolean(),
   isBestseller: Joi.boolean(),
   isOnSale: Joi.boolean(),
+  ratingAvg: Joi.number().min(0).max(5),   // starter/seed rating (used until REVIEW_THRESHOLD genuine reviews)
+  ratingCount: Joi.number().min(0),
   order: Joi.number(),
   isActive: Joi.boolean(),
 };
 
 const createSchema = Joi.object({ ...base, name: base.name.required(), price: base.price.required() });
 const updateSchema = Joi.object(base).min(1);
+
+// Below this many genuine (verified-purchase, approved) reviews, the admin's
+// starter rating is shown. At/above it, the real customer rating takes over.
+const REVIEW_THRESHOLD = 30;
+
+async function genuineRatings(productIds) {
+  if (!productIds.length) return new Map();
+  const rows = await Review.aggregate([
+    { $match: { productId: { $in: productIds.map((id) => new mongoose.Types.ObjectId(id)) }, isApproved: true, verifiedPurchase: true } },
+    { $group: { _id: '$productId', avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+  ]);
+  const m = new Map();
+  rows.forEach((r) => m.set(String(r._id), { avg: Math.round(r.avg * 10) / 10, count: r.count }));
+  return m;
+}
+
+// Merge the effective rating into a product plain object.
+function withRating(p, g) {
+  const real = g && g.count >= REVIEW_THRESHOLD;
+  return {
+    ...p,
+    ratingAvg: real ? g.avg : (p.ratingAvg || 0),
+    ratingCount: real ? g.count : (p.ratingCount || 0),
+    reviewCount: g ? g.count : 0,   // genuine reviews so far (for admin progress)
+    isRealRating: !!real,
+  };
+}
 
 function normalize(payload) {
   if (payload.name && !payload.slug) payload.slug = slugify(payload.name);
@@ -86,7 +117,13 @@ router.get(
     if (search) filter.$text = { $search: search };
 
     const products = await Product.find(filter).sort({ order: 1, createdAt: -1 }).lean();
-    res.json({ success: true, data: products });
+    const gm = await genuineRatings(products.map((p) => p._id));
+    // Admin (showAll) gets the raw seed rating + review progress; storefront gets the effective rating.
+    const data = products.map((p) => {
+      const g = gm.get(String(p._id));
+      return showAll ? { ...p, reviewCount: g ? g.count : 0 } : withRating(p, g);
+    });
+    res.json({ success: true, data });
   })
 );
 
@@ -98,7 +135,8 @@ router.get(
     const query = objectId.validate(idOrSlug).error ? { slug: idOrSlug } : { _id: idOrSlug };
     const product = await Product.findOne(query).lean();
     if (!product) throw ApiError.notFound('Product not found');
-    res.json({ success: true, data: product });
+    const gm = await genuineRatings([product._id]);
+    res.json({ success: true, data: withRating(product, gm.get(String(product._id))) });
   })
 );
 

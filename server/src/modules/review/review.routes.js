@@ -11,6 +11,7 @@ const base = {
   text: Joi.string().allow('').max(1000),
   image: Joi.string().allow('').max(500),
   productId: objectId.allow(null, ''),
+  verifiedPurchase: Joi.boolean(),
   isApproved: Joi.boolean(),
   isFeatured: Joi.boolean(),
   order: Joi.number(),
@@ -20,6 +21,8 @@ export default crudFactory({
   Model: Review,
   createSchema: Joi.object({ ...base, name: base.name.required() }),
   updateSchema: Joi.object(base).min(1),
-  publicFilter: { isApproved: true },
+  // Homepage testimonial wall = admin-curated reviews only. Customer
+  // post-purchase reviews (customerId set) feed product ratings, not this list.
+  publicFilter: { isApproved: true, customerId: null },
   sort: { isFeatured: -1, order: 1, createdAt: -1 },
 });
