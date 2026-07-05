@@ -203,4 +203,16 @@ router.post(
   })
 );
 
+// ADMIN — wipe ALL orders (pre-launch testing cleanup). Guarded by a confirm
+// token so it can't be triggered accidentally. Does not touch stock.
+router.post(
+  '/delete-all',
+  requireAdmin,
+  validate({ body: Joi.object({ confirm: Joi.string().valid('DELETE_ALL').required() }) }),
+  asyncHandler(async (req, res) => {
+    const { deletedCount } = await Order.deleteMany({});
+    res.json({ success: true, data: { deletedCount } });
+  })
+);
+
 export default router;

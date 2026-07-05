@@ -33,12 +33,30 @@ export function AdminOrders() {
   const [filter, setFilter] = useState('all')
   const [newOpen, setNewOpen] = useState(false)
 
+  const [wiping, setWiping] = useState(false)
+
   const load = async () => {
     setLoading(true)
     setOrders(await api.get('/orders', { auth: true }))
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  // Pre-launch cleanup: wipe all (test) orders.
+  const deleteAll = async () => {
+    if (orders.length === 0) return
+    if (!window.confirm(`Delete ALL ${orders.length} orders permanently? This is for pre-launch testing cleanup and cannot be undone.`)) return
+    setWiping(true)
+    try {
+      const res = await api.post('/orders/delete-all', { confirm: 'DELETE_ALL' }, { auth: true })
+      await load()
+      window.alert(`Deleted ${res?.deletedCount ?? 0} order(s).`)
+    } catch (e) {
+      window.alert(e?.message || 'Could not delete orders')
+    } finally {
+      setWiping(false)
+    }
+  }
 
   // Any admin patch (status / payment) — reconcile with the server response
   // so auto-effects (stock deduction, COD→paid on delivery) reflect.
@@ -55,6 +73,11 @@ export function AdminOrders() {
   return (
     <div>
       <AdminHeader title="Orders" subtitle={`${orders.length} orders`}>
+        {orders.length > 0 && (
+          <Btn variant="danger" onClick={deleteAll} disabled={wiping}>
+            <Trash2 size={16} /> {wiping ? 'Deleting…' : 'Delete all'}
+          </Btn>
+        )}
         <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
       </AdminHeader>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={load} />}
