@@ -56,11 +56,11 @@ export function Navbar() {
         solid ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-cream-200/80' : 'bg-transparent'
       }`}>
         <div className="container-wide">
-          <div className="flex items-center justify-between h-14 md:h-20 gap-2">
+          <div className={`flex items-center justify-between gap-2 ${settings.showBrandName === false && settings.logo ? 'h-16 md:h-24' : 'h-14 md:h-20'}`}>
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2 flex-shrink-0 min-w-0">
               {settings.logo ? (
-                <img src={settings.logo} alt={settings.brandName} className={`w-auto object-contain ${settings.showBrandName === false ? 'h-10 md:h-14' : 'h-8 md:h-9'}`} />
+                <img src={settings.logo} alt={settings.brandName} className={`w-auto object-contain ${settings.showBrandName === false ? 'h-14 md:h-20' : 'h-8 md:h-9'}`} />
               ) : (
                 <div className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--gold), var(--gold-light))' }}>
                   <span className="font-display text-base md:text-lg" style={{ color: 'var(--maroon-dark)' }}>{settings.brandName?.[0] || 'S'}</span>
