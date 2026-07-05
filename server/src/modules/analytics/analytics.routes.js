@@ -125,4 +125,65 @@ router.get(
   })
 );
 
+// ADMIN — per-product view stats (separate from page-view totals). Server-side
+// search + pagination so it scales to a large catalog.
+router.get(
+  '/product-views',
+  requireAdmin,
+  validate({
+    query: Joi.object({
+      days: Joi.number().min(1).max(365).default(30),
+      page: Joi.number().min(1).default(1),
+      limit: Joi.number().min(1).max(100).default(20),
+      search: Joi.string().allow('').max(120).default(''),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const { days, page, limit, search } = req.query;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    // View counts per product-detail page in the window.
+    const agg = await Visit.aggregate([
+      { $match: { createdAt: { $gte: since }, path: { $regex: /^\/products\/[a-f0-9]{24}$/i } } },
+      { $group: { _id: '$path', views: { $sum: 1 } } },
+    ]);
+    const viewMap = new Map();
+    for (const r of agg) viewMap.set(r._id.split('/').pop().toLowerCase(), r.views);
+
+    const shape = (p, id, views) => ({
+      id,
+      name: p?.name || 'Product (deleted)',
+      image: p?.images?.[0] || '',
+      price: p?.price || 0,
+      views,
+    });
+
+    let items;
+    let total;
+
+    if (search) {
+      // Product-centric: search by name, attach views (incl. 0), sort by views.
+      const matched = await Product.find({ name: { $regex: search, $options: 'i' } })
+        .select('name images price')
+        .lean();
+      const list = matched
+        .map((p) => shape(p, String(p._id), viewMap.get(String(p._id).toLowerCase()) || 0))
+        .sort((a, b) => b.views - a.views);
+      total = list.length;
+      items = list.slice((page - 1) * limit, page * limit);
+    } else {
+      // Leaderboard: only products with views, most-viewed first.
+      const sorted = [...viewMap.entries()].sort((a, b) => b[1] - a[1]);
+      total = sorted.length;
+      const slice = sorted.slice((page - 1) * limit, page * limit);
+      const ids = slice.map(([id]) => id);
+      const products = await Product.find({ _id: { $in: ids } }).select('name images price').lean();
+      const byId = new Map(products.map((p) => [String(p._id).toLowerCase(), p]));
+      items = slice.map(([id, views]) => shape(byId.get(id), id, views));
+    }
+
+    res.json({ success: true, data: { items, total, page, limit, days } });
+  })
+);
+
 export default router;

@@ -20,6 +20,7 @@ import { Account }       from './pages/storefront/Account.jsx'
 // Admin pages
 import { AdminLogin }       from './pages/admin/Login.jsx'
 import { AdminDashboard }   from './pages/admin/Dashboard.jsx'
+import { AdminProductViews } from './pages/admin/ProductViews.jsx'
 import { AdminHomepage }    from './pages/admin/Homepage.jsx'
 import { AdminProducts }    from './pages/admin/Products.jsx'
 import { AdminInventory }   from './pages/admin/Inventory.jsx'
@@ -72,6 +73,7 @@ const router = createBrowserRouter([
     element: <AdminLayout />,
     children: [
       { index: true,           element: <AdminDashboard />   },
+      { path: 'product-views', element: <AdminProductViews /> },
       { path: 'homepage',      element: <AdminHomepage />    },
       { path: 'products',      element: <AdminProducts />    },
       { path: 'inventory',     element: <AdminInventory />   },
