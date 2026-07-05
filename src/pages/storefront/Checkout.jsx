@@ -177,7 +177,7 @@ export function Checkout() {
 
       <div className="container-wide py-6 md:py-10">
         <div className="grid lg:grid-cols-3 gap-6 lg:gap-10">
-          <div className="lg:col-span-2 space-y-4 md:space-y-6">
+          <div className="order-2 lg:order-1 lg:col-span-2 space-y-4 md:space-y-6">
             {/* Sign-in prompt (optional — guest checkout allowed) */}
             <div className="bg-white rounded-2xl p-4 shadow-card flex items-center gap-3">
               <div className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--maroon) 12%, transparent)', color: 'var(--maroon)' }}><User size={17} /></div>
@@ -231,7 +231,7 @@ export function Checkout() {
             </div>
           </div>
 
-          <aside className="bg-white rounded-2xl p-4 md:p-6 shadow-card h-fit space-y-4 lg:sticky lg:top-24">
+          <aside className="order-1 lg:order-2 bg-white rounded-2xl p-4 md:p-6 shadow-card h-fit space-y-4 lg:sticky lg:top-24">
             <h3 className="font-display text-lg" style={{ color: 'var(--ink)' }}>Order Summary</h3>
             <div className="space-y-3">
               {items.map((item) => (
