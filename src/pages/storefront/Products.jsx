@@ -72,10 +72,10 @@ export function Products() {
   const hindi = activeCat?.hindiName || activeCol?.hindiName || (under599 ? '₹599 से कम' : 'सभी झुमके')
 
   return (
-    <div className="pt-16 min-h-dvh" style={{ background: 'var(--cream)' }}>
+    <div className="min-h-dvh" style={{ background: 'var(--cream)' }}>
       <div className="relative overflow-hidden" style={{ background: 'var(--maroon)' }}>
         <Mandala size={360} className="absolute -right-24 -top-16 opacity-20" />
-        <div className="container-wide py-14 relative text-center">
+        <div className="container-wide pt-24 md:pt-32 pb-12 md:pb-14 relative text-center">
           <div className="eyebrow justify-center flex"><Motif size={18} />Browse the collection</div>
           <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">{hindi}</p>
           <h1 className="font-display text-white text-4xl md:text-5xl">{title}</h1>

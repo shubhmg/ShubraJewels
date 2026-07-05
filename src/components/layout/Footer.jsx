@@ -1,12 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Instagram, Facebook, Youtube, Mail, Phone, MapPin } from 'lucide-react'
 import { instagramHandle, instagramUrl, useSettings } from '../../lib/SettingsProvider.jsx'
-import { useCategories } from '../../hooks/useApi.js'
 import { Motif, MehendiDivider } from '../decor/Decor.jsx'
 
 export function Footer() {
   const settings = useSettings()
-  const { data: categories } = useCategories()
   const igUrl = instagramUrl(settings)
   const igHandle = instagramHandle(settings)
 
@@ -20,7 +18,7 @@ export function Footer() {
     <footer style={{ background: 'var(--maroon-dark)', color: 'rgba(255,255,255,0.7)' }}>
       <MehendiDivider />
       <div className="container-wide py-14">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1 space-y-4">
             <div className="flex items-center gap-2">
@@ -44,18 +42,6 @@ export function Footer() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Categories */}
-          <div>
-            <h4 className="text-white text-sm font-semibold tracking-wide mb-4">Shop</h4>
-            <ul className="space-y-2.5 text-sm">
-              {(categories || []).slice(0, 6).map((c) => (
-                <li key={c._id}>
-                  <Link to={`/products?category=${c.slug || c._id}`} className="hover:text-[var(--gold-light)] transition-colors">{c.name}</Link>
-                </li>
-              ))}
-            </ul>
           </div>
 
           {/* Company */}

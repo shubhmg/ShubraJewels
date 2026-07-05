@@ -15,11 +15,11 @@ export function About() {
   const settings = useSettings()
 
   return (
-    <div className="pt-16 min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
+    <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
       {/* Hero */}
       <div className="relative overflow-hidden text-center" style={{ background: 'var(--maroon-dark)' }}>
         <Mandala size={440} className="absolute left-1/2 -translate-x-1/2 -top-24 opacity-15" />
-        <div className="container-wide py-20 relative">
+        <div className="container-wide pt-28 md:pt-36 pb-16 md:pb-20 relative">
           <div className="eyebrow justify-center flex"><Motif size={20} />Our Story</div>
           <p className="font-hindi text-2xl md:text-3xl text-[var(--gold-light)] mt-3">{settings.slogan}</p>
           <h1 className="font-display text-white text-4xl md:text-6xl leading-tight mt-1">{settings.brandName}</h1>

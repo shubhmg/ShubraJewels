@@ -18,11 +18,11 @@ export function Collections() {
     (products || []).filter((p) => (p.collectionIds || []).map(String).includes(String(colId))).length
 
   return (
-    <div className="pt-16 min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
+    <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
       {/* Hero */}
       <div className="relative overflow-hidden text-center" style={{ background: 'var(--maroon-dark)' }}>
         <Mandala size={440} className="absolute left-1/2 -translate-x-1/2 -top-24 opacity-20" />
-        <div className="container-wide py-20 relative">
+        <div className="container-wide pt-28 md:pt-36 pb-16 md:pb-20 relative">
           <div className="eyebrow justify-center flex"><Motif size={20} /><span className="font-hindi">{settings.brandNameHindi}</span></div>
           <p className="font-hindi text-2xl text-[var(--gold-light)] mt-3">राजसी संग्रह</p>
           <h1 className="font-display text-white text-5xl md:text-6xl leading-tight mt-1">The Royal Collections</h1>

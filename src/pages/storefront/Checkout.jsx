@@ -120,12 +120,14 @@ export function Checkout() {
     }
   }
 
-  const orderViaWhatsApp = async () => {
-    const order = await placeOrder('whatsapp')
-    if (!order) return
-    const lines = order.items.map((i) => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n')
-    const msg = `${settings.whatsappMessage || 'Hello! I would like to order:'}\n\nOrder ${order.orderNo}\n${lines}\n\nTotal: ${fmt(order.total)}\nName: ${order.customer.name}\nPhone: ${order.customer.phone}`
-    const link = whatsappLink(settings, msg)
+  // WhatsApp button: only opens a pre-filled chat — it does NOT place an order.
+  const orderViaWhatsApp = () => {
+    if (items.length === 0) return
+    const lines = items.map((i) => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n')
+    const parts = [settings.whatsappMessage || 'Hello! I would like to order:', '', lines, '', `Total: ${fmt(subtotal)}`]
+    if (form.name.trim()) parts.push(`Name: ${form.name.trim()}`)
+    if (form.phone.trim()) parts.push(`Phone: ${form.phone.trim()}`)
+    const link = whatsappLink(settings, parts.join('\n'))
     if (link) window.open(link, '_blank')
   }
 
@@ -164,10 +166,10 @@ export function Checkout() {
   }
 
   return (
-    <div className="pt-16 min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
+    <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
       <div className="relative overflow-hidden" style={{ background: 'var(--maroon)' }}>
         <Mandala size={300} className="absolute -right-16 -top-10 opacity-20" />
-        <div className="container-wide py-8 md:py-12 relative">
+        <div className="container-wide pt-24 md:pt-28 pb-8 md:pb-12 relative">
           <div className="flex items-center gap-2 text-xs text-white/60 mb-2">
             <Link to="/" className="hover:text-white">Home</Link><ChevronRight size={12} /><span className="text-white/90">Checkout</span>
           </div>

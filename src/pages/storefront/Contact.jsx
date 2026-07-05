@@ -18,10 +18,10 @@ export function Contact() {
   ].filter((s) => s.url)
 
   return (
-    <div className="pt-16 min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
+    <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
       <div className="relative overflow-hidden text-center" style={{ background: 'var(--maroon)' }}>
         <Mandala size={320} className="absolute -right-20 -top-12 opacity-20" />
-        <div className="container-wide py-16 relative">
+        <div className="container-wide pt-24 md:pt-32 pb-12 md:pb-16 relative">
           <div className="eyebrow justify-center flex"><Motif size={18} />Get in touch</div>
           <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">हमसे जुड़ें</p>
           <h1 className="font-display text-white text-4xl md:text-5xl">We'd Love to Hear From You</h1>

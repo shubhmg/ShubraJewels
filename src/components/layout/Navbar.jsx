@@ -15,6 +15,11 @@ const NAV = [
   { to: '/contact',     label: 'Contact'     },
 ]
 
+// Routes that open with a full-width dark banner (or hero). On these, the
+// navbar starts transparent/merged (white text) and turns solid/light on
+// scroll — same behaviour as the home hero.
+const DARK_TOP_ROUTES = new Set(['/', '/products', '/collections', '/about', '/contact', '/checkout'])
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -26,7 +31,10 @@ export function Navbar() {
   const { customer, fetchMe, isAuthed } = useCustomerStore()
   useEffect(() => { fetchMe() }, []) // eslint-disable-line
   const onAccount = () => (isAuthed() ? navigate('/account') : setAuthOpen(true))
-  const heroBg = !scrolled && location.pathname === '/' && !mobileOpen
+  // Routes whose page opens with a dark top banner that the navbar merges into
+  // (transparent + white at the top, going solid/light on scroll).
+  const darkTop = DARK_TOP_ROUTES.has(location.pathname)
+  const heroBg = !scrolled && darkTop && !mobileOpen
   const cartCount = useCartStore((s) => s.items.reduce((a, i) => a + i.qty, 0))
   const wishCount = useWishlistStore((s) => s.items.length)
   const openCart = useCartStore((s) => s.openCart)
@@ -45,9 +53,8 @@ export function Navbar() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  // Transparent-at-top is only for the home hero; every other route is solid
-  // immediately (they load scrolled to top with no dark hero behind the bar).
-  const solid = scrolled || mobileOpen || location.pathname !== '/'
+  // Merged/transparent only on dark-top routes; every other route is solid.
+  const solid = scrolled || mobileOpen || !darkTop
 
   return (
     <>
