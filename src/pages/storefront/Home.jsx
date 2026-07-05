@@ -132,7 +132,7 @@ function Hero({ settings }) {
   const t = settings.theme || {}
   const hero = settings.homepage?.hero || {}
   return (
-    <section className="relative min-h-[94vh] flex flex-col overflow-hidden pt-16 md:pt-24" style={{ background: 'var(--maroon-dark)' }}>
+    <section className="relative min-h-[68vh] md:min-h-[80vh] flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
       {/* Scattered jhumka silhouettes (replaces the mandala) */}
       <EarringMotif size={150} className="absolute right-[7%] top-[9%] rotate-12" style={{ opacity: 0.1 }} />
       <EarringMotif size={95} className="absolute left-[8%] top-[22%] -rotate-12" style={{ opacity: 0.08 }} />
@@ -140,25 +140,25 @@ function Hero({ settings }) {
       <EarringMotif size={72} className="absolute right-[15%] bottom-[24%] -rotate-6" style={{ opacity: 0.09 }} />
 
       {/* Hero background — 3D jewel, image, or video (admin-selectable) */}
-      <div className="relative flex-1 min-h-[40vh] md:min-h-[48vh]">
+      <div className="relative flex-1 min-h-[30vh] md:min-h-[42vh]">
         <HeroBackground hero={hero} t={t} />
       </div>
 
       {/* Text */}
       <motion.div
-        className="container-wide relative z-10 pb-24 pt-2 text-center"
+        className="container-wide relative z-10 pb-10 md:pb-14 pt-2 text-center"
         initial="hidden"
         animate="show"
         variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
       >
-        <HeroLine><div className="eyebrow justify-center flex mb-4"><Motif size={20} />{hero.eyebrow || settings.brandNameHindi}</div></HeroLine>
-        <HeroLine><p className="font-hindi text-2xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
-        <HeroLine><h1 className="font-display text-white text-5xl md:text-7xl lg:text-8xl leading-[1.03] mt-2 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
-        {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-4 text-base md:text-lg">{hero.subheading}</p></HeroLine>}
+        <HeroLine><div className="eyebrow justify-center flex mb-2.5"><Motif size={18} />{hero.eyebrow || settings.brandNameHindi}</div></HeroLine>
+        <HeroLine><p className="font-hindi text-xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
+        <HeroLine><h1 className="font-display text-white text-4xl md:text-6xl lg:text-7xl leading-[1.05] mt-1.5 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
+        {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-3 text-sm md:text-lg">{hero.subheading}</p></HeroLine>}
         <HeroLine>
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
-            <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={17} /></Link></Magnetic>
-            {hero.showWhatsapp !== false && <Magnetic><WhatsAppButton label="Order on WhatsApp" size="md" className="!px-6 !py-3" /></Magnetic>}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
+            <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold !px-6 !py-2.5 !text-sm">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={16} /></Link></Magnetic>
+            {hero.showWhatsapp !== false && <Magnetic><WhatsAppButton label="Order on WhatsApp" size="md" className="!px-5 !py-2.5 !text-sm !bg-white/10 !text-white !shadow-none border border-white/30 backdrop-blur-sm hover:!bg-white/20" /></Magnetic>}
           </div>
         </HeroLine>
       </motion.div>
