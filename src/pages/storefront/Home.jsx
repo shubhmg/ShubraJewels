@@ -222,7 +222,7 @@ function HeroBackground({ hero, t }) {
 /* ── Offer strip ──────────────────────────────────────────────────── */
 function OfferStrip({ offers }) {
   return (
-    <section className="container-wide -mt-8 relative z-20">
+    <section className="container-wide -mt-8 mb-10 md:mb-14 relative z-20">
       <div className="grid md:grid-cols-2 gap-4">
         {offers.slice(0, 2).map((o, i) => (
           <div
