@@ -45,7 +45,9 @@ export function Navbar() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const solid = scrolled || mobileOpen
+  // Transparent-at-top is only for the home hero; every other route is solid
+  // immediately (they load scrolled to top with no dark hero behind the bar).
+  const solid = scrolled || mobileOpen || location.pathname !== '/'
 
   return (
     <>
