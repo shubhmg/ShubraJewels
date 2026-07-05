@@ -20,7 +20,9 @@ const SKIP_KEYS = new Set(['_id', '__v', 'createdAt', 'updatedAt']);
 function replaceUrls(value, replacements) {
   if (typeof value === 'string') return replacements.get(value) || value;
   if (Array.isArray(value)) return value.map((item) => replaceUrls(item, replacements));
-  if (value && typeof value === 'object') {
+  // Only recurse into PLAIN objects. ObjectId, Date, Buffer, etc. must pass
+  // through untouched — rebuilding them corrupts the value (e.g. ObjectId → {buffer}).
+  if (value && typeof value === 'object' && value.constructor === Object) {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [key, replaceUrls(item, replacements)])
     );
