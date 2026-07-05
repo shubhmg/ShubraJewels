@@ -2,6 +2,7 @@ import express from 'express';
 import Joi from 'joi';
 import Visit from './visit.model.js';
 import Order from '../order/order.model.js';
+import Product from '../product/product.model.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
@@ -9,6 +10,34 @@ import asyncHandler from '../../utils/asyncHandler.js';
 const router = express.Router();
 
 const dayStr = (d) => new Date(d).toISOString().slice(0, 10);
+
+const PAGE_LABELS = {
+  '/': 'Home',
+  '/products': 'All Jhumkas',
+  '/collections': 'Collections',
+  '/checkout': 'Checkout',
+  '/about': 'Our Story',
+  '/contact': 'Contact',
+  '/wishlist': 'Wishlist',
+  '/cart': 'Cart',
+  '/account': 'Account',
+};
+
+// Turn raw paths into human labels — product detail pages become product names.
+async function labelPages(pages) {
+  const ids = pages
+    .map((p) => (p.path.match(/^\/products\/([a-f0-9]{24})$/i) || [])[1])
+    .filter(Boolean);
+  const products = ids.length
+    ? await Product.find({ _id: { $in: ids } }).select('name').lean()
+    : [];
+  const nameById = new Map(products.map((p) => [String(p._id), p.name]));
+  return pages.map((p) => {
+    const m = p.path.match(/^\/products\/([a-f0-9]{24})$/i);
+    const label = m ? (nameById.get(m[1]) || 'Product (deleted)') : (PAGE_LABELS[p.path] || p.path);
+    return { ...p, label };
+  });
+}
 
 // PUBLIC — record a page view (fire-and-forget beacon from the storefront).
 router.post(
@@ -87,7 +116,7 @@ router.get(
         uniqueSessions,
         todayViews,
         series,
-        topPages,
+        topPages: await labelPages(topPages),
         deviceSplit: deviceSplit.map((d) => ({ device: d._id || 'unknown', count: d.count })),
         orders: orderStats[0]?.orders || 0,
         revenue: orderStats[0]?.revenue || 0,
