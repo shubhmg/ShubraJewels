@@ -107,7 +107,7 @@ export function ProductDetail() {
             {/* Story — the signature "हर झुमका एक कहानी" block */}
             {product.story && (
               <div className="rounded-2xl p-5" style={{ background: 'color-mix(in srgb, var(--beige) 60%, white)' }}>
-                <div className="eyebrow"><Motif size={16} />{settings.slogan}</div>
+                <div className="eyebrow"><Motif size={16} /><span className="font-hindi">{settings.slogan}</span></div>
                 <p className="mt-2 leading-relaxed text-sm" style={{ color: 'var(--ink)' }}>{product.story}</p>
               </div>
             )}

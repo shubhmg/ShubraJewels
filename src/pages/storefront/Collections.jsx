@@ -23,7 +23,7 @@ export function Collections() {
       <div className="relative overflow-hidden text-center" style={{ background: 'var(--maroon-dark)' }}>
         <Mandala size={440} className="absolute left-1/2 -translate-x-1/2 -top-24 opacity-20" />
         <div className="container-wide py-20 relative">
-          <div className="eyebrow justify-center flex"><Motif size={20} />{settings.brandNameHindi}</div>
+          <div className="eyebrow justify-center flex"><Motif size={20} /><span className="font-hindi">{settings.brandNameHindi}</span></div>
           <p className="font-hindi text-2xl text-[var(--gold-light)] mt-3">राजसी संग्रह</p>
           <h1 className="font-display text-white text-5xl md:text-6xl leading-tight mt-1">The Royal Collections</h1>
           <p className="mt-4 text-white/70 max-w-lg mx-auto text-sm">

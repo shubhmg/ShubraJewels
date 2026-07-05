@@ -104,6 +104,13 @@
     font-weight: 800;
   }
 
+  /* Devanagari must never inherit letter-spacing/uppercase (breaks matras &
+     conjuncts). Any Hindi text should carry .font-hindi. */
+  .font-hindi {
+    letter-spacing: normal !important;
+    text-transform: none !important;
+  }
+
   /* Cart drawer overlay */
   .drawer-overlay {
     background: rgba(12, 10, 9, 0.6);

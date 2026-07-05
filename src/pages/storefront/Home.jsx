@@ -186,11 +186,15 @@ function HeroBackground({ hero, t }) {
     return () => io.disconnect()
   }, [bg, url])
 
+  // Fades the media's bottom edge into the maroon text block below (continuity).
+  const bottomFade = <div className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent, var(--maroon-dark) 96%)' }} />
+
   if (bg === 'image' && url) {
     return (
       <>
         <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
+        {bottomFade}
       </>
     )
   }
@@ -199,6 +203,7 @@ function HeroBackground({ hero, t }) {
       <>
         <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" src={url} autoPlay muted loop playsInline />
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
+        {bottomFade}
       </>
     )
   }
@@ -304,7 +309,7 @@ function StorySpotlight({ product, settings }) {
           </Tilt>
         </Reveal>
         <Reveal delay={0.1} className="text-center md:text-left">
-          <div className="eyebrow"><Motif size={18} />{settings.slogan}</div>
+          <div className="eyebrow"><Motif size={18} /><span className="font-hindi">{settings.slogan}</span></div>
           {product.hindiName && <p className="font-hindi text-[var(--gold-light)] text-xl mt-3">{product.hindiName}</p>}
           <h2 className="font-display text-white text-4xl md:text-5xl mt-1">{product.name}</h2>
           <p className="text-white/80 mt-5 leading-relaxed max-w-lg">{product.story}</p>
