@@ -1,19 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Eye, Users, ShoppingCart, IndianRupee, Loader2, Database, Trash2, Sparkles, Smartphone, Monitor, Tablet, ArrowRight } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Eye, Users, ShoppingCart, IndianRupee, Loader2, Smartphone, Monitor, Tablet, Receipt, Percent, Clock } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { api } from '../../lib/api.js'
-import { AdminHeader, Btn } from '../../components/admin/AdminUI.jsx'
+import { AdminHeader } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 const nf = (n) => new Intl.NumberFormat('en-IN').format(n || 0)
 
-const STATUS_TINT = {
-  pending: 'bg-amber-50 text-amber-600', confirmed: 'bg-blue-50 text-blue-600',
-  shipped: 'bg-violet-50 text-violet-600', delivered: 'bg-emerald-50 text-emerald-600',
-  cancelled: 'bg-red-50 text-red-600',
-}
 const DEVICE_ICON = { mobile: Smartphone, desktop: Monitor, tablet: Tablet, unknown: Monitor }
 
 function ChartTip({ active, payload, label }) {
@@ -52,15 +46,11 @@ function Spark({ data, dataKey, color }) {
 
 export function AdminDashboard() {
   const [data, setData] = useState(null)
-  const [orders, setOrders] = useState([])
   const [days, setDays] = useState(30)
 
   useEffect(() => {
     api.get(`/analytics/summary?days=${days}`, { auth: true }).then(setData)
   }, [days])
-  useEffect(() => {
-    api.get('/orders', { auth: true }).then((o) => setOrders(o.slice(0, 6)))
-  }, [])
 
   if (!data) return <div className="flex justify-center py-20"><Loader2 className="animate-spin" style={{ color: 'var(--gold)' }} /></div>
 
@@ -71,8 +61,15 @@ export function AdminDashboard() {
     { icon: IndianRupee, label: 'Revenue', value: fmt(data.revenue), tint: 'bg-[color-mix(in_srgb,var(--gold)_14%,white)]', iconColor: 'var(--gold)' },
   ]
 
-  const maxPage = Math.max(...(data.topPages || []).map((p) => p.views), 1)
   const totalDev = (data.deviceSplit || []).reduce((a, d) => a + d.count, 0) || 1
+
+  const dash = '—'
+  const insights = [
+    { icon: Receipt, label: 'Avg order value', value: data.orders ? fmt(Math.round(data.revenue / data.orders)) : dash, hint: 'Revenue ÷ orders' },
+    { icon: Percent, label: 'Conversion', value: data.uniqueSessions ? `${((data.orders / data.uniqueSessions) * 100).toFixed(1)}%` : dash, hint: 'Orders ÷ visitors' },
+    { icon: Eye, label: 'Views / visitor', value: data.uniqueSessions ? (data.totalViews / data.uniqueSessions).toFixed(1) : dash, hint: 'Engagement depth' },
+    { icon: Clock, label: 'Views today', value: nf(data.todayViews), hint: 'So far today' },
+  ]
 
   return (
     <div>
@@ -94,6 +91,17 @@ export function AdminDashboard() {
             <p className="text-2xl md:text-[28px] font-bold leading-none mt-3 tracking-tight text-zinc-900">{value}</p>
             <p className="text-[11px] text-zinc-400 mt-1.5 font-semibold uppercase tracking-wide">{label}</p>
             {spark && <div className="mt-2 -mb-1"><Spark data={data.series} dataKey={spark} color={sparkColor} /></div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Insight stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
+        {insights.map(({ icon: Icon, label, value, hint }) => (
+          <div key={label} className="admin-card p-4 md:p-5">
+            <div className="flex items-center gap-2 text-zinc-400"><Icon size={15} /><span className="text-[11px] font-semibold uppercase tracking-wide">{label}</span></div>
+            <p className="text-2xl md:text-[26px] font-bold leading-none mt-2.5 tracking-tight text-zinc-900">{value}</p>
+            <p className="text-[11px] text-zinc-400 mt-1.5">{hint}</p>
           </div>
         ))}
       </div>
@@ -134,54 +142,6 @@ export function AdminDashboard() {
           )}
         </div>
 
-        {/* Top pages */}
-        <div className="admin-card p-4 md:p-5">
-          <h2 className="font-semibold text-lg text-zinc-900 mb-4">Top Pages</h2>
-          <div className="space-y-3">
-            {(data.topPages || []).map((p) => (
-              <div key={p.path}>
-                <div className="flex items-center justify-between gap-2 text-[13px] mb-1">
-                  <span className="truncate text-zinc-700" title={p.path}>{p.label || p.path}</span>
-                  <span className="font-semibold text-zinc-900 shrink-0">{nf(p.views)}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${(p.views / maxPage) * 100}%`, background: 'linear-gradient(90deg, var(--gold), var(--gold-light))' }} />
-                </div>
-              </div>
-            ))}
-            {!data.topPages?.length && <p className="text-stone-400 text-sm">No data yet.</p>}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-4 md:gap-6 mt-4 md:mt-6">
-        {/* Recent orders */}
-        <div className="lg:col-span-2 admin-card p-4 md:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-lg text-zinc-900">Recent Orders</h2>
-            <Link to="/admin/orders" className="text-xs font-semibold inline-flex items-center gap-1" style={{ color: 'var(--maroon)' }}>View all <ArrowRight size={13} /></Link>
-          </div>
-          {orders.length ? (
-            <div className="space-y-1">
-              {orders.map((o) => (
-                <div key={o._id} className="flex items-center gap-3 py-2.5 border-b border-zinc-100 last:border-0 text-sm">
-                  <div className="w-8 h-8 rounded-full grid place-items-center text-[11px] font-bold shrink-0" style={{ background: 'color-mix(in srgb, var(--maroon) 10%, transparent)', color: 'var(--maroon)' }}>
-                    {(o.customer?.name || '?')[0]?.toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-zinc-800 truncate">{o.customer?.name || 'Guest'}</p>
-                    <p className="text-xs text-zinc-400">{o.orderNo}</p>
-                  </div>
-                  <span className="ml-auto font-semibold text-zinc-900 shrink-0">{fmt(o.total)}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide shrink-0 ${STATUS_TINT[o.status] || 'bg-zinc-100 text-zinc-500'}`}>{o.status}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-stone-400 text-sm py-6">No orders yet.</p>
-          )}
-        </div>
-
         {/* Device split */}
         <div className="admin-card p-4 md:p-5">
           <h2 className="font-semibold text-lg text-zinc-900 mb-4">Devices</h2>
@@ -209,50 +169,6 @@ export function AdminDashboard() {
           )}
         </div>
       </div>
-
-      <DemoDataCard />
-    </div>
-  )
-}
-
-// Seed / clear the sample content — handy for seeing what's DB-driven vs static.
-function DemoDataCard() {
-  const [busy, setBusy] = useState('')
-  const [msg, setMsg] = useState(null)
-
-  const seed = async () => {
-    setBusy('seed'); setMsg(null)
-    try {
-      const { seeded } = await api.post('/admin/seed', {}, { auth: true })
-      const parts = Object.entries(seeded).map(([k, v]) => `${v} ${k}`)
-      setMsg(parts.length ? `Added: ${parts.join(', ')}.` : 'Nothing to add — everything already has data.')
-    } catch (e) { setMsg(e.message) } finally { setBusy('') }
-  }
-
-  const clear = async () => {
-    if (!confirm('Delete ALL content — products, categories, collections, banners, videos, reviews, gallery?\n\nYour orders, settings and login are kept. This cannot be undone.')) return
-    setBusy('clear'); setMsg(null)
-    try {
-      const { cleared } = await api.post('/admin/clear', {}, { auth: true })
-      const total = Object.values(cleared).reduce((a, b) => a + b, 0)
-      setMsg(`Cleared ${total} items. The storefront now shows only static parts.`)
-    } catch (e) { setMsg(e.message) } finally { setBusy('') }
-  }
-
-  return (
-    <div className="admin-card p-5 mt-6">
-      <div className="flex items-center gap-2 mb-1">
-        <Database size={16} className="text-gold-500" />
-        <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50">Sample Data</h2>
-      </div>
-      <p className="text-sm text-stone-400 mb-4">
-        Seed fills empty sections with demo jhumkas. Clear empties everything DB-driven — whatever still shows on the site after clearing is hardcoded, not from the database.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Btn onClick={seed} disabled={!!busy}><Sparkles size={16} /> {busy === 'seed' ? 'Seeding…' : 'Seed sample data'}</Btn>
-        <Btn variant="danger" onClick={clear} disabled={!!busy}><Trash2 size={16} /> {busy === 'clear' ? 'Clearing…' : 'Clear all content'}</Btn>
-      </div>
-      {msg && <p className="text-sm text-stone-500 dark:text-stone-300 mt-3">{msg}</p>}
     </div>
   )
 }

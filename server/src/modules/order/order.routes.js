@@ -76,16 +76,41 @@ router.post(
   })
 );
 
-// ADMIN — list
+// ADMIN — paginated list with status filter, search, and per-status counts.
+const ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 router.get(
   '/',
   requireAdmin,
-  validate({ query: Joi.object({ status: Joi.string().allow('') }) }),
+  validate({
+    query: Joi.object({
+      status: Joi.string().allow('').default(''),
+      search: Joi.string().allow('').max(120).default(''),
+      page: Joi.number().min(1).default(1),
+      limit: Joi.number().min(1).max(100).default(20),
+    }),
+  }),
   asyncHandler(async (req, res) => {
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
-    res.json({ success: true, data: orders });
+    const { status, search, page, limit } = req.query;
+    const base = {}; // search-only filter (status excluded so tab counts stay accurate)
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      base.$or = [{ orderNo: rx }, { 'customer.name': rx }, { 'customer.phone': rx }];
+    }
+    const listFilter = status ? { ...base, status } : base;
+
+    const [items, statusAgg] = await Promise.all([
+      Order.find(listFilter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Order.aggregate([{ $match: base }, { $group: { _id: '$status', c: { $sum: 1 } } }]),
+    ]);
+
+    const counts = { all: 0 };
+    ORDER_STATUSES.forEach((s) => { counts[s] = 0; });
+    for (const g of statusAgg) { counts[g._id] = g.c; counts.all += g.c; }
+    const total = status ? (counts[status] || 0) : counts.all;
+
+    res.json({ success: true, data: { items, total, page, limit, counts } });
   })
 );
 

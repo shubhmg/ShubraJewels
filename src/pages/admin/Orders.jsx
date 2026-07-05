@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ChevronDown, ChevronUp, Phone, Plus, Minus, Trash2, Check } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
+
+const PAGE_LIMIT = 20
 
 const fmtN = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 const PAY_METHODS = [
@@ -28,27 +30,41 @@ function payBadge(o) {
 
 export function AdminOrders() {
   const [orders, setOrders] = useState([])
+  const [counts, setCounts] = useState({ all: 0 })
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(null)
   const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
 
   const [wiping, setWiping] = useState(false)
 
+  // Debounced search; reset to page 1 on new query/filter.
+  useEffect(() => { const t = setTimeout(() => { setQ(search); setPage(1) }, 350); return () => clearTimeout(t) }, [search])
+  useEffect(() => { setPage(1) }, [filter])
+
   const load = async () => {
     setLoading(true)
-    setOrders(await api.get('/orders', { auth: true }))
+    const statusParam = filter === 'all' ? '' : filter
+    const res = await api.get(`/orders?status=${statusParam}&search=${encodeURIComponent(q)}&page=${page}&limit=${PAGE_LIMIT}`, { auth: true })
+    setOrders(res.items || [])
+    setCounts(res.counts || { all: 0 })
+    setTotal(res.total || 0)
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [filter, q, page]) // eslint-disable-line
 
   // Pre-launch cleanup: wipe all (test) orders.
   const deleteAll = async () => {
-    if (orders.length === 0) return
-    if (!window.confirm(`Delete ALL ${orders.length} orders permanently? This is for pre-launch testing cleanup and cannot be undone.`)) return
+    if ((counts.all || 0) === 0) return
+    if (!window.confirm(`Delete ALL ${counts.all} orders permanently? This is for pre-launch testing cleanup and cannot be undone.`)) return
     setWiping(true)
     try {
       const res = await api.post('/orders/delete-all', { confirm: 'DELETE_ALL' }, { auth: true })
+      setPage(1)
       await load()
       window.alert(`Deleted ${res?.deletedCount ?? 0} order(s).`)
     } catch (e) {
@@ -67,20 +83,31 @@ export function AdminOrders() {
   }
   const setStatus = (id, status) => patchOrder(id, { status })
 
-  const countFor = (s) => (s === 'all' ? orders.length : orders.filter((o) => o.status === s).length)
-  const shown = filter === 'all' ? orders : orders.filter((o) => o.status === filter)
+  const countFor = (s) => (s === 'all' ? (counts.all || 0) : (counts[s] || 0))
+  const pages = Math.max(1, Math.ceil(total / PAGE_LIMIT))
 
   return (
     <div>
-      <AdminHeader title="Orders" subtitle={`${orders.length} orders`}>
-        {orders.length > 0 && (
+      <AdminHeader title="Orders" subtitle={`${counts.all || 0} orders`}>
+        {(counts.all || 0) > 0 && (
           <Btn variant="danger" onClick={deleteAll} disabled={wiping}>
             <Trash2 size={16} /> {wiping ? 'Deleting…' : 'Delete all'}
           </Btn>
         )}
         <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
       </AdminHeader>
-      {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={load} />}
+      {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
+
+      {/* Search */}
+      <div className="relative mb-4 max-w-sm">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search order no., name or phone…"
+          className="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 bg-white text-sm outline-none focus:border-[var(--gold)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--gold)_28%,transparent)]"
+        />
+      </div>
 
       {/* Status filter tabs */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -101,11 +128,11 @@ export function AdminOrders() {
       </div>
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gold-500" /></div>
-      ) : shown.length === 0 ? (
-        <p className="text-center py-20 text-stone-400">{orders.length === 0 ? 'No orders yet.' : `No ${filter} orders.`}</p>
+      ) : orders.length === 0 ? (
+        <p className="text-center py-20 text-stone-400">{q ? 'No matching orders.' : (counts.all === 0 ? 'No orders yet.' : `No ${filter} orders.`)}</p>
       ) : (
         <div className="space-y-3">
-          {shown.map((o) => {
+          {orders.map((o) => {
             const isOpen = open === o._id
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
             const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -178,6 +205,16 @@ export function AdminOrders() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {!loading && pages > 1 && (
+        <div className="flex items-center justify-between mt-5 text-sm">
+          <span className="text-zinc-400">Page {page} of {pages} · {total} orders</span>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="w-9 h-9 grid place-items-center rounded-lg border border-zinc-300 bg-white disabled:opacity-40 cursor-pointer"><ChevronLeft size={16} /></button>
+            <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="w-9 h-9 grid place-items-center rounded-lg border border-zinc-300 bg-white disabled:opacity-40 cursor-pointer"><ChevronRight size={16} /></button>
+          </div>
         </div>
       )}
     </div>
