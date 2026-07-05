@@ -172,8 +172,14 @@ router.get(
       total = list.length;
       items = list.slice((page - 1) * limit, page * limit);
     } else {
-      // Leaderboard: only products with views, most-viewed first.
-      const sorted = [...viewMap.entries()].sort((a, b) => b[1] - a[1]);
+      // Leaderboard: only products that still exist (exclude deleted), most-viewed first.
+      const viewedIds = [...viewMap.keys()];
+      const existing = await Product.find({ _id: { $in: viewedIds } }).select('_id').lean();
+      const existingSet = new Set(existing.map((p) => String(p._id).toLowerCase()));
+      const sorted = viewedIds
+        .filter((id) => existingSet.has(id))
+        .map((id) => [id, viewMap.get(id)])
+        .sort((a, b) => b[1] - a[1]);
       total = sorted.length;
       const slice = sorted.slice((page - 1) * limit, page * limit);
       const ids = slice.map(([id]) => id);
