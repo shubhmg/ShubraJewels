@@ -328,19 +328,19 @@ function RoyalCollections({ collections, h = {} }) {
   return (
     <section className="section container-wide">
       <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
-      <Stagger className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+      <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
         {collections.map((c) => (
           <StaggerItem key={c._id}>
             <Tilt max={8}>
-              <Link to={`/products?collection=${c.slug || c._id}`} className="group relative block aspect-[3/4] rounded-3xl overflow-hidden shadow-card">
+              <Link to={`/products?collection=${c.slug || c._id}`} className="group relative block aspect-[4/5] rounded-2xl overflow-hidden shadow-card">
                 {c.image
                   ? <img src={c.image} alt={c.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                   : <div className="w-full h-full" style={{ background: c.accentColor }} />}
                 <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 30%, ${c.accentColor}cc 100%)` }} />
-                <div className="absolute inset-x-0 bottom-0 p-5 text-center">
-                  {c.hindiName && <p className="font-hindi text-white/90 text-base">{c.hindiName}</p>}
-                  <h3 className="font-display text-white text-2xl md:text-3xl leading-tight">{c.name}</h3>
-                  {c.tagline && <p className="text-white/80 text-xs mt-1 italic">{c.tagline}</p>}
+                <div className="absolute inset-x-0 bottom-0 p-4 text-center">
+                  {c.hindiName && <p className="font-hindi text-white/90 text-sm">{c.hindiName}</p>}
+                  <h3 className="font-display text-white text-lg leading-tight">{c.name}</h3>
+                  {c.tagline && <p className="text-white/80 text-[11px] mt-0.5 italic line-clamp-1">{c.tagline}</p>}
                 </div>
               </Link>
             </Tilt>
