@@ -40,10 +40,11 @@ export default {
         },
       },
       fontFamily: {
-        // Google Sans feel: Plus Jakarta Sans for display headings, Inter for body
-        serif: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        // Storefront: Fraunces (editorial luxury serif) for display, Inter for body.
+        // (Admin overrides to Plus Jakarta via .admin-shell, so it's unaffected.)
+        serif: ['Fraunces', 'Georgia', 'serif'],
         sans:  ['Inter', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        display: ['Fraunces', 'Georgia', 'serif'],
         hindi:   ['Mukta', 'Inter', 'sans-serif'],
         mukta:   ['Mukta', 'Inter', 'sans-serif'],
       },

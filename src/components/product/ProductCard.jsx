@@ -30,26 +30,27 @@ export function ProductCard({ product }) {
     : 0
 
   return (
-    <div className="group relative animate-fade-in rounded-2xl overflow-hidden shadow-sm" style={{ background: 'color-mix(in srgb, var(--beige) 45%, white)' }}>
+    <div className="group relative animate-fade-in">
 
-      {/* Image */}
+      {/* Image — editorial frame, gentle zoom on hover */}
       <Link to={`/products/${f.id}`} className="block">
-        <div className="product-img-wrap relative aspect-[3/4] overflow-hidden">
-          <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <div className="product-img-wrap relative aspect-[3/4] rounded-2xl overflow-hidden" style={{ background: 'color-mix(in srgb, var(--beige) 55%, white)', boxShadow: '0 1px 2px rgba(42,26,22,0.06), 0 18px 36px -22px rgba(42,26,22,0.35)' }}>
+          <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]" />
+          <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.35)' }} />
         </div>
       </Link>
 
-      {/* Wishlist — floats over the card */}
+      {/* Wishlist — floats over the image */}
       <button
         onClick={() => toggle({ ...product, id: f.id })}
-        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm hover:scale-110 transition-transform duration-200 cursor-pointer"
+        className="absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-sm hover:scale-110 transition-transform duration-200 cursor-pointer"
         aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
       >
         <Heart size={13} className={wishlisted ? 'fill-rose-500 text-rose-500' : 'text-stone-400'} />
       </button>
 
-      {/* Info — sits on the card's own beige background, always light */}
-      <div className="px-3 py-3">
+      {/* Info */}
+      <div className="pt-3 px-0.5">
         {(f.isNew || product.isBestseller || !inStock) && (
           <div className="flex flex-wrap gap-1 mb-1.5">
             {f.isNew && <Badge variant="new" className="!text-[9px] !px-1.5 !py-0.5">New</Badge>}
@@ -58,15 +59,12 @@ export function ProductCard({ product }) {
           </div>
         )}
         {f.material && (
-          <p className="text-[10px] tracking-widest font-medium uppercase mb-0.5" style={{ color: 'rgb(120,110,100)' }}>
+          <p className="text-[9px] tracking-[0.22em] font-semibold uppercase mb-1" style={{ color: 'color-mix(in srgb, var(--maroon) 55%, transparent)' }}>
             {f.material}
           </p>
         )}
         <Link to={`/products/${f.id}`}>
-          <h3
-            className="font-display text-sm leading-snug transition-colors hover:opacity-80"
-            style={{ color: 'var(--ink)', fontWeight: 700 }}
-          >
+          <h3 className="font-display text-[15px] leading-snug transition-colors group-hover:opacity-70" style={{ color: 'var(--ink)', fontWeight: 560 }}>
             {product.name}
           </h3>
         </Link>
@@ -76,12 +74,12 @@ export function ProductCard({ product }) {
           </p>
         )}
         {f.rating > 0 && (
-          <div className="mt-1">
+          <div className="mt-1.5">
             <StarRating rating={f.rating} showCount count={f.reviews} size={11} />
           </div>
         )}
-        <div className="flex items-baseline gap-2 mt-1.5">
-          <span className="font-bold text-sm" style={{ color: 'var(--maroon)' }}>{fmt(product.price)}</span>
+        <div className="flex items-baseline gap-2 mt-2">
+          <span className="text-[15px]" style={{ color: 'var(--maroon)', fontWeight: 600 }}>{fmt(product.price)}</span>
           {discount > 0 && (
             <span className="text-xs line-through text-stone-400">{fmt(f.originalPrice)}</span>
           )}
