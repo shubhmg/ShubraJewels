@@ -40,7 +40,7 @@ export function ProductCard({ product }) {
           {/* Badges */}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {f.isNew        && <Badge variant="new"        className="!text-[10px] !px-2 !py-0.5">New</Badge>}
-            {product.isBestseller && <Badge variant="bestseller" className="!text-[10px] !px-2 !py-0.5">Best</Badge>}
+            {product.isBestseller && <Badge variant="bestseller" className="!text-[10px] !px-2 !py-0.5">Bestseller</Badge>}
             {discount > 0   && <Badge variant="sale"       className="!text-[10px] !px-2 !py-0.5">-{discount}%</Badge>}
             {!inStock        && <Badge variant="default"    className="!text-[10px] !px-2 !py-0.5">Sold Out</Badge>}
           </div>

@@ -35,7 +35,7 @@ export function Wishlist() {
             <Link to="/products" className="btn-maroon mt-6">Explore Jhumkas</Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
             {items.map((product) => {
               const pid = product.id || product._id
               const img = product.images?.[0]
@@ -44,15 +44,15 @@ export function Wishlist() {
                   <div className="aspect-[3/4] overflow-hidden">
                     <Link to={`/products/${pid}`}><img src={img} alt={product.name} className="w-full h-full object-cover" /></Link>
                   </div>
-                  <button onClick={() => toggle(product)} className="absolute top-3 right-3 w-8 h-8 grid place-items-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm hover:bg-rose-50 transition cursor-pointer" aria-label="Remove">
-                    <Trash2 size={14} className="text-rose-500" />
+                  <button onClick={() => toggle(product)} className="absolute top-2 right-2 w-7 h-7 md:w-8 md:h-8 grid place-items-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm hover:bg-rose-50 transition cursor-pointer" aria-label="Remove">
+                    <Trash2 size={13} className="text-rose-500" />
                   </button>
-                  <div className="p-4 space-y-2">
-                    {product.hindiName && <p className="font-hindi text-sm" style={{ color: 'var(--maroon)' }}>{product.hindiName}</p>}
-                    <Link to={`/products/${pid}`}><h3 className="font-display text-lg leading-snug" style={{ color: 'var(--ink)' }}>{product.name}</h3></Link>
-                    <p className="font-semibold" style={{ color: 'var(--maroon)' }}>{fmt(product.price)}</p>
-                    <button onClick={() => handleAddToCart(product)} disabled={product.inStock === false} className="btn-maroon w-full !py-2 !text-sm mt-1 disabled:opacity-50">
-                      <ShoppingBag size={14} />{product.inStock === false ? 'Sold Out' : 'Add to Bag'}
+                  <div className="p-2.5 md:p-4 space-y-1 md:space-y-2">
+                    {product.hindiName && <p className="font-hindi text-xs md:text-sm" style={{ color: 'var(--maroon)' }}>{product.hindiName}</p>}
+                    <Link to={`/products/${pid}`}><h3 className="font-display text-sm md:text-lg leading-snug line-clamp-2" style={{ color: 'var(--ink)' }}>{product.name}</h3></Link>
+                    <p className="font-semibold text-sm md:text-base" style={{ color: 'var(--maroon)' }}>{fmt(product.price)}</p>
+                    <button onClick={() => handleAddToCart(product)} disabled={product.inStock === false} className="btn-maroon w-full !py-1.5 md:!py-2 !px-2 !text-xs md:!text-sm !gap-1.5 mt-1 disabled:opacity-50">
+                      <ShoppingBag size={13} />{product.inStock === false ? 'Sold Out' : 'Add to Bag'}
                     </button>
                   </div>
                 </div>
