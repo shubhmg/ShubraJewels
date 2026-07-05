@@ -21,7 +21,7 @@ export function Collections() {
     <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
       {/* Hero */}
       <div className="relative overflow-hidden text-center" style={{ background: 'var(--maroon-dark)' }}>
-        <Mandala size={300} className="absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
+        <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-28 md:pt-36 pb-16 md:pb-20 relative">
           <div className="eyebrow justify-center flex"><Motif size={20} /><span className="font-hindi">{settings.brandNameHindi}</span></div>
           <p className="font-hindi text-2xl text-[var(--gold-light)] mt-3">राजसी संग्रह</p>

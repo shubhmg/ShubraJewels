@@ -168,7 +168,7 @@ export function Checkout() {
   return (
     <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
       <div className="relative overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
-        <Mandala size={300} className="absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
+        <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-24 md:pt-28 pb-8 md:pb-12 relative">
           <div className="flex items-center gap-2 text-xs text-white/60 mb-2">
             <Link to="/" className="hover:text-white">Home</Link><ChevronRight size={12} /><span className="text-white/90">Checkout</span>

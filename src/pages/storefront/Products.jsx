@@ -74,7 +74,7 @@ export function Products() {
   return (
     <div className="min-h-dvh" style={{ background: 'var(--cream)' }}>
       <div className="relative overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
-        <Mandala size={300} className="absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
+        <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-24 md:pt-32 pb-12 md:pb-14 relative text-center">
           <div className="eyebrow justify-center flex"><Motif size={18} />Browse the collection</div>
           <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">{hindi}</p>
