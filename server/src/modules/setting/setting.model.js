@@ -39,6 +39,7 @@ const settingSchema = new mongoose.Schema(
     slogan: { type: String, default: 'हर झुमका एक कहानी' },
     sloganEnglish: { type: String, default: 'Every jhumka tells a story' },
     logo: { type: String, default: '' },
+    showBrandName: { type: Boolean, default: true },
 
     // Rotating Hindi taglines shown around the site
     taglines: { type: [String], default: ['हर झुमका एक कहानी', 'राजस्थान की शान', 'हर रंग में परंपरा'] },

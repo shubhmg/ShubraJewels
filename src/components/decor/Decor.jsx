@@ -11,7 +11,10 @@ export function MehendiDivider({ className = '', flip = false }) {
   )
 }
 
+// Jewelry-flavoured radial motif — teardrop petals + a fringe of drop-bells
+// (jhumka jhalar), no straight spokes. Reads ornamental, not astro.
 export function Mandala({ size = 320, className = '', style }) {
+  const tint = 'color-mix(in srgb, var(--gold) 12%, transparent)'
   return (
     <svg
       aria-hidden
@@ -24,25 +27,34 @@ export function Mandala({ size = 320, className = '', style }) {
       stroke="var(--gold)"
     >
       <g strokeOpacity="0.35" strokeWidth="1">
-        {[26, 46, 68, 90, 112].map((r) => (
-          <circle key={r} cx="120" cy="120" r={r} />
+        {/* soft concentric rings */}
+        <circle cx="120" cy="120" r="44" />
+        <circle cx="120" cy="120" r="70" />
+
+        {/* teardrop / paisley petals radiating outward */}
+        {Array.from({ length: 16 }).map((_, i) => (
+          <path
+            key={`pt${i}`}
+            transform={`rotate(${i * 22.5} 120 120)`}
+            d="M113 70 C112 42, 116 28, 120 24 C124 28, 128 42, 127 70 Z"
+            fill={tint}
+          />
         ))}
-        {Array.from({ length: 16 }).map((_, i) => {
-          const a = (i * Math.PI) / 8
+
+        {/* moti fringe — ring of tiny drop-bells */}
+        {Array.from({ length: 24 }).map((_, i) => {
+          const a = (i * Math.PI) / 12
           return (
-            <line
-              key={i}
-              x1="120"
-              y1="120"
-              x2={120 + 112 * Math.cos(a)}
-              y2={120 + 112 * Math.sin(a)}
-            />
+            <circle key={`m${i}`} cx={120 + 104 * Math.cos(a)} cy={120 + 104 * Math.sin(a)} r="2.4" fill={tint} />
           )
         })}
-        {Array.from({ length: 12 }).map((_, i) => {
-          const a = (i * Math.PI) / 6
+
+        {/* centre rosette */}
+        <circle cx="120" cy="120" r="8" />
+        {Array.from({ length: 8 }).map((_, i) => {
+          const a = (i * Math.PI) / 4
           return (
-            <circle key={`p${i}`} cx={120 + 90 * Math.cos(a)} cy={120 + 90 * Math.sin(a)} r="7" />
+            <circle key={`c${i}`} cx={120 + 22 * Math.cos(a)} cy={120 + 22 * Math.sin(a)} r="2" fill="var(--gold)" stroke="none" />
           )
         })}
       </g>
@@ -50,14 +62,28 @@ export function Mandala({ size = 320, className = '', style }) {
   )
 }
 
-// Small lotus/temple motif used as a heading ornament.
+// Heading ornament — a tiny pair of jhumka earrings.
 export function Motif({ className = '', size = 26 }) {
+  const tint = 'color-mix(in srgb, var(--gold) 25%, transparent)'
+  const jhumka = (x) => (
+    <g key={x}>
+      {/* hook ring + connector */}
+      <circle cx={x} cy="7" r="1.3" />
+      <path d={`M${x} 8.3V10.4`} />
+      {/* bell dome */}
+      <path d={`M${x - 4} 17c0-4 1.6-6.6 4-6.6s4 2.6 4 6.6z`} fill={tint} />
+      {/* jhalar drop-bells */}
+      <circle cx={x - 2.6} cy="18.4" r="0.9" fill="var(--gold)" stroke="none" />
+      <circle cx={x} cy="18.8" r="0.9" fill="var(--gold)" stroke="none" />
+      <circle cx={x + 2.6} cy="18.4" r="0.9" fill="var(--gold)" stroke="none" />
+      {/* central drop */}
+      <circle cx={x} cy="22" r="1.3" fill={tint} />
+    </g>
+  )
   return (
-    <svg aria-hidden width={size} height={size} viewBox="0 0 32 32" className={className} fill="none" stroke="var(--gold)" strokeWidth="1.3">
-      <path d="M16 3c2.5 4 2.5 8 0 12-2.5-4-2.5-8 0-12Z" fill="color-mix(in srgb, var(--gold) 25%, transparent)" />
-      <path d="M16 15c4-2 8-2 12 0-4 3-8 3-12 0Z" />
-      <path d="M16 15c-4-2-8-2-12 0 4 3 8 3 12 0Z" />
-      <circle cx="16" cy="16" r="1.6" fill="var(--gold)" stroke="none" />
+    <svg aria-hidden width={size} height={size} viewBox="0 0 32 32" className={className} fill="none" stroke="var(--gold)" strokeWidth="1">
+      {jhumka(10.5)}
+      {jhumka(21.5)}
     </svg>
   )
 }

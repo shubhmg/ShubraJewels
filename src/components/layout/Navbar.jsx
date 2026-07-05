@@ -66,9 +66,11 @@ export function Navbar() {
                   <span className="font-display text-base md:text-lg" style={{ color: 'var(--maroon-dark)' }}>{settings.brandName?.[0] || 'S'}</span>
                 </div>
               )}
-              <span className={`font-display text-lg sm:text-xl md:text-2xl tracking-wide truncate transition-colors duration-300 ${heroBg ? 'text-white' : ''}`} style={heroBg ? undefined : { color: 'var(--maroon)' }}>
-                {settings.brandName}
-              </span>
+              {(settings.showBrandName !== false || !settings.logo) && (
+                <span className={`font-display text-lg sm:text-xl md:text-2xl tracking-wide truncate transition-colors duration-300 ${heroBg ? 'text-white' : ''}`} style={heroBg ? undefined : { color: 'var(--maroon)' }}>
+                  {settings.brandName}
+                </span>
+              )}
             </Link>
 
             {/* Desktop nav */}

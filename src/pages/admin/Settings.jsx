@@ -105,6 +105,9 @@ export function AdminSettings() {
             <MediaUploader label="Logo (optional)" value={s.logo} onChange={(v) => set('logo', v)} accept="image" />
           </div>
           <div className="sm:col-span-2">
+            <Field field={{ label: 'Show brand name next to logo', type: 'toggle' }} value={s.showBrandName !== false} onChange={(v) => set('showBrandName', v)} />
+          </div>
+          <div className="sm:col-span-2">
             <Field field={{ label: 'About (short)', type: 'textarea' }} value={s.aboutShort} onChange={(v) => set('aboutShort', v)} />
           </div>
         </div>
