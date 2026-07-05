@@ -107,7 +107,7 @@ export function AdminLayout() {
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Mobile top bar only — desktop has no top chrome */}
-        <header className="md:hidden h-14 bg-[#F7F1E7]/85 backdrop-blur border-b border-[color-mix(in_srgb,var(--gold)_22%,transparent)] flex items-center gap-3 px-4 flex-shrink-0 sticky top-0 z-20">
+        <header className="md:hidden h-14 bg-[color-mix(in_srgb,var(--cream)_85%,transparent)] backdrop-blur border-b border-[color-mix(in_srgb,var(--gold)_22%,transparent)] flex items-center gap-3 px-4 flex-shrink-0 sticky top-0 z-20">
           <button onClick={() => setMobileOpen(true)} className="w-9 h-9 grid place-items-center rounded-lg text-zinc-600 hover:bg-black/5 cursor-pointer" aria-label="Menu"><Menu size={20} /></button>
           <span className="font-bold text-zinc-900 truncate">{settings.brandName}</span>
         </header>

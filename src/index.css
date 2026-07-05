@@ -265,14 +265,15 @@
   }
 }
 
-/* ─── Admin surfaces (warm, premium, floating) ──────────────────────── */
+/* ─── Admin surfaces (warm, premium, floating) — driven by the same
+   admin-editable theme vars as the storefront, so the panel re-themes too. ─── */
 .admin-shell {
   font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   letter-spacing: -0.01em;
   background:
-    radial-gradient(1200px 500px at 100% -10%, rgba(201,168,76,0.10), transparent 60%),
-    radial-gradient(1000px 500px at -10% 110%, rgba(123,30,43,0.06), transparent 55%),
-    #F7F1E7;
+    radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 60%),
+    radial-gradient(1000px 500px at -10% 110%, color-mix(in srgb, var(--maroon) 8%, transparent), transparent 55%),
+    color-mix(in srgb, var(--beige) 45%, white);
 }
 /* Admin uses Plus Jakarta everywhere (incl. portalled dropdown menus/modals) */
 .admin-shell *,
@@ -283,7 +284,7 @@
 .admin-card {
   background: #fff;
   border-radius: 22px;
-  box-shadow: 0 1px 3px rgba(40,20,15,0.05), 0 18px 44px -22px rgba(90,18,28,0.22);
+  box-shadow: 0 1px 3px rgba(40,20,15,0.05), 0 18px 44px -22px color-mix(in srgb, var(--maroon) 40%, transparent);
 }
 .admin-row {
   background: #fff;
@@ -292,13 +293,13 @@
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .admin-row:hover {
-  box-shadow: 0 12px 30px -14px rgba(90,18,28,0.28);
+  box-shadow: 0 12px 30px -14px color-mix(in srgb, var(--maroon) 50%, transparent);
   transform: translateY(-1px);
 }
 .admin-sidebar {
   background:
-    radial-gradient(600px 300px at 20% 0%, rgba(201,168,76,0.10), transparent 60%),
-    linear-gradient(180deg, #4a121c 0%, #2c0d13 100%);
+    radial-gradient(600px 300px at 20% 0%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--maroon-dark) 0%, color-mix(in srgb, var(--maroon-dark) 60%, black) 100%);
 }
 
 @layer utilities {

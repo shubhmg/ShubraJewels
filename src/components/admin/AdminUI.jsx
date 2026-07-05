@@ -61,7 +61,7 @@ export function Toggle({ checked, onChange, label }) {
   )
 }
 
-const inputCls = 'w-full px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10 transition'
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-[var(--gold)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--gold)_28%,transparent)] transition'
 
 export function Field({ field, value, onChange }) {
   const { label, type = 'text', options = [], placeholder, help } = field
