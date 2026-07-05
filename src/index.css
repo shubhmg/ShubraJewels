@@ -270,7 +270,7 @@
 .admin-shell {
   font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   letter-spacing: -0.01em;
-  font-weight: 500; /* medium base — the thin 400 default read poorly */
+  font-weight: 600; /* semibold base for strong readability */
   color: #18181b;   /* zinc-900 default text */
   background:
     radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 60%),
@@ -285,8 +285,8 @@
 }
 /* Readability: bolder base + lift the lightest muted greys a notch so labels,
    subtitles and helper text are legible across every admin page. */
-.admin-shell, .admin-font { --admin-min-weight: 500; }
-.admin-shell .font-normal, .admin-font .font-normal { font-weight: 500; }
+.admin-shell .font-normal, .admin-font .font-normal { font-weight: 600; }
+.admin-shell .font-medium, .admin-font .font-medium { font-weight: 600; }
 .admin-shell .text-zinc-400,  .admin-font .text-zinc-400  { color: #71717a; } /* → zinc-500 */
 .admin-shell .text-zinc-500,  .admin-font .text-zinc-500  { color: #52525b; } /* → zinc-600 */
 .admin-shell .text-stone-400, .admin-font .text-stone-400 { color: #78716c; } /* → stone-500 */
