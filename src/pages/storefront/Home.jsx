@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Truck, Gift, Star, Quote, Instagram } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
-import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { SectionHeading } from '../../components/ui/SectionHeading.jsx'
 import { Mandala, MehendiDivider, TempleFrame, Motif, EarringMotif } from '../../components/decor/Decor.jsx'
 import { Reveal, Stagger, StaggerItem, Tilt, Magnetic } from '../../components/motion/Motion.jsx'
@@ -100,13 +99,16 @@ function ProductGridBlock({ all, config }) {
 function ImageBlock({ config }) {
   const c = config || {}
   if (!c.url) return null
+  const dark = c.dark
   const img = <img src={c.url} alt={c.caption || ''} loading="lazy" decoding="async" className="w-full h-auto rounded-2xl shadow-card" />
   return (
-    <section className="section container-wide">
+    <section className="section" style={dark ? { background: 'var(--ink)' } : undefined}>
+      <div className="container-wide">
       <Reveal>
         {c.link ? <Link to={c.link}>{img}</Link> : img}
-        {c.caption && <p className="text-center text-sm text-stone-500 mt-3">{c.caption}</p>}
+        {c.caption && <p className={`text-center text-sm mt-3 ${dark ? 'text-white/70' : 'text-stone-500'}`}>{c.caption}</p>}
       </Reveal>
+      </div>
     </section>
   )
 }
@@ -157,7 +159,6 @@ function Hero({ settings }) {
         <HeroLine>
           <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
             <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold !px-6 !py-2.5 !text-sm">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={16} /></Link></Magnetic>
-            {hero.showWhatsapp !== false && <Magnetic><WhatsAppButton label="Order on WhatsApp" size="md" className="!px-5 !py-2.5 !text-sm !bg-white/10 !text-white !shadow-none border border-white/30 backdrop-blur-sm hover:!bg-white/20" /></Magnetic>}
           </div>
         </HeroLine>
       </motion.div>
@@ -251,9 +252,11 @@ function OfferStrip({ offers }) {
 
 /* ── Categories ───────────────────────────────────────────────────── */
 function CategoryGrid({ categories, h = {} }) {
+  const dark = h.dark
   return (
-    <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
+    <section className="section" style={dark ? { background: 'var(--ink)' } : undefined}>
+      <div className="container-wide">
+      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} light={dark} /></Reveal>
       <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
         {categories.map((c) => (
           <StaggerItem key={c._id}>
@@ -272,6 +275,7 @@ function CategoryGrid({ categories, h = {} }) {
           </StaggerItem>
         ))}
       </Stagger>
+      </div>
     </section>
   )
 }
@@ -325,9 +329,11 @@ function StorySpotlight({ product, settings }) {
 
 /* ── Royal collections ────────────────────────────────────────────── */
 function RoyalCollections({ collections, h = {} }) {
+  const dark = h.dark
   return (
-    <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
+    <section className="section" style={dark ? { background: 'var(--ink)' } : undefined}>
+      <div className="container-wide">
+      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} light={dark} /></Reveal>
       <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
         {collections.map((c) => (
           <StaggerItem key={c._id}>
@@ -347,6 +353,7 @@ function RoyalCollections({ collections, h = {} }) {
           </StaggerItem>
         ))}
       </Stagger>
+      </div>
     </section>
   )
 }
@@ -374,9 +381,11 @@ function Under599({ products, h = {} }) {
 
 /* ── Videos ───────────────────────────────────────────────────────── */
 function VideoSection({ videos, h = {} }) {
+  const dark = h.dark
   return (
-    <section className="section container-wide">
-      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
+    <section className="section" style={dark ? { background: 'var(--ink)' } : undefined}>
+      <div className="container-wide">
+      <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} light={dark} /></Reveal>
       <Stagger className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
         {videos.map((v) => (
           <StaggerItem key={v._id}><figure className="rounded-2xl overflow-hidden shadow-card bg-black">
@@ -390,16 +399,18 @@ function VideoSection({ videos, h = {} }) {
           </figure></StaggerItem>
         ))}
       </Stagger>
+      </div>
     </section>
   )
 }
 
 /* ── Reviews ──────────────────────────────────────────────────────── */
 function Reviews({ reviews, h = {} }) {
+  const dark = h.dark
   return (
-    <section className="section" style={{ background: 'color-mix(in srgb, var(--beige) 55%, var(--cream))' }}>
+    <section className="section" style={{ background: dark ? 'var(--ink)' : 'color-mix(in srgb, var(--beige) 55%, var(--cream))' }}>
       <div className="container-wide">
-        <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
+        <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} light={dark} /></Reveal>
         <Stagger className="grid md:grid-cols-3 gap-5">
           {reviews.slice(0, 6).map((r) => (
             <StaggerItem key={r._id}><div className="rounded-2xl p-6 bg-white shadow-card relative h-full">
@@ -431,9 +442,11 @@ function Reviews({ reviews, h = {} }) {
 function GalleryWall({ gallery, h = {}, settings }) {
   const igUrl = instagramUrl(settings)
   const handle = instagramHandle(settings)
+  const dark = h.dark
 
   return (
-    <section className="section container-wide">
+    <section className="section" style={dark ? { background: 'var(--ink)' } : undefined}>
+      <div className="container-wide">
       <Reveal>
         <div className="text-center mx-auto max-w-2xl mb-10 md:mb-14">
           {handle && (
@@ -442,9 +455,9 @@ function GalleryWall({ gallery, h = {}, settings }) {
               {handle}
             </a>
           )}
-          {h.hindi && <p className="font-hindi text-lg md:text-xl" style={{ color: 'var(--maroon)' }}>{h.hindi}</p>}
-          <h2 className="font-display text-3xl md:text-5xl mt-1 leading-tight" style={{ color: 'var(--ink)' }}>{h.title || 'Styled by the Shubra Community'}</h2>
-          <p className="mt-3 text-sm md:text-base text-stone-500">{h.subtitle || 'Customer moments, quietly gathered from our world.'}</p>
+          {h.hindi && <p className="font-hindi text-lg md:text-xl" style={{ color: dark ? 'var(--gold-light)' : 'var(--maroon)' }}>{h.hindi}</p>}
+          <h2 className="font-display text-3xl md:text-5xl mt-1 leading-tight" style={{ color: dark ? '#fff' : 'var(--ink)' }}>{h.title || 'Styled by the Shubra Community'}</h2>
+          <p className={`mt-3 text-sm md:text-base ${dark ? 'text-white/70' : 'text-stone-500'}`}>{h.subtitle || 'Customer moments, quietly gathered from our world.'}</p>
         </div>
       </Reveal>
       <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
@@ -452,6 +465,7 @@ function GalleryWall({ gallery, h = {}, settings }) {
           <StaggerItem key={g._id}><GalleryTile item={g} /></StaggerItem>
         ))}
       </Stagger>
+      </div>
     </section>
   )
 }
@@ -506,9 +520,6 @@ function SloganBand({ settings }) {
         <Motif size={34} className="mx-auto" />
         <p className="font-hindi text-3xl md:text-5xl text-white mt-4">{settings.slogan}</p>
         <p className="text-[var(--gold-light)] mt-3 tracking-widest uppercase text-sm">{settings.sloganEnglish}</p>
-        <div className="mt-8 flex justify-center">
-          <WhatsAppButton label="Order on WhatsApp" className="!px-7 !py-3.5" />
-        </div>
       </div>
     </section>
   )

@@ -158,6 +158,7 @@ function BlockConfig({ block, cats, cols, setCfg }) {
         <MediaUploader label="Image" value={c.url} onChange={(v) => setCfg('url', v)} accept="image" />
         <Field field={{ label: 'Link (optional)' }} value={c.link} onChange={(v) => setCfg('link', v)} />
         <Field field={{ label: 'Caption (optional)' }} value={c.caption} onChange={(v) => setCfg('caption', v)} />
+        <Field field={{ label: 'Dark background', type: 'toggle' }} value={c.dark} onChange={(v) => setCfg('dark', v)} />
       </div>
     )
   }
@@ -198,8 +199,13 @@ function BlockConfig({ block, cats, cols, setCfg }) {
     )
   }
 
-  // categories / collections / videos / reviews / gallery → headings only
-  return HAS_HEADING.includes(t) ? Headings : <Note>No options.</Note>
+  // categories / collections / videos / reviews / gallery → headings + bg toggle
+  return HAS_HEADING.includes(t) ? (
+    <div className="space-y-3">
+      {Headings}
+      <Field field={{ label: 'Dark background', type: 'toggle' }} value={c.dark} onChange={(v) => setCfg('dark', v)} />
+    </div>
+  ) : <Note>No options.</Note>
 }
 
 function Note({ children }) {

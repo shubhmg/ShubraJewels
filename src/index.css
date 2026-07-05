@@ -156,7 +156,7 @@
      contain-intrinsic-size remembers the last rendered height so the scrollbar
      doesn't jump when scrolling back up. */
   .section {
-    @apply py-16 md:py-24;
+    @apply py-10 md:py-16;
     content-visibility: auto;
     contain-intrinsic-size: auto 700px;
   }
