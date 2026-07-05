@@ -8,6 +8,7 @@ export function Badge({ children, variant = 'default', className = '' }) {
     new:        { background: 'var(--maroon)', color: 'var(--cream)', boxShadow: '0 2px 6px rgba(0,0,0,0.35)' },
     bestseller: { background: 'linear-gradient(135deg, var(--gold), var(--gold-light))', color: 'var(--ink)', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' },
     sale:       { background: 'var(--maroon-dark)', color: 'var(--gold-light)', boxShadow: '0 2px 6px rgba(0,0,0,0.35)' },
+    soldout:    { background: 'color-mix(in srgb, var(--ink) 12%, transparent)', color: 'var(--ink)' },
   }
 
   const variants = {

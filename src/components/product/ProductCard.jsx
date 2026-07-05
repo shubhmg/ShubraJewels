@@ -36,14 +36,6 @@ export function ProductCard({ product }) {
       <Link to={`/products/${f.id}`} className="block">
         <div className="product-img-wrap relative aspect-[3/4] overflow-hidden">
           <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-
-          {/* Badges */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1">
-            {f.isNew        && <Badge variant="new"        className="!text-[10px] !px-2 !py-0.5">New</Badge>}
-            {product.isBestseller && <Badge variant="bestseller" className="!text-[10px] !px-2 !py-0.5">Bestseller</Badge>}
-            {discount > 0   && <Badge variant="sale"       className="!text-[10px] !px-2 !py-0.5">-{discount}%</Badge>}
-            {!inStock        && <Badge variant="default"    className="!text-[10px] !px-2 !py-0.5">Sold Out</Badge>}
-          </div>
         </div>
       </Link>
 
@@ -58,6 +50,13 @@ export function ProductCard({ product }) {
 
       {/* Info — sits on the card's own beige background, always light */}
       <div className="px-3 py-3">
+        {(f.isNew || product.isBestseller || !inStock) && (
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {f.isNew && <Badge variant="new" className="!text-[9px] !px-1.5 !py-0.5">New</Badge>}
+            {product.isBestseller && <Badge variant="bestseller" className="!text-[9px] !px-1.5 !py-0.5">Bestseller</Badge>}
+            {!inStock && <Badge variant="soldout" className="!text-[9px] !px-1.5 !py-0.5">Sold Out</Badge>}
+          </div>
+        )}
         {f.material && (
           <p className="text-[10px] tracking-widest font-medium uppercase mb-0.5" style={{ color: 'rgb(120,110,100)' }}>
             {f.material}

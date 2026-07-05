@@ -102,14 +102,6 @@ export function ProductDetail() {
                 <Heart size={17} className={wishlisted ? 'fill-rose-500 text-rose-500' : 'text-stone-500'} />
               </button>
 
-              {/* Badges — top-left, clear of the info sheet */}
-              <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
-                {product.isNewArrival && <Badge variant="new" className="!text-[11px]">New</Badge>}
-                {product.isBestseller && <Badge variant="bestseller" className="!text-[11px]">Bestseller</Badge>}
-                {discount > 0 && <Badge variant="sale" className="!text-[11px]">-{discount}%</Badge>}
-                {!inStock && <Badge variant="default" className="!text-[11px]">Sold Out</Badge>}
-              </div>
-
               {/* Desktop arrows */}
               {images.length > 1 && (
                 <div className="hidden md:block">
@@ -143,6 +135,13 @@ export function ProductDetail() {
           {/* ── Info sheet ───────────────────────────────────────── */}
           <div className="relative -mt-5 lg:mt-0 rounded-t-[1.75rem] lg:rounded-none px-4 pt-6 lg:px-0 lg:pt-0 space-y-5" style={{ background: 'var(--cream)' }}>
             <div>
+              {(product.isNewArrival || product.isBestseller || !inStock) && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {product.isNewArrival && <Badge variant="new">New</Badge>}
+                  {product.isBestseller && <Badge variant="bestseller">Bestseller</Badge>}
+                  {!inStock && <Badge variant="soldout">Sold Out</Badge>}
+                </div>
+              )}
               {product.hindiName && <p className="font-hindi text-lg" style={{ color: 'var(--maroon)' }}>{product.hindiName}</p>}
               <h1 className="font-display text-[26px] md:text-4xl mt-0.5 leading-tight" style={{ color: 'var(--ink)' }}>{product.name}</h1>
               {product.ratingAvg > 0 && <div className="mt-2"><StarRating rating={product.ratingAvg} showCount count={product.ratingCount} size={14} /></div>}
@@ -151,12 +150,7 @@ export function ProductDetail() {
             {/* Price */}
             <div className="flex items-baseline gap-3">
               <span className="text-3xl font-bold" style={{ color: 'var(--maroon)' }}>{fmt(product.price)}</span>
-              {discount > 0 && (
-                <>
-                  <span className="text-lg text-stone-400 line-through">{fmt(product.mrp)}</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--gold) 22%, transparent)', color: 'var(--maroon-dark)' }}>SAVE {discount}%</span>
-                </>
-              )}
+              {discount > 0 && <span className="text-lg text-stone-400 line-through">{fmt(product.mrp)}</span>}
             </div>
 
             {/* Story — signature block */}
