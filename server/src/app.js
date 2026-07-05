@@ -59,7 +59,10 @@ app.use(cors({ origin: env.nodeEnv === 'production' ? (process.env.CORS_ORIGIN |
 app.use(express.json({ limit: '5mb' }));
 
 // Static uploads
-app.use('/uploads', express.static(UPLOAD_DIR));
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  maxAge: '30d',
+  immutable: true,
+}));
 
 // Health check
 app.get('/api/health', (_req, res) => {

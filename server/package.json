@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "seed": "node src/scripts/seed.js"
+    "seed": "node src/scripts/seed.js",
+    "optimize:uploads": "node src/scripts/optimize-uploads.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -19,6 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",
     "multer": "^2.2.0",
-    "razorpay": "^2.9.6"
+    "razorpay": "^2.9.6",
+    "sharp": "^0.35.3"
   }
 }
