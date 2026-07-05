@@ -151,7 +151,6 @@ function Hero({ settings }) {
         animate="show"
         variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
       >
-        <HeroLine><div className="eyebrow justify-center flex mb-2.5"><Motif size={18} />{hero.eyebrow || settings.brandNameHindi}</div></HeroLine>
         <HeroLine><p className="font-hindi text-xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
         <HeroLine><h1 className="font-display text-white text-4xl md:text-6xl lg:text-7xl leading-[1.05] mt-1.5 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
         {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-3 text-sm md:text-lg">{hero.subheading}</p></HeroLine>}

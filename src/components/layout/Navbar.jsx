@@ -60,7 +60,7 @@ export function Navbar() {
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2 flex-shrink-0 min-w-0">
               {settings.logo ? (
-                <img src={settings.logo} alt={settings.brandName} className="h-8 md:h-9 w-auto object-contain" />
+                <img src={settings.logo} alt={settings.brandName} className={`w-auto object-contain ${settings.showBrandName === false ? 'h-10 md:h-14' : 'h-8 md:h-9'}`} />
               ) : (
                 <div className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--gold), var(--gold-light))' }}>
                   <span className="font-display text-base md:text-lg" style={{ color: 'var(--maroon-dark)' }}>{settings.brandName?.[0] || 'S'}</span>
