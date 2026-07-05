@@ -11,10 +11,35 @@ export function MehendiDivider({ className = '', flip = false }) {
   )
 }
 
-// Jewelry-flavoured radial motif — teardrop petals + a fringe of drop-bells
-// (jhumka jhalar), no straight spokes. Reads ornamental, not astro.
+// Decorative backdrop — a cluster of hanging jhumka earrings (NOT a mandala).
+// Kept the export name `Mandala` so every call site swaps at once.
 export function Mandala({ size = 320, className = '', style }) {
-  const tint = 'color-mix(in srgb, var(--gold) 12%, transparent)'
+  const solid = 'var(--gold)'
+  const tint = 'color-mix(in srgb, var(--gold) 16%, transparent)'
+
+  // One hanging jhumka: thread → stud → bell dome → jhalar fringe → drop.
+  const jhumka = (cx, topY, k, key) => {
+    const studY = topY + 20 * k
+    const baseY = studY + 22 * k
+    const bellR = 17 * k
+    const dropY = baseY + 15 * k
+    return (
+      <g key={key}>
+        <line x1={cx} y1={topY} x2={cx} y2={studY} />
+        <circle cx={cx} cy={studY} r={2.8 * k} fill={solid} stroke="none" />
+        {/* bell dome */}
+        <path d={`M ${cx - bellR} ${baseY} A ${bellR} ${bellR} 0 0 1 ${cx + bellR} ${baseY} Z`} fill={tint} />
+        {/* jhalar fringe of moti */}
+        {[-2, -1, 0, 1, 2].map((n) => (
+          <circle key={n} cx={cx + n * (bellR / 2.4)} cy={baseY + 3 * k} r={2.3 * k} fill={solid} stroke="none" />
+        ))}
+        {/* central drop bell */}
+        <line x1={cx} y1={baseY} x2={cx} y2={dropY - 3.4 * k} />
+        <circle cx={cx} cy={dropY} r={3.6 * k} fill={tint} />
+      </g>
+    )
+  }
+
   return (
     <svg
       aria-hidden
@@ -26,37 +51,12 @@ export function Mandala({ size = 320, className = '', style }) {
       fill="none"
       stroke="var(--gold)"
     >
-      <g strokeOpacity="0.35" strokeWidth="1">
-        {/* soft concentric rings */}
-        <circle cx="120" cy="120" r="44" />
-        <circle cx="120" cy="120" r="70" />
-
-        {/* teardrop / paisley petals radiating outward */}
-        {Array.from({ length: 16 }).map((_, i) => (
-          <path
-            key={`pt${i}`}
-            transform={`rotate(${i * 22.5} 120 120)`}
-            d="M113 70 C112 42, 116 28, 120 24 C124 28, 128 42, 127 70 Z"
-            fill={tint}
-          />
-        ))}
-
-        {/* moti fringe — ring of tiny drop-bells */}
-        {Array.from({ length: 24 }).map((_, i) => {
-          const a = (i * Math.PI) / 12
-          return (
-            <circle key={`m${i}`} cx={120 + 104 * Math.cos(a)} cy={120 + 104 * Math.sin(a)} r="2.4" fill={tint} />
-          )
-        })}
-
-        {/* centre rosette */}
-        <circle cx="120" cy="120" r="8" />
-        {Array.from({ length: 8 }).map((_, i) => {
-          const a = (i * Math.PI) / 4
-          return (
-            <circle key={`c${i}`} cx={120 + 22 * Math.cos(a)} cy={120 + 22 * Math.sin(a)} r="2" fill="var(--gold)" stroke="none" />
-          )
-        })}
+      <g strokeOpacity="0.4" strokeWidth="1.4" strokeLinecap="round">
+        {/* garland thread the earrings hang from */}
+        <path d="M44 52 Q120 34 196 52" />
+        {jhumka(74, 46, 0.9, 'a')}
+        {jhumka(120, 40, 1.15, 'b')}
+        {jhumka(166, 46, 0.9, 'c')}
       </g>
     </svg>
   )

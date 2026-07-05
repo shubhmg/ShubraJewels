@@ -57,9 +57,16 @@ async function main() {
 
   for (const filename of files) {
     if (!isOptimizableImage(filename)) continue;
+    if (filename.includes('-optimized')) continue; // already optimized in a prior pass
 
     const input = join(UPLOAD_DIR, filename);
-    const result = await optimizeImageFile(input, { removeOriginal: false, skipIfLarger: true });
+    let result;
+    try {
+      result = await optimizeImageFile(input, { removeOriginal: false, skipIfLarger: true });
+    } catch (err) {
+      console.warn(`skipped ${filename}: ${err.message}`);
+      continue;
+    }
     if (!result.optimized) continue;
 
     replacements.set(`/uploads/${filename}`, `/uploads/${result.filename}`);

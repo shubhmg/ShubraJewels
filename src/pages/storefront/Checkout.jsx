@@ -167,17 +167,17 @@ export function Checkout() {
     <div className="pt-16 min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
       <div className="relative overflow-hidden" style={{ background: 'var(--maroon)' }}>
         <Mandala size={300} className="absolute -right-16 -top-10 opacity-20" />
-        <div className="container-wide py-12 relative">
+        <div className="container-wide py-8 md:py-12 relative">
           <div className="flex items-center gap-2 text-xs text-white/60 mb-2">
             <Link to="/" className="hover:text-white">Home</Link><ChevronRight size={12} /><span className="text-white/90">Checkout</span>
           </div>
-          <h1 className="font-display text-white text-4xl">Checkout</h1>
+          <h1 className="font-display text-white text-3xl md:text-4xl">Checkout</h1>
         </div>
       </div>
 
-      <div className="container-wide py-10">
-        <div className="grid lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2 space-y-6">
+      <div className="container-wide py-6 md:py-10">
+        <div className="grid lg:grid-cols-3 gap-6 lg:gap-10">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* Sign-in prompt (optional — guest checkout allowed) */}
             <div className="bg-white rounded-2xl p-4 shadow-card flex items-center gap-3">
               <div className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: 'color-mix(in srgb, var(--maroon) 12%, transparent)', color: 'var(--maroon)' }}><User size={17} /></div>
@@ -190,21 +190,21 @@ export function Checkout() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-card space-y-4">
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-card space-y-4">
               <h2 className="font-display text-xl" style={{ color: 'var(--ink)' }}>Your Details</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Full Name *" value={form.name} onChange={(v) => set('name', v)} placeholder="Priya Sharma" />
-                <Field label="Phone *" value={form.phone} onChange={(v) => set('phone', v)} placeholder="98xxxxxxxx" />
+                <Field label="Phone *" type="tel" value={form.phone} onChange={(v) => set('phone', v)} placeholder="98xxxxxxxx" />
               </div>
               <Field label="Email (optional)" type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="you@example.com" />
 
               <h2 className="font-display text-xl pt-2" style={{ color: 'var(--ink)' }}>Shipping Address</h2>
               <Field label="Address" value={form.line1} onChange={(v) => set('line1', v)} placeholder="House no., street" />
               <Field label="Landmark / Area (optional)" value={form.line2} onChange={(v) => set('line2', v)} placeholder="Landmark, area" />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <Field label="City" value={form.city} onChange={(v) => set('city', v)} placeholder={settings.freeShippingCity} />
                 <Field label="State" value={form.state} onChange={(v) => set('state', v)} placeholder="State" />
-                <Field label="PIN" value={form.pincode} onChange={(v) => set('pincode', v)} placeholder="1100xx" />
+                <Field label="PIN" type="tel" value={form.pincode} onChange={(v) => set('pincode', v)} placeholder="1100xx" />
               </div>
               <Field label="Order notes (optional)" value={form.notes} onChange={(v) => set('notes', v)} placeholder="Anything we should know?" />
 
@@ -231,7 +231,7 @@ export function Checkout() {
             </div>
           </div>
 
-          <aside className="bg-white rounded-2xl p-6 shadow-card h-fit space-y-4 sticky top-24">
+          <aside className="bg-white rounded-2xl p-4 md:p-6 shadow-card h-fit space-y-4 lg:sticky lg:top-24">
             <h3 className="font-display text-lg" style={{ color: 'var(--ink)' }}>Order Summary</h3>
             <div className="space-y-3">
               {items.map((item) => (
@@ -267,8 +267,8 @@ function Field({ label, value, onChange, placeholder, type = 'text' }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 w-full px-4 py-2.5 rounded-xl border bg-white text-sm focus:outline-none"
-        style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}
+        className="mt-1 w-full px-4 py-3 rounded-xl border bg-white text-base sm:text-sm outline-none focus:ring-2 transition-shadow"
+        style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)', '--tw-ring-color': 'color-mix(in srgb, var(--gold) 45%, transparent)' }}
       />
     </label>
   )
