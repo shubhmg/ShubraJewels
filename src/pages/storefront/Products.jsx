@@ -136,7 +136,7 @@ export function Products() {
                 <p className="text-stone-400 text-sm mt-1">Try a different filter.</p>
               </div>
             ) : (
-              <Stagger className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6" gap={0.05}>
+              <Stagger className="product-masonry md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6" gap={0.05}>
                 {list.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
               </Stagger>
             )}

@@ -76,7 +76,7 @@ export function Collections() {
         <section className="section" style={{ background: 'color-mix(in srgb, var(--beige) 45%, var(--cream))' }}>
           <div className="container-wide">
             <SectionHeading eyebrow="Just In" hindi="नए झुमके" title="New Arrivals" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
+            <div className="product-masonry md:grid md:grid-cols-4 gap-5 md:gap-6">
               {newArrivals.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
           </div>

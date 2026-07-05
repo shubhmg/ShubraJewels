@@ -99,6 +99,23 @@
     overflow: hidden;
   }
 
+  /* Mobile-only masonry for product cards: cards vary in height (hindi name,
+     rating, badges) so a fixed grid leaves gaps. Multi-column packs them.
+     At md+ the call site's `md:grid` takes over (multicol is ignored on a
+     grid container), so desktop is unchanged. */
+  .product-masonry {
+    column-count: 2;
+    column-gap: 0.75rem;
+  }
+  .product-masonry > * {
+    break-inside: avoid;
+    margin-bottom: 0.75rem;
+  }
+  @media (min-width: 768px) {
+    .product-masonry { column-count: unset; column-gap: normal; }
+    .product-masonry > * { margin-bottom: 0; break-inside: auto; }
+  }
+
   /* Force extrabold on all display-font elements (headings, pull quotes, etc.) */
   .font-display {
     font-weight: 800;
