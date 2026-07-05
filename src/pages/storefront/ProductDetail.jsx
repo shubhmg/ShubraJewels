@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Heart, ShoppingBag, Truck, Gift, ChevronLeft, ChevronRight, ArrowLeft, Sparkles } from 'lucide-react'
+import { useParams, Link } from 'react-router-dom'
+import { Heart, ShoppingBag, Truck, Gift, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { useCartStore } from '../../store/cartStore.js'
 import { useWishlistStore } from '../../store/wishlistStore.js'
 import { Badge } from '../../components/ui/Badge.jsx'
@@ -14,7 +14,6 @@ const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
 export function ProductDetail() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const { data: product, loading } = useProduct(id)
   const { data: allProducts } = useProducts()
   const settings = useSettings()
@@ -82,7 +81,7 @@ export function ProductDetail() {
       <div className="md:container-wide md:pb-16">
         <div className="lg:grid lg:grid-cols-2 lg:gap-14">
           {/* ── Gallery ─────────────────────────────────────────── */}
-          <div className="lg:sticky lg:top-24 self-start">
+          <div className="pt-14 lg:pt-0 lg:sticky lg:top-24 self-start">
             {/* Full-bleed swipe carousel */}
             <div className="relative">
               <div
@@ -98,21 +97,13 @@ export function ProductDetail() {
                 ))}
               </div>
 
-              {/* soft top scrim so navbar stays legible over the image on mobile */}
-              <div className="md:hidden pointer-events-none absolute inset-x-0 top-0 h-24" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.25), transparent)' }} />
-
-              {/* Back button (mobile, floats over image) */}
-              <button onClick={() => navigate(-1)} className="md:hidden absolute left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] w-9 h-9 grid place-items-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm cursor-pointer" aria-label="Back">
-                <ArrowLeft size={18} style={{ color: 'var(--ink)' }} />
-              </button>
-
               {/* Wishlist (floats over image) */}
-              <button onClick={() => toggle({ ...product, id: pid })} className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] md:top-3 w-9 h-9 grid place-items-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm cursor-pointer" aria-label="Wishlist">
+              <button onClick={() => toggle({ ...product, id: pid })} className="absolute right-3 top-3 w-9 h-9 grid place-items-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm cursor-pointer" aria-label="Wishlist">
                 <Heart size={17} className={wishlisted ? 'fill-rose-500 text-rose-500' : 'text-stone-500'} />
               </button>
 
-              {/* Badges */}
-              <div className="absolute left-3 bottom-3 md:top-3 md:bottom-auto flex gap-1.5">
+              {/* Badges — top-left, clear of the info sheet */}
+              <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
                 {product.isNewArrival && <Badge variant="new" className="!text-[11px]">New</Badge>}
                 {product.isBestseller && <Badge variant="bestseller" className="!text-[11px]">Bestseller</Badge>}
                 {discount > 0 && <Badge variant="sale" className="!text-[11px]">-{discount}%</Badge>}
@@ -127,9 +118,9 @@ export function ProductDetail() {
                 </div>
               )}
 
-              {/* Dots (mobile) */}
+              {/* Dots (mobile) — lifted above the overlapping info sheet */}
               {images.length > 1 && (
-                <div className="md:hidden absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+                <div className="md:hidden absolute inset-x-0 bottom-7 flex justify-center gap-1.5">
                   {images.map((_, i) => (
                     <span key={i} className="h-1.5 rounded-full transition-all" style={{ width: i === imgIdx ? 18 : 6, background: i === imgIdx ? 'var(--gold)' : 'rgba(255,255,255,0.7)' }} />
                   ))}
