@@ -31,6 +31,7 @@ import { AdminVideos }      from './pages/admin/Videos.jsx'
 import { AdminReviews }     from './pages/admin/Reviews.jsx'
 import { AdminGallery }     from './pages/admin/Gallery.jsx'
 import { AdminOrders }      from './pages/admin/Orders.jsx'
+import { AdminCoupons }     from './pages/admin/Coupons.jsx'
 import { AdminSettings }    from './pages/admin/Settings.jsx'
 
 function Analytics() {
@@ -84,6 +85,7 @@ const router = createBrowserRouter([
       { path: 'reviews',       element: <AdminReviews />     },
       { path: 'gallery',       element: <AdminGallery />     },
       { path: 'orders',        element: <AdminOrders />      },
+      { path: 'coupons',       element: <AdminCoupons />     },
       { path: 'settings',      element: <AdminSettings />    },
     ],
   },

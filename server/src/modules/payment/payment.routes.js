@@ -9,6 +9,10 @@ import asyncHandler from '../../utils/asyncHandler.js';
 import ApiError from '../../utils/ApiError.js';
 import Product from '../product/product.model.js';
 import Order from '../order/order.model.js';
+import Coupon from '../coupon/coupon.model.js';
+import { getSettings } from '../setting/setting.model.js';
+import { resolveCoupon } from '../coupon/coupon.service.js';
+import { computeShipping } from '../../utils/pricing.js';
 
 const router = express.Router();
 const objectId = Joi.string().hex().length(24);
@@ -42,14 +46,37 @@ const itemsSchema = Joi.array()
   .min(1)
   .required();
 
+// Full server-side pricing: subtotal + shipping − validated discount.
+async function priceOrder({ items, city, couponCode }) {
+  const priced = await priceItems(items);
+  const settings = await getSettings();
+  const shipping = computeShipping(settings, city, priced.subtotal);
+  let discount = 0;
+  let coupon = null;
+  if (couponCode) {
+    const r = await resolveCoupon(couponCode, priced.subtotal);
+    if (r.error) throw ApiError.badRequest(r.error);
+    discount = r.discount;
+    coupon = r.coupon;
+  }
+  const total = Math.max(0, priced.subtotal + shipping - discount);
+  return { ...priced, shipping, discount, coupon, couponCode: coupon?.code || '', total };
+}
+
 // STEP 1 — create a Razorpay order (amount computed server-side, in paise).
 router.post(
   '/create-order',
-  validate({ body: Joi.object({ items: itemsSchema }) }),
+  validate({
+    body: Joi.object({
+      items: itemsSchema,
+      city: Joi.string().allow('').max(80).default(''),
+      couponCode: Joi.string().allow('').max(40).default(''),
+    }),
+  }),
   asyncHandler(async (req, res) => {
     if (!rzp) throw ApiError.badRequest('Online payments are not configured');
-    const { subtotal } = await priceItems(req.body.items);
-    const amount = Math.round(subtotal * 100);
+    const { total } = await priceOrder({ items: req.body.items, city: req.body.city, couponCode: req.body.couponCode });
+    const amount = Math.round(total * 100);
     if (amount < 100) throw ApiError.badRequest('Amount must be at least ₹1');
 
     let order;
@@ -81,6 +108,7 @@ router.post(
         line1: Joi.string().allow('').max(200), line2: Joi.string().allow('').max(200),
         city: Joi.string().allow('').max(80), state: Joi.string().allow('').max(80), pincode: Joi.string().allow('').max(12),
       }).default({}),
+      couponCode: Joi.string().allow('').max(40).default(''),
       notes: Joi.string().allow('').max(1000),
     }),
   }),
@@ -94,16 +122,18 @@ router.post(
       .digest('hex');
     if (expected !== razorpay_signature) throw ApiError.badRequest('Payment signature verification failed');
 
-    const { items, subtotal } = await priceItems(req.body.items);
+    const priced = await priceOrder({ items: req.body.items, city: req.body.address?.city, couponCode: req.body.couponCode });
     const order = await Order.create({
       orderNo: await nextOrderNo(),
       customerId: req.customer?.id || null,
-      items,
+      items: priced.items,
       customer: req.body.customer,
       address: req.body.address || {},
-      subtotal,
-      shipping: 0,
-      total: subtotal,
+      subtotal: priced.subtotal,
+      shipping: priced.shipping,
+      discount: priced.discount,
+      couponCode: priced.couponCode,
+      total: priced.total,
       channel: 'web',
       notes: req.body.notes || '',
       paymentMethod: 'razorpay',
@@ -111,6 +141,7 @@ router.post(
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
     });
+    if (priced.coupon) await Coupon.updateOne({ _id: priced.coupon._id }, { $inc: { usedCount: 1 } });
     res.status(201).json({ success: true, data: order });
   })
 );

@@ -26,6 +26,7 @@ import uploadRoutes from './modules/upload/upload.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import customerRoutes from './modules/customer/customer.routes.js';
 import paymentRoutes from './modules/payment/payment.routes.js';
+import couponRoutes from './modules/coupon/coupon.routes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +91,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/coupons', couponRoutes);
 
 // In production, serve the built Vite app (dist/) for any non-API route.
 const distDir = resolve(__dirname, '../../dist');

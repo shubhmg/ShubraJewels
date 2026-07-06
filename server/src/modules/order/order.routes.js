@@ -2,6 +2,10 @@ import express from 'express';
 import Joi from 'joi';
 import Order from './order.model.js';
 import Product from '../product/product.model.js';
+import Coupon from '../coupon/coupon.model.js';
+import { getSettings } from '../setting/setting.model.js';
+import { resolveCoupon } from '../coupon/coupon.service.js';
+import { computeShipping } from '../../utils/pricing.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -42,6 +46,7 @@ router.post(
       }).default({}),
       channel: Joi.string().valid('web', 'whatsapp').default('web'),
       paymentMethod: Joi.string().valid('cod', 'whatsapp', 'none').optional(),
+      couponCode: Joi.string().allow('').max(40).default(''),
       notes: Joi.string().allow('').max(1000),
     }),
   }),
@@ -57,6 +62,22 @@ router.post(
     });
 
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+    const settings = await getSettings();
+    const shipping = computeShipping(settings, req.body.address?.city, subtotal);
+
+    // Re-validate the coupon server-side (never trust a client-sent discount).
+    let discount = 0;
+    let couponCode = '';
+    let appliedCoupon = null;
+    if (req.body.couponCode) {
+      const r = await resolveCoupon(req.body.couponCode, subtotal);
+      if (r.error) throw ApiError.badRequest(r.error);
+      discount = r.discount;
+      couponCode = r.coupon.code;
+      appliedCoupon = r.coupon;
+    }
+
+    const total = Math.max(0, subtotal + shipping - discount);
     const order = await Order.create({
       orderNo: await nextOrderNo(),
       customerId: req.customer?.id || null,
@@ -64,13 +85,17 @@ router.post(
       customer: req.body.customer,
       address: req.body.address || {},
       subtotal,
-      shipping: 0,
-      total: subtotal,
+      shipping,
+      discount,
+      couponCode,
+      total,
       channel: req.body.channel || 'web',
       paymentMethod: req.body.paymentMethod || (req.body.channel === 'whatsapp' ? 'whatsapp' : 'cod'),
       paymentStatus: 'unpaid', // COD / WhatsApp orders are collected later
       notes: req.body.notes || '',
     });
+
+    if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
 
     res.status(201).json({ success: true, data: order });
   })

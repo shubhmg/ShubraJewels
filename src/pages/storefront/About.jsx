@@ -7,7 +7,7 @@ import { useSettings } from '../../lib/SettingsProvider.jsx'
 const VALUES = [
   { icon: HandHeart, title: 'Handcrafted', text: 'Every jhumka is made by hand by Rajasthani artisans.' },
   { icon: Sparkles, title: 'A Story Each', text: 'Every design carries a name and a story of its own.' },
-  { icon: Truck, title: 'Delivered with Care', text: 'Free shipping in {city}, pan-India delivery available.' },
+  { icon: Truck, title: 'Delivered with Care', text: 'Carefully packed and shipped across India.' },
   { icon: ShieldCheck, title: 'Quality Promise', text: 'Skin-friendly, long-lasting finish on every pair.' },
 ]
 
@@ -57,7 +57,7 @@ export function About() {
                 <Icon size={20} style={{ color: 'var(--maroon)' }} />
               </div>
               <h3 className="font-display text-lg" style={{ color: 'var(--ink)' }}>{title}</h3>
-              <p className="text-xs text-stone-500 mt-1">{text.replace('{city}', settings.freeShippingCity)}</p>
+              <p className="text-xs text-stone-500 mt-1">{text}</p>
             </div>
           ))}
         </div>

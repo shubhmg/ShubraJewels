@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
-import { Loader2, Check, Palette } from 'lucide-react'
+import { Loader2, Check, Palette, X } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Field } from '../../components/admin/AdminUI.jsx'
 import { MediaUploader } from '../../components/admin/MediaUploader.jsx'
 import { useSettingsCtx } from '../../lib/SettingsProvider.jsx'
+import { INDIAN_CITIES } from '../../data/indianCities.js'
 
 const THEME_KEYS = [
   { key: 'maroon',    label: 'Primary (maroon)' },
@@ -119,10 +120,13 @@ export function AdminSettings() {
           <Field field={{ label: 'WhatsApp default message' }} value={s.whatsappMessage} onChange={(v) => set('whatsappMessage', v)} />
           <Field field={{ label: 'Phone' }} value={s.phone} onChange={(v) => set('phone', v)} />
           <Field field={{ label: 'Email' }} value={s.email} onChange={(v) => set('email', v)} />
-          <Field field={{ label: 'Free shipping city' }} value={s.freeShippingCity} onChange={(v) => set('freeShippingCity', v)} />
-          <Field field={{ label: 'Shipping note' }} value={s.shippingNote} onChange={(v) => set('shippingNote', v)} />
+          <Field field={{ label: 'Shipping note', help: 'Short line shown on product pages / footer' }} value={s.shippingNote} onChange={(v) => set('shippingNote', v)} />
           <Field field={{ label: 'Announcement strip' }} value={s.announcement} onChange={(v) => set('announcement', v)} />
         </div>
+      </Section>
+
+      <Section title="Shipping" subtitle="Base charge applies everywhere, unless a city is overridden below or the order qualifies for free shipping.">
+        <ShippingEditor value={s.shipping} onChange={(v) => set('shipping', v)} />
       </Section>
 
       <Section title="Payment Methods" subtitle="Which checkout options customers see.">
@@ -248,6 +252,57 @@ function Section({ title, subtitle, children }) {
       <h2 className="font-semibold text-lg text-dark-900 dark:text-cream-50">{title}</h2>
       {subtitle && <p className="text-xs text-stone-400 mb-4">{subtitle}</p>}
       <div className={subtitle ? '' : 'mt-4'}>{children}</div>
+    </div>
+  )
+}
+
+function ShippingEditor({ value, onChange }) {
+  const s = value || { cities: [], defaultCharge: 0, freeAboveSubtotal: 0 }
+  const cities = s.cities || []
+  const patch = (p) => onChange({ ...s, ...p })
+  const setCity = (i, k, v) => patch({ cities: cities.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)) })
+  const addCity = () => patch({ cities: [...cities, { name: '', charge: 0 }] })
+  const removeCity = (i) => patch({ cities: cities.filter((_, idx) => idx !== i) })
+
+  return (
+    <div className="space-y-5">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field field={{ label: 'Base delivery charge (₹)', type: 'number', help: 'Applied to any city not listed below' }} value={s.defaultCharge} onChange={(v) => patch({ defaultCharge: Number(v) || 0 })} />
+        <Field field={{ label: 'Free above order value (₹)', type: 'number', help: '0 = off. Free shipping when subtotal ≥ this' }} value={s.freeAboveSubtotal} onChange={(v) => patch({ freeAboveSubtotal: Number(v) || 0 })} />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[13px] font-semibold text-zinc-700">City overrides <span className="text-zinc-400 font-normal">(₹0 = free)</span></p>
+          <Btn variant="outline" onClick={addCity}>+ Add city</Btn>
+        </div>
+        {cities.length === 0 && <p className="text-xs text-zinc-400">No overrides — every city pays the base charge.</p>}
+        <div className="space-y-2">
+          {cities.map((c, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={c.name}
+                onChange={(e) => setCity(i, 'name', e.target.value)}
+                list="admin-in-cities"
+                placeholder="City"
+                className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm outline-none focus:border-[var(--gold)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--gold)_28%,transparent)]"
+              />
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-zinc-400 text-sm">₹</span>
+                <input
+                  type="number"
+                  value={c.charge}
+                  onChange={(e) => setCity(i, 'charge', Number(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-24 px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm outline-none focus:border-[var(--gold)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--gold)_28%,transparent)]"
+                />
+              </div>
+              <button onClick={() => removeCity(i)} className="w-9 h-9 grid place-items-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 cursor-pointer shrink-0"><X size={16} /></button>
+            </div>
+          ))}
+        </div>
+        <datalist id="admin-in-cities">{INDIAN_CITIES.map((c) => <option key={c} value={c} />)}</datalist>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, Check, ShoppingBag, User } from 'lucide-react'
+import { ChevronRight, Check, ShoppingBag, User, Tag, X } from 'lucide-react'
 import { useCartStore } from '../../store/cartStore.js'
 import { useCustomerStore } from '../../store/customerStore.js'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
@@ -9,10 +9,21 @@ import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { api } from '../../lib/api.js'
 import { loadRazorpay } from '../../lib/razorpay.js'
 import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
+import { INDIAN_CITIES, CITY_STATE } from '../../data/indianCities.js'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
 const EMPTY = { name: '', phone: '', email: '', line1: '', line2: '', city: '', state: '', pincode: '', notes: '' }
+
+// Mirrors server computeShipping — must match so the shown total is right.
+function calcShipping(settings, city, subtotal) {
+  const s = settings.shipping || {}
+  if (Number(s.freeAboveSubtotal) > 0 && subtotal >= Number(s.freeAboveSubtotal)) return 0
+  const norm = (v) => String(v || '').toLowerCase().trim()
+  const m = (s.cities || []).find((c) => norm(c.name) === norm(city))
+  if (m) return Math.max(0, Number(m.charge) || 0)
+  return Math.max(0, Number(s.defaultCharge) || 0)
+}
 
 export function Checkout() {
   const settings = useSettings()
@@ -23,9 +34,35 @@ export function Checkout() {
   const [error, setError] = useState(null)
   const [placed, setPlaced] = useState(null) // holds the created order
   const [authOpen, setAuthOpen] = useState(false)
+  const [couponInput, setCouponInput] = useState('')
+  const [coupon, setCoupon] = useState(null) // { code, discount }
+  const [couponErr, setCouponErr] = useState('')
+  const [applyingCoupon, setApplyingCoupon] = useState(false)
 
   const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0)
+  const shipping = calcShipping(settings, form.city, subtotal)
+  const discount = coupon?.discount || 0
+  const total = Math.max(0, subtotal + shipping - discount)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  // Selecting a city autofills its state.
+  const setCity = (v) => setForm((f) => {
+    const st = CITY_STATE[String(v).toLowerCase().trim()]
+    return { ...f, city: v, state: st || f.state }
+  })
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim()
+    if (!code) return
+    setApplyingCoupon(true); setCouponErr('')
+    try {
+      const r = await api.post('/coupons/validate', { code, subtotal })
+      setCoupon({ code: r.code, discount: r.discount })
+      setCouponInput('')
+    } catch (e) {
+      setCoupon(null); setCouponErr(e?.message || 'Invalid coupon')
+    } finally { setApplyingCoupon(false) }
+  }
+  const removeCoupon = () => { setCoupon(null); setCouponErr('') }
 
   // Prefill from the signed-in customer.
   useEffect(() => { if (isAuthed()) fetchMe() }, []) // eslint-disable-line
@@ -48,6 +85,7 @@ export function Checkout() {
     customer: { name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim() },
     address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, pincode: form.pincode },
     channel,
+    couponCode: coupon?.code || '',
     notes: form.notes,
   })
 
@@ -84,7 +122,7 @@ export function Checkout() {
     setPlacing(true)
     try {
       const itemsPayload = items.map((i) => ({ productId: i.id || i._id, qty: i.qty }))
-      const ro = await api.post('/payments/create-order', { items: itemsPayload })
+      const ro = await api.post('/payments/create-order', { items: itemsPayload, city: form.city, couponCode: coupon?.code || '' })
       const ok = await loadRazorpay()
       if (!ok) throw new Error('Could not load payment gateway')
 
@@ -124,7 +162,10 @@ export function Checkout() {
   const orderViaWhatsApp = () => {
     if (items.length === 0) return
     const lines = items.map((i) => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n')
-    const parts = [settings.whatsappMessage || 'Hello! I would like to order:', '', lines, '', `Total: ${fmt(subtotal)}`]
+    const parts = [settings.whatsappMessage || 'Hello! I would like to order:', '', lines, '', `Subtotal: ${fmt(subtotal)}`]
+    if (coupon) parts.push(`Coupon ${coupon.code}: −${fmt(discount)}`)
+    parts.push(`Shipping${form.city ? ` (${form.city})` : ''}: ${shipping === 0 ? 'Free' : fmt(shipping)}`)
+    parts.push(`Total: ${fmt(total)}`)
     if (form.name.trim()) parts.push(`Name: ${form.name.trim()}`)
     if (form.phone.trim()) parts.push(`Phone: ${form.phone.trim()}`)
     const link = whatsappLink(settings, parts.join('\n'))
@@ -204,17 +245,18 @@ export function Checkout() {
               <Field label="Address" value={form.line1} onChange={(v) => set('line1', v)} placeholder="House no., street" />
               <Field label="Landmark / Area (optional)" value={form.line2} onChange={(v) => set('line2', v)} placeholder="Landmark, area" />
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                <Field label="City" value={form.city} onChange={(v) => set('city', v)} placeholder={settings.freeShippingCity} />
+                <Field label="City" value={form.city} onChange={setCity} placeholder="Start typing…" list="in-cities" />
                 <Field label="State" value={form.state} onChange={(v) => set('state', v)} placeholder="State" />
                 <Field label="PIN" type="tel" value={form.pincode} onChange={(v) => set('pincode', v)} placeholder="1100xx" />
               </div>
+              <datalist id="in-cities">{INDIAN_CITIES.map((c) => <option key={c} value={c} />)}</datalist>
               <Field label="Order notes (optional)" value={form.notes} onChange={(v) => set('notes', v)} placeholder="Anything we should know?" />
 
               {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
               {settings.payments?.razorpay !== false && (
                 <button onClick={payOnline} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60">
-                  {placing ? 'Processing…' : `Pay Online · ${fmt(subtotal)}`}
+                  {placing ? 'Processing…' : `Pay Online · ${fmt(total)}`}
                 </button>
               )}
               <div className="flex flex-col sm:flex-row gap-3">
@@ -247,11 +289,41 @@ export function Checkout() {
                 </div>
               ))}
             </div>
+            {/* Coupon */}
+            <div className="h-px" style={{ background: 'color-mix(in srgb, var(--gold) 30%, transparent)' }} />
+            {coupon ? (
+              <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)' }}>
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--maroon-dark)' }}><Tag size={14} /> {coupon.code}</span>
+                <button onClick={removeCoupon} className="text-stone-400 hover:text-red-500 cursor-pointer" aria-label="Remove coupon"><X size={16} /></button>
+              </div>
+            ) : (
+              <div>
+                <div className="flex gap-2">
+                  <input
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === 'Enter' && applyCoupon()}
+                    placeholder="Coupon code"
+                    className="flex-1 min-w-0 px-3 py-2 rounded-xl border bg-white text-sm outline-none focus:ring-2"
+                    style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)', '--tw-ring-color': 'color-mix(in srgb, var(--gold) 45%, transparent)' }}
+                  />
+                  <button onClick={applyCoupon} disabled={applyingCoupon || !couponInput.trim()} className="px-4 rounded-xl text-sm font-semibold shrink-0 disabled:opacity-50 cursor-pointer" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>
+                    {applyingCoupon ? '…' : 'Apply'}
+                  </button>
+                </div>
+                {couponErr && <p className="text-xs text-red-500 mt-1.5">{couponErr}</p>}
+              </div>
+            )}
+
             <div className="h-px" style={{ background: 'color-mix(in srgb, var(--gold) 30%, transparent)' }} />
             <div className="flex justify-between text-sm text-stone-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-            <div className="flex justify-between text-sm text-stone-500"><span>Shipping</span><span className="text-emerald-600">Free in {settings.freeShippingCity}</span></div>
+            {discount > 0 && <div className="flex justify-between text-sm"><span className="text-stone-500">Discount</span><span className="font-semibold text-emerald-600">−{fmt(discount)}</span></div>}
+            <div className="flex justify-between text-sm text-stone-500">
+              <span>Shipping{form.city ? '' : ' (enter city)'}</span>
+              <span className={shipping === 0 ? 'text-emerald-600 font-semibold' : ''}>{shipping === 0 ? 'Free' : fmt(shipping)}</span>
+            </div>
             <div className="h-px" style={{ background: 'color-mix(in srgb, var(--gold) 30%, transparent)' }} />
-            <div className="flex justify-between font-semibold text-lg" style={{ color: 'var(--maroon)' }}><span>Total</span><span>{fmt(subtotal)}</span></div>
+            <div className="flex justify-between font-semibold text-lg" style={{ color: 'var(--maroon)' }}><span>Total</span><span>{fmt(total)}</span></div>
           </aside>
         </div>
       </div>
@@ -260,12 +332,13 @@ export function Checkout() {
   )
 }
 
-function Field({ label, value, onChange, placeholder, type = 'text' }) {
+function Field({ label, value, onChange, placeholder, type = 'text', list }) {
   return (
     <label className="block">
       <span className="text-xs font-medium text-stone-500">{label}</span>
       <input
         type={type}
+        list={list}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

@@ -196,7 +196,7 @@ export function ProductDetail() {
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--beige) 55%, white)' }}>
                 <Truck size={16} style={{ color: 'var(--maroon)' }} />
-                <p className="text-xs text-stone-600">Free shipping in {settings.freeShippingCity}</p>
+                <p className="text-xs text-stone-600">{settings.shippingNote || 'Fast, tracked delivery across India'}</p>
               </div>
               <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--beige) 55%, white)' }}>
                 <Gift size={16} style={{ color: 'var(--maroon)' }} />

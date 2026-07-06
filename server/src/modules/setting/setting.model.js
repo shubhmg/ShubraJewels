@@ -54,7 +54,14 @@ const settingSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     email: { type: String, default: '' },
     freeShippingCity: { type: String, default: 'Delhi' },
-    shippingNote: { type: String, default: 'Free shipping in Delhi. Pan-India delivery available.' },
+    shippingNote: { type: String, default: 'Fast, tracked delivery across India.' },
+
+    // Delivery charges — city is chosen from `cities` at checkout (deterministic).
+    shipping: {
+      cities: { type: [{ name: String, charge: Number }], default: [{ name: 'Delhi', charge: 0 }] },
+      defaultCharge: { type: Number, default: 0 }, // fee for "Other city" not in the list
+      freeAboveSubtotal: { type: Number, default: 0 }, // free everywhere above this (0 = off)
+    },
 
     // Socials
     instagram: { type: String, default: '' },

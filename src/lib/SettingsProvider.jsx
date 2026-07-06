@@ -16,7 +16,8 @@ const DEFAULTS = {
   whatsappNumber: '',
   whatsappMessage: 'Hello! I would like to order:',
   freeShippingCity: 'Delhi',
-  shippingNote: 'Free shipping in Delhi. Pan-India delivery available.',
+  shippingNote: 'Fast, tracked delivery across India.',
+  shipping: { cities: [{ name: 'Delhi', charge: 0 }], defaultCharge: 0, freeAboveSubtotal: 0 },
   aboutShort: 'Handcrafted jhumkas inspired by the royal heritage of Rajasthan.',
   phone: '', email: '',
   instagram: '', instagramUrl: '', facebook: '', youtube: '',
@@ -52,7 +53,7 @@ export function SettingsProvider({ children }) {
         ? { hero: { ...DEFAULTS.homepage.hero, ...(data.homepage.hero || {}) }, blocks: data.homepage.blocks }
         : DEFAULTS.homepage
       const social = data.instagramUrl || data.instagram || ''
-      const merged = { ...DEFAULTS, ...data, instagramUrl: social, instagram: social, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, payments: { ...DEFAULTS.payments, ...(data.payments || {}) }, homepage: hp }
+      const merged = { ...DEFAULTS, ...data, instagramUrl: social, instagram: social, theme: { ...DEFAULTS.theme, ...(data.theme || {}) }, payments: { ...DEFAULTS.payments, ...(data.payments || {}) }, shipping: { ...DEFAULTS.shipping, ...(data.shipping || {}) }, homepage: hp }
       applyTheme(merged.theme)
       setSettings(merged)
     } catch {
