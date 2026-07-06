@@ -267,9 +267,9 @@ function CategoryGrid({ categories, h = {} }) {
                   ? <img src={c.image} alt={c.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   : <div className="w-full h-full" style={{ background: 'var(--beige)' }} />}
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 40%, rgba(42,26,22,0.8) 100%)' }} />
-                <div className="absolute bottom-0 left-0 right-0 p-4 text-center">
+                <div className="absolute inset-x-0 bottom-0 p-3 md:p-4 text-center flex flex-col items-center">
                   {c.hindiName && <p className="font-hindi text-[var(--gold-light)] text-sm">{c.hindiName}</p>}
-                  <p className="font-display text-white text-lg leading-tight">{c.name}</p>
+                  <p className="font-display text-white text-base md:text-lg leading-tight text-balance">{c.name}</p>
                 </div>
               </Link>
             </Tilt>

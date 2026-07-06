@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
@@ -29,7 +29,13 @@ export function Products() {
   const [inStockOnly, setInStockOnly] = useState(false)
   const [showFilter, setShowFilter] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
 
-  useEffect(() => { window.scrollTo(0, 0) }, [categoryParam, collectionParam, under599])
+  // Scroll to top only when the filter actually CHANGES — not on mount, so
+  // returning here via the back button keeps the previous scroll position.
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return }
+    window.scrollTo(0, 0)
+  }, [categoryParam, collectionParam, under599])
 
   const setParam = (key, val) => {
     const next = new URLSearchParams(params)

@@ -75,7 +75,18 @@ export function AdminSettings() {
   const save = async () => {
     setSaving(true)
     try {
-      await api.patch('/settings', s, { auth: true })
+      // Coerce shipping fields (which may be '' while typing) to numbers.
+      const sh = s.shipping || {}
+      const payload = {
+        ...s,
+        shipping: {
+          ...sh,
+          defaultCharge: Number(sh.defaultCharge) || 0,
+          freeAboveSubtotal: Number(sh.freeAboveSubtotal) || 0,
+          cities: (sh.cities || []).filter((c) => c.name?.trim()).map((c) => ({ name: c.name.trim(), charge: Number(c.charge) || 0 })),
+        },
+      }
+      await api.patch('/settings', payload, { auth: true })
       await refresh()
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } finally {
@@ -267,8 +278,8 @@ function ShippingEditor({ value, onChange }) {
   return (
     <div className="space-y-5">
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field field={{ label: 'Base delivery charge (₹)', type: 'number', help: 'Applied to any city not listed below' }} value={s.defaultCharge} onChange={(v) => patch({ defaultCharge: Number(v) || 0 })} />
-        <Field field={{ label: 'Free above order value (₹)', type: 'number', help: '0 = off. Free shipping when subtotal ≥ this' }} value={s.freeAboveSubtotal} onChange={(v) => patch({ freeAboveSubtotal: Number(v) || 0 })} />
+        <Field field={{ label: 'Base delivery charge (₹)', type: 'number', help: 'Applied to any city not listed below' }} value={s.defaultCharge} onChange={(v) => patch({ defaultCharge: v })} />
+        <Field field={{ label: 'Free above order value (₹)', type: 'number', help: '0 = off. Free shipping when subtotal ≥ this' }} value={s.freeAboveSubtotal} onChange={(v) => patch({ freeAboveSubtotal: v })} />
       </div>
 
       <div>
@@ -292,7 +303,7 @@ function ShippingEditor({ value, onChange }) {
                 <input
                   type="number"
                   value={c.charge}
-                  onChange={(e) => setCity(i, 'charge', Number(e.target.value) || 0)}
+                  onChange={(e) => setCity(i, 'charge', e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="0"
                   className="w-24 px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm outline-none focus:border-[var(--gold)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--gold)_28%,transparent)]"
                 />

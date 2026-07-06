@@ -57,11 +57,6 @@ export function ProductCard({ product }) {
             {!inStock && <Badge variant="soldout" className="!text-[9px] !px-1.5 !py-0.5">Sold Out</Badge>}
           </div>
         )}
-        {f.material && (
-          <p className="text-[10px] tracking-widest font-medium uppercase mb-0.5" style={{ color: 'rgb(120,110,100)' }}>
-            {f.material}
-          </p>
-        )}
         <Link to={`/products/${f.id}`}>
           <h3
             className="font-display text-sm leading-snug transition-colors hover:opacity-80"

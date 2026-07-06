@@ -173,14 +173,10 @@
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
   }
 
-  /* Page section — content-visibility lets the browser skip layout/paint of
-     off-screen sections (big scroll win on long pages). `auto` in
-     contain-intrinsic-size remembers the last rendered height so the scrollbar
-     doesn't jump when scrolling back up. */
+  /* Page section. (content-visibility was removed — its height estimation
+     broke back-navigation scroll restoration, landing users on the footer.) */
   .section {
     @apply py-10 md:py-16;
-    content-visibility: auto;
-    contain-intrinsic-size: auto 700px;
   }
   .container-wide  { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
   .container-tight { @apply max-w-5xl  mx-auto px-4 sm:px-6 lg:px-8; }

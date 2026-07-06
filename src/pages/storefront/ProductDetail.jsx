@@ -181,6 +181,17 @@ export function ProductDetail() {
               </div>
             )}
 
+            {/* Tags — as hashtags */}
+            {product.tags?.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {product.tags.map((t) => (
+                  <span key={t} className="text-xs font-semibold rounded-full px-3 py-1" style={{ background: 'color-mix(in srgb, var(--gold) 14%, transparent)', color: 'var(--maroon-dark)' }}>
+                    #{String(t).replace(/\s+/g, '')}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Desktop actions (mobile uses the sticky bar) */}
             <div className="hidden lg:flex gap-3 pt-1">
               <button onClick={handleAddToCart} disabled={!inStock || adding} className="btn-maroon flex-1 disabled:opacity-50">
