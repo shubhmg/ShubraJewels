@@ -1,20 +1,27 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api, normalizeProduct } from '../lib/api.js'
 
+// Module-level cache. On back-navigation a page re-renders instantly at full
+// height from cache (then revalidates in the background) — without this the
+// page mounts empty/short and browser scroll-restoration lands on the footer.
+const _cache = new Map()
+
 /**
  * Generic GET hook. Returns { data, loading, error, refresh }.
  * `path` may change; pass a stable string.
  */
 export function useFetch(path, { transform } = {}) {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState(() => (path && _cache.has(path) ? _cache.get(path) : null))
+  const [loading, setLoading] = useState(() => !(path && _cache.has(path)))
   const [error, setError] = useState(null)
 
   const refresh = useCallback(async () => {
-    setLoading(true)
+    if (!_cache.has(path)) setLoading(true) // only show a loader when nothing is cached yet
     try {
       const res = await api.get(path)
-      setData(transform ? transform(res) : res)
+      const val = transform ? transform(res) : res
+      _cache.set(path, val)
+      setData(val)
       setError(null)
     } catch (e) {
       setError(e)
