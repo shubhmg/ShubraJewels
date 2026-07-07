@@ -17,13 +17,26 @@ const SORT_OPTIONS = [
 
 export function Products() {
   const [params, setParams] = useSearchParams()
-  const { data: products, loading } = useProducts()
   const { data: categories } = useCategories()
   const { data: collections } = useCollections()
 
   const categoryParam = params.get('category') || 'all'
   const collectionParam = params.get('collection') || 'all'
   const under599 = params.get('under599') === '1'
+
+  // Let the SERVER filter (it resolves slug-or-id, under599 and collection
+  // correctly) — the client only sorts + hides out-of-stock. This avoids the
+  // id-resolution race that showed an empty grid before categories loaded.
+  const query = useMemo(() => {
+    const q = new URLSearchParams()
+    if (categoryParam !== 'all') q.set('category', categoryParam)
+    if (collectionParam !== 'all') q.set('collection', collectionParam)
+    if (under599) q.set('under599', '1')
+    const s = q.toString()
+    return s ? `?${s}` : ''
+  }, [categoryParam, collectionParam, under599])
+
+  const { data: products, loading } = useProducts(query)
 
   const [sort, setSort] = useState('featured')
   const [inStockOnly, setInStockOnly] = useState(false)
@@ -37,30 +50,20 @@ export function Products() {
     window.scrollTo(0, 0)
   }, [categoryParam, collectionParam, under599])
 
-  const setParam = (key, val) => {
+  // Apply several param changes atomically. Doing sequential setParam() calls
+  // races: each clones the same stale `params`, so only the last write survives.
+  const patchParams = (updates) => {
     const next = new URLSearchParams(params)
-    if (!val || val === 'all') next.delete(key)
-    else next.set(key, val)
+    for (const [key, val] of Object.entries(updates)) {
+      if (!val || val === 'all') next.delete(key)
+      else next.set(key, val)
+    }
     setParams(next, { replace: true })
   }
-
-  const catId = useMemo(() => {
-    if (categoryParam === 'all') return null
-    const c = (categories || []).find((x) => x.slug === categoryParam || x._id === categoryParam)
-    return c?._id || categoryParam
-  }, [categoryParam, categories])
-
-  const colId = useMemo(() => {
-    if (collectionParam === 'all') return null
-    const c = (collections || []).find((x) => x.slug === collectionParam || x._id === collectionParam)
-    return c?._id || collectionParam
-  }, [collectionParam, collections])
+  const setParam = (key, val) => patchParams({ [key]: val })
 
   const list = useMemo(() => {
     let res = [...(products || [])]
-    if (catId) res = res.filter((p) => String(p.categoryId) === String(catId))
-    if (colId) res = res.filter((p) => (p.collectionIds || []).map(String).includes(String(colId)))
-    if (under599) res = res.filter((p) => p.price <= 599)
     if (inStockOnly) res = res.filter((p) => p.inStock !== false)
     switch (sort) {
       case 'price-asc':  res.sort((a, b) => a.price - b.price); break
@@ -70,10 +73,10 @@ export function Products() {
       default: break
     }
     return res
-  }, [products, catId, colId, under599, inStockOnly, sort])
+  }, [products, inStockOnly, sort])
 
-  const activeCat = (categories || []).find((c) => c._id === catId)
-  const activeCol = (collections || []).find((c) => c._id === colId)
+  const activeCat = (categories || []).find((c) => c.slug === categoryParam || c._id === categoryParam)
+  const activeCol = (collections || []).find((c) => c.slug === collectionParam || c._id === collectionParam)
   const title = activeCat?.name || activeCol?.name || (under599 ? 'Under ₹599' : 'All Jhumkas')
   const hindi = activeCat?.hindiName || activeCol?.hindiName || (under599 ? '₹599 से कम' : 'सभी झुमके')
 
@@ -113,7 +116,7 @@ export function Products() {
                   <button onClick={() => setShowFilter(false)} className="text-stone-400 cursor-pointer"><X size={18} /></button>
                 </div>
                 <FilterGroup title="Category">
-                  <Chip active={categoryParam === 'all' && !under599} onClick={() => { setParam('category', 'all'); setParam('under599', '') }}>All</Chip>
+                  <Chip active={categoryParam === 'all' && !under599} onClick={() => patchParams({ category: 'all', under599: '' })}>All</Chip>
                   {(categories || []).map((c) => (
                     <Chip key={c._id} active={c.slug === categoryParam || c._id === categoryParam} onClick={() => setParam('category', c.slug || c._id)}>{c.name}</Chip>
                   ))}
