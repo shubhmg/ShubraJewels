@@ -87,9 +87,9 @@ function ProductGridBlock({ all, config }) {
     <section className="section" style={{ background: dark ? 'var(--ink)' : 'color-mix(in srgb, var(--beige) 45%, var(--cream))' }}>
       <div className="container-wide">
         <Reveal><SectionHeading eyebrow={c.eyebrow} hindi={c.hindi} title={c.title} subtitle={c.subtitle} light={dark} /></Reveal>
-        <Stagger className="product-masonry md:grid md:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7">
-          {list.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
-        </Stagger>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7" style={{ display: 'grid' }}>
+          {list.map((p) => <ProductCard key={p.id} product={p} />)}
+        </div>
       </div>
     </section>
   )
@@ -287,9 +287,9 @@ function FeaturedJhumkas({ products, h = {} }) {
     <section className="section" style={{ background: 'color-mix(in srgb, var(--beige) 45%, var(--cream))' }}>
       <div className="container-wide">
         <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} /></Reveal>
-        <Stagger className="product-masonry md:grid md:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7">
-          {products.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
-        </Stagger>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7" style={{ display: 'grid' }}>
+          {products.map((p) => <ProductCard key={p.id} product={p} />)}
+        </div>
         <Reveal delay={0.1}>
           <div className="text-center mt-12">
             <Magnetic><Link to="/products" className="btn-outline-gold">View All Jhumkas <ArrowRight size={16} /></Link></Magnetic>
@@ -372,9 +372,9 @@ function Under599({ products, h = {} }) {
           </div>
           <Magnetic><Link to="/products?under599=1" className="btn-outline-gold">See All <ArrowRight size={16} /></Link></Magnetic>
         </div>
-        <Stagger className="product-masonry md:grid md:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7">
-          {products.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
-        </Stagger>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7" style={{ display: 'grid' }}>
+          {products.map((p) => <ProductCard key={p.id} product={p} />)}
+        </div>
       </div>
     </section>
   )
