@@ -145,8 +145,8 @@ export function Products() {
                 <p className="text-stone-400 text-sm mt-1">Try a different filter.</p>
               </div>
             ) : (
-              <Stagger className="product-masonry md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6" gap={0.05}>
-                {list.map((p) => <StaggerItem key={p.id}><ProductCard product={p} /></StaggerItem>)}
+              <Stagger className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6 items-start" gap={0.04}>
+                {list.map((p) => <StaggerItem key={p.id} className="min-w-0"><ProductCard product={p} /></StaggerItem>)}
               </Stagger>
             )}
           </div>

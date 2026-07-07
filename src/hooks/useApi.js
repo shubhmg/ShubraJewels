@@ -15,22 +15,41 @@ export function useFetch(path, { transform } = {}) {
   const [loading, setLoading] = useState(() => !(path && _cache.has(path)))
   const [error, setError] = useState(null)
 
-  const refresh = useCallback(async () => {
-    if (!_cache.has(path)) setLoading(true) // only show a loader when nothing is cached yet
+  const fetchPath = useCallback(async () => {
     try {
       const res = await api.get(path)
       const val = transform ? transform(res) : res
       _cache.set(path, val)
-      setData(val)
-      setError(null)
+      return { val }
     } catch (e) {
-      setError(e)
-    } finally {
-      setLoading(false)
+      return { err: e }
     }
   }, [path]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { if (path) refresh() }, [path, refresh])
+  // Re-sync whenever `path` changes. Cached path → show it instantly (keeps
+  // back-nav scroll restore); uncached path → clear stale data + show loader so
+  // a filter switch never flashes the previous filter's products. `alive` drops
+  // out-of-order responses when filters are switched quickly.
+  useEffect(() => {
+    if (!path) { setData(null); setLoading(false); return }
+    let alive = true
+    if (_cache.has(path)) { setData(_cache.get(path)); setLoading(false) }
+    else { setData(null); setLoading(true) }
+    fetchPath().then(({ val, err }) => {
+      if (!alive) return
+      if (err) setError(err)
+      else { setData(val); setError(null) }
+      setLoading(false)
+    })
+    return () => { alive = false }
+  }, [path, fetchPath])
+
+  const refresh = useCallback(async () => {
+    const { val, err } = await fetchPath()
+    if (err) setError(err)
+    else { setData(val); setError(null) }
+    setLoading(false)
+  }, [fetchPath])
 
   return { data, loading, error, refresh }
 }
