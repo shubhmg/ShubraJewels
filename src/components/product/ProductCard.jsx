@@ -30,7 +30,7 @@ export function ProductCard({ product }) {
     : 0
 
   return (
-    <div className="group relative animate-fade-in rounded-2xl overflow-hidden shadow-sm" style={{ background: 'color-mix(in srgb, var(--beige) 45%, white)' }}>
+    <div className="group relative animate-fade-in rounded-2xl overflow-hidden shadow-sm h-full flex flex-col" style={{ background: 'color-mix(in srgb, var(--beige) 45%, white)' }}>
 
       {/* Image */}
       <Link to={`/products/${f.id}`} className="block">

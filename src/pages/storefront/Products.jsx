@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
-import { Stagger, StaggerItem } from '../../components/motion/Motion.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
 import { useProducts, useCategories, useCollections } from '../../hooks/useApi.js'
 
@@ -138,16 +137,32 @@ export function Products() {
           )}
 
           <div className="flex-1 min-w-0">
-            {list.length === 0 ? (
+            {loading && list.length === 0 ? (
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6" style={{ display: 'grid' }}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl overflow-hidden animate-pulse" style={{ background: 'color-mix(in srgb, var(--beige) 40%, white)' }}>
+                    <div className="aspect-[3/4]" style={{ background: 'color-mix(in srgb, var(--beige) 70%, white)' }} />
+                    <div className="p-3 space-y-2">
+                      <div className="h-3 rounded" style={{ background: 'color-mix(in srgb, var(--beige) 70%, white)' }} />
+                      <div className="h-3 w-1/2 rounded" style={{ background: 'color-mix(in srgb, var(--beige) 70%, white)' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : list.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <X size={28} className="text-stone-300 mb-3" />
                 <p className="font-display text-xl" style={{ color: 'var(--ink)' }}>No jhumkas found</p>
                 <p className="text-stone-400 text-sm mt-1">Try a different filter.</p>
               </div>
             ) : (
-              <Stagger className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6 items-start" gap={0.04}>
-                {list.map((p) => <StaggerItem key={p.id} className="min-w-0"><ProductCard product={p} /></StaggerItem>)}
-              </Stagger>
+              // Plain CSS grid — row-major, equal-height cells. Inline display:grid
+              // guarantees it regardless of any utility-class ordering. No motion
+              // wrappers here: they were injecting transformed divs between the grid
+              // and the cards, breaking the row layout on mobile.
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6" style={{ display: 'grid' }}>
+                {list.map((p) => <ProductCard key={p.id} product={p} />)}
+              </div>
             )}
           </div>
         </div>
