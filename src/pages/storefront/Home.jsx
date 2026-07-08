@@ -188,7 +188,6 @@ function Hero({ settings }) {
             <div className="absolute inset-0 flex items-center justify-center">
               <img src={url} alt="" className="max-h-full max-w-full w-auto h-auto" style={{ WebkitMaskImage: edgeFade, maskImage: edgeFade }} />
             </div>
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
           </div>
         </div>
 
