@@ -193,10 +193,13 @@ function HeroBackground({ hero, t }) {
   if (bg === 'image' && url) {
     return (
       <>
-        {/* Bias the crop toward the top on wide desktop so a portrait's face +
-            earrings stay in frame (centred cover otherwise cuts the head off);
-            mobile's tall band already shows the whole image. */}
-        <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover object-center md:object-[center_22%]" />
+        {/* The band is wide-and-short on desktop but the uploaded image is often
+            a tall portrait — object-cover would crop it to a thin strip (and cut
+            the face). Instead show the WHOLE image with object-contain, and fill
+            the leftover space with a blurred copy so it reads as intentional on
+            any screen / any aspect ratio. */}
+        <img src={url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60" />
+        <img src={url} alt="" className="absolute inset-0 w-full h-full object-contain object-center" />
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
         {bottomFade}
       </>
@@ -205,7 +208,7 @@ function HeroBackground({ hero, t }) {
   if (bg === 'video' && url) {
     return (
       <>
-        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover object-center md:object-[center_22%]" src={url} autoPlay muted loop playsInline />
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover object-center" src={url} autoPlay muted loop playsInline />
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
         {bottomFade}
       </>
