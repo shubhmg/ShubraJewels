@@ -130,39 +130,82 @@ function TextBlock({ config }) {
 }
 
 /* ── Hero ─────────────────────────────────────────────────────────── */
+function HeroText({ hero, settings }) {
+  return (
+    <motion.div
+      className="container-wide relative z-10 pb-10 md:pb-14 pt-2 text-center"
+      initial="hidden"
+      animate="show"
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
+    >
+      <HeroLine><p className="font-hindi text-xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
+      <HeroLine><h1 className="font-display text-white text-4xl md:text-6xl lg:text-7xl leading-[1.05] mt-1.5 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
+      {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-3 text-sm md:text-lg">{hero.subheading}</p></HeroLine>}
+      <HeroLine>
+        <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
+          <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold !px-6 !py-2.5 !text-sm">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={16} /></Link></Magnetic>
+        </div>
+      </HeroLine>
+    </motion.div>
+  )
+}
+
+const HERO_MOTIFS = (
+  <>
+    <EarringMotif size={150} className="absolute right-[7%] top-[9%] rotate-12" style={{ opacity: 0.1 }} />
+    <EarringMotif size={95} className="absolute left-[8%] top-[22%] -rotate-12" style={{ opacity: 0.08 }} />
+    <EarringMotif size={120} className="absolute left-[13%] bottom-[16%] rotate-6" style={{ opacity: 0.07 }} />
+    <EarringMotif size={72} className="absolute right-[15%] bottom-[24%] -rotate-6" style={{ opacity: 0.09 }} />
+  </>
+)
+
 function Hero({ settings }) {
   const t = settings.theme || {}
   const hero = settings.homepage?.hero || {}
+  const bg = hero.background || 'jewel'
+  const url = hero.mediaUrl || ''
+
+  // Image hero gets a bespoke layout: on mobile the image is full-width at its
+  // natural aspect (height auto, flush under the navbar — no dead space); on
+  // desktop it's the contain + blurred-fill band with feathered edges.
+  if (bg === 'image' && url) {
+    const edgeFade = 'linear-gradient(to right, transparent 0%, #000 13%, #000 87%, transparent 100%)'
+    const bottomMask = 'linear-gradient(to bottom, #000 0%, #000 40%, transparent 94%)'
+    const mobileBottom = 'linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%)'
+    return (
+      <section className="relative flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
+        {HERO_MOTIFS}
+
+        {/* Mobile: natural full-width image, height follows aspect ratio */}
+        <div className="md:hidden relative">
+          <img src={url} alt="" className="block w-full h-auto" style={{ WebkitMaskImage: mobileBottom, maskImage: mobileBottom }} />
+        </div>
+
+        {/* Desktop: full image over a blurred copy, all edges feathered */}
+        <div className="hidden md:block relative h-[58vh] lg:h-[62vh]">
+          <div className="absolute inset-0" style={{ WebkitMaskImage: bottomMask, maskImage: bottomMask }}>
+            <img src={url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src={url} alt="" className="max-h-full max-w-full w-auto h-auto" style={{ WebkitMaskImage: edgeFade, maskImage: edgeFade }} />
+            </div>
+            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
+          </div>
+        </div>
+
+        <HeroText hero={hero} settings={settings} />
+        <div className="absolute bottom-0 left-0 right-0"><MehendiDivider /></div>
+      </section>
+    )
+  }
+
+  // 3D jewel / video: full-bleed band with text below.
   return (
     <section className="relative min-h-[68vh] md:min-h-[80vh] flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
-      {/* Scattered jhumka silhouettes (replaces the mandala) */}
-      <EarringMotif size={150} className="absolute right-[7%] top-[9%] rotate-12" style={{ opacity: 0.1 }} />
-      <EarringMotif size={95} className="absolute left-[8%] top-[22%] -rotate-12" style={{ opacity: 0.08 }} />
-      <EarringMotif size={120} className="absolute left-[13%] bottom-[16%] rotate-6" style={{ opacity: 0.07 }} />
-      <EarringMotif size={72} className="absolute right-[15%] bottom-[24%] -rotate-6" style={{ opacity: 0.09 }} />
-
-      {/* Hero background — 3D jewel, image, or video (admin-selectable) */}
+      {HERO_MOTIFS}
       <div className="relative flex-1 min-h-[30vh] md:min-h-[42vh]">
         <HeroBackground hero={hero} t={t} />
       </div>
-
-      {/* Text */}
-      <motion.div
-        className="container-wide relative z-10 pb-10 md:pb-14 pt-2 text-center"
-        initial="hidden"
-        animate="show"
-        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
-      >
-        <HeroLine><p className="font-hindi text-xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
-        <HeroLine><h1 className="font-display text-white text-4xl md:text-6xl lg:text-7xl leading-[1.05] mt-1.5 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
-        {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-3 text-sm md:text-lg">{hero.subheading}</p></HeroLine>}
-        <HeroLine>
-          <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
-            <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold !px-6 !py-2.5 !text-sm">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={16} /></Link></Magnetic>
-          </div>
-        </HeroLine>
-      </motion.div>
-
+      <HeroText hero={hero} settings={settings} />
       <div className="absolute bottom-0 left-0 right-0"><MehendiDivider /></div>
     </section>
   )
