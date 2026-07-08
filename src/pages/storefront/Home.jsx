@@ -196,19 +196,23 @@ function HeroBackground({ hero, t }) {
     // its left/right edges are feathered with a mask, so it melts into the
     // blurred backdrop instead of ending in a hard vertical seam.
     const edgeFade = 'linear-gradient(to right, transparent 0%, #000 13%, #000 87%, transparent 100%)'
+    // Fade the whole band's bottom into the maroon below — same soft feather as
+    // the sides (replaces the old abrupt bottom gradient).
+    const bottomMask = 'linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%)'
     return (
       <>
-        <img src={url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <img
-            src={url}
-            alt=""
-            className="max-h-full max-w-full w-auto h-auto"
-            style={{ WebkitMaskImage: edgeFade, maskImage: edgeFade }}
-          />
+        <div className="absolute inset-0" style={{ WebkitMaskImage: bottomMask, maskImage: bottomMask }}>
+          <img src={url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img
+              src={url}
+              alt=""
+              className="max-h-full max-w-full w-auto h-auto"
+              style={{ WebkitMaskImage: edgeFade, maskImage: edgeFade }}
+            />
+          </div>
         </div>
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
-        {bottomFade}
       </>
     )
   }
