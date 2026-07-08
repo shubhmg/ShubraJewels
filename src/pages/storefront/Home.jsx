@@ -191,15 +191,22 @@ function HeroBackground({ hero, t }) {
   const bottomFade = <div className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent, var(--maroon-dark) 96%)' }} />
 
   if (bg === 'image' && url) {
+    // Show the WHOLE image (never cropped) over a blurred copy of itself that
+    // fills the leftover space. The sharp image is sized to its own content and
+    // its left/right edges are feathered with a mask, so it melts into the
+    // blurred backdrop instead of ending in a hard vertical seam.
+    const edgeFade = 'linear-gradient(to right, transparent 0%, #000 13%, #000 87%, transparent 100%)'
     return (
       <>
-        {/* The band is wide-and-short on desktop but the uploaded image is often
-            a tall portrait — object-cover would crop it to a thin strip (and cut
-            the face). Instead show the WHOLE image with object-contain, and fill
-            the leftover space with a blurred copy so it reads as intentional on
-            any screen / any aspect ratio. */}
         <img src={url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60" />
-        <img src={url} alt="" className="absolute inset-0 w-full h-full object-contain object-center" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <img
+            src={url}
+            alt=""
+            className="max-h-full max-w-full w-auto h-auto"
+            style={{ WebkitMaskImage: edgeFade, maskImage: edgeFade }}
+          />
+        </div>
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
         {bottomFade}
       </>
