@@ -9,6 +9,7 @@ import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { useProduct, useProducts } from '../../hooks/useApi.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
+import { resolveContent } from '../../lib/siteContent.js'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
@@ -17,6 +18,7 @@ export function ProductDetail() {
   const { data: product, loading } = useProduct(id)
   const { data: allProducts } = useProducts()
   const settings = useSettings()
+  const pc = resolveContent(settings.content).product
 
   const [imgIdx, setImgIdx] = useState(0)
   const [adding, setAdding] = useState(false)
@@ -139,7 +141,7 @@ export function ProductDetail() {
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {product.isNewArrival && <Badge variant="new">New</Badge>}
                   {product.isBestseller && <Badge variant="bestseller">Bestseller</Badge>}
-                  {!inStock && <Badge variant="soldout">Sold Out</Badge>}
+                  {!inStock && <Badge variant="soldout">{pc.soldOut}</Badge>}
                 </div>
               )}
               {product.hindiName && <p className="font-hindi text-lg" style={{ color: 'var(--maroon)' }}>{product.hindiName}</p>}
@@ -195,7 +197,7 @@ export function ProductDetail() {
             {/* Desktop actions (mobile uses the sticky bar) */}
             <div className="hidden lg:flex gap-3 pt-1">
               <button onClick={handleAddToCart} disabled={!inStock || adding} className="btn-maroon flex-1 disabled:opacity-50">
-                <ShoppingBag size={16} />{adding ? 'Added!' : inStock ? 'Add to Bag' : 'Sold Out'}
+                <ShoppingBag size={16} />{adding ? 'Added!' : inStock ? pc.addToBag : pc.soldOut}
               </button>
               <button onClick={() => toggle({ ...product, id: pid })} className="w-12 h-12 grid place-items-center rounded-full border transition-all cursor-pointer shrink-0" style={{ borderColor: wishlisted ? '#f43f5e' : 'color-mix(in srgb, var(--gold) 40%, transparent)' }} aria-label="Wishlist">
                 <Heart size={18} className={wishlisted ? 'fill-rose-500 text-rose-500' : 'text-stone-400'} />
@@ -211,7 +213,7 @@ export function ProductDetail() {
               </div>
               <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--beige) 55%, white)' }}>
                 <Gift size={16} style={{ color: 'var(--maroon)' }} />
-                <p className="text-xs text-stone-600">Gift-ready packaging</p>
+                <p className="text-xs text-stone-600">{pc.packagingNote}</p>
               </div>
             </div>
           </div>
@@ -236,7 +238,7 @@ export function ProductDetail() {
             <span className="block text-lg font-bold" style={{ color: 'var(--maroon)' }}>{fmt(product.price)}</span>
           </div>
           <button onClick={handleAddToCart} disabled={!inStock || adding} className="btn-maroon flex-1 disabled:opacity-50">
-            <ShoppingBag size={16} />{adding ? 'Added!' : inStock ? 'Add to Bag' : 'Sold Out'}
+            <ShoppingBag size={16} />{adding ? 'Added!' : inStock ? pc.addToBag : pc.soldOut}
           </button>
         </div>
       </div>

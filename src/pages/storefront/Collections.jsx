@@ -5,9 +5,11 @@ import { Mandala, Motif, MehendiDivider } from '../../components/decor/Decor.jsx
 import { SectionHeading } from '../../components/ui/SectionHeading.jsx'
 import { useCollections, useProducts } from '../../hooks/useApi.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
+import { resolveContent } from '../../lib/siteContent.js'
 
 export function Collections() {
   const settings = useSettings()
+  const c = resolveContent(settings.content).pages.collections
   const { data: collections } = useCollections()
   const { data: products } = useProducts()
 
@@ -24,8 +26,8 @@ export function Collections() {
         <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-28 md:pt-36 pb-16 md:pb-20 relative">
           <div className="eyebrow justify-center flex"><Motif size={20} /><span className="font-hindi">{settings.brandNameHindi}</span></div>
-          <p className="font-hindi text-2xl text-[var(--gold-light)] mt-3">राजसी संग्रह</p>
-          <h1 className="font-display text-white text-5xl md:text-6xl leading-tight mt-1">The Royal Collections</h1>
+          <p className="font-hindi text-2xl text-[var(--gold-light)] mt-3">{c.hindi}</p>
+          <h1 className="font-display text-white text-5xl md:text-6xl leading-tight mt-1">{c.heading}</h1>
           <p className="mt-4 text-white/70 max-w-lg mx-auto text-sm">
             Every collection is a world of its own — Maharani, Rajputana, Banjara & more. {settings.slogan}
           </p>
@@ -75,7 +77,7 @@ export function Collections() {
       {newArrivals.length > 0 && (
         <section className="section" style={{ background: 'color-mix(in srgb, var(--beige) 45%, var(--cream))' }}>
           <div className="container-wide">
-            <SectionHeading eyebrow="Just In" hindi="नए झुमके" title="New Arrivals" />
+            <SectionHeading eyebrow={c.naEyebrow} hindi={c.naHindi} title={c.naTitle} />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6" style={{ display: 'grid' }}>
               {newArrivals.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>

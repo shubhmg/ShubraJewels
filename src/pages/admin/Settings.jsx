@@ -6,6 +6,17 @@ import { MediaUploader } from '../../components/admin/MediaUploader.jsx'
 import { useSettingsCtx } from '../../lib/SettingsProvider.jsx'
 import { INDIAN_CITIES } from '../../data/indianCities.js'
 import { resolveAbout, VALUE_ICON_NAMES } from '../../lib/aboutContent.js'
+import { resolveContent } from '../../lib/siteContent.js'
+
+const TABS = [
+  { id: 'brand', label: 'Brand' },
+  { id: 'contact', label: 'Contact & Social' },
+  { id: 'shipping', label: 'Shipping' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'story', label: 'Our Story' },
+  { id: 'content', label: 'Text & Content' },
+  { id: 'theme', label: 'Theme' },
+]
 
 const THEME_KEYS = [
   { key: 'maroon',    label: 'Primary (maroon)' },
@@ -66,6 +77,7 @@ export function AdminSettings() {
   const [s, setS] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [tab, setTab] = useState('brand')
 
   useEffect(() => { api.get('/settings').then(setS) }, [])
 
@@ -105,6 +117,23 @@ export function AdminSettings() {
         <Btn onClick={save} disabled={saving}>{saved ? <><Check size={16} /> Saved</> : saving ? 'Saving…' : 'Save Changes'}</Btn>
       </AdminHeader>
 
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-1.5 mb-6 sticky top-0 z-10 py-2 -mx-1 px-1" style={{ background: 'var(--cream)' }}>
+        {TABS.map((tb) => (
+          <button
+            key={tb.id}
+            onClick={() => setTab(tb.id)}
+            className="px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer"
+            style={tab === tb.id
+              ? { background: 'var(--maroon)', color: 'var(--cream)' }
+              : { background: 'color-mix(in srgb, var(--gold) 12%, transparent)', color: 'var(--ink)' }}
+          >
+            {tb.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'brand' && (
       <Section title="Brand & Slogan">
         <div className="grid sm:grid-cols-2 gap-4">
           <Field field={{ label: 'Brand name' }} value={s.brandName} onChange={(v) => set('brandName', v)} />
@@ -125,7 +154,9 @@ export function AdminSettings() {
           </div>
         </div>
       </Section>
+      )}
 
+      {tab === 'contact' && (
       <Section title="Ordering & Contact">
         <div className="grid sm:grid-cols-2 gap-4">
           <Field field={{ label: 'WhatsApp number', help: 'With country code, digits only e.g. 919812345678' }} value={s.whatsappNumber} onChange={(v) => set('whatsappNumber', v)} />
@@ -136,23 +167,9 @@ export function AdminSettings() {
           <Field field={{ label: 'Announcement strip' }} value={s.announcement} onChange={(v) => set('announcement', v)} />
         </div>
       </Section>
+      )}
 
-      <Section title="Shipping" subtitle="Base charge applies everywhere, unless a city is overridden below or the order qualifies for free shipping.">
-        <ShippingEditor value={s.shipping} onChange={(v) => set('shipping', v)} />
-      </Section>
-
-      <Section title="Payment Methods" subtitle="Which checkout options customers see.">
-        <div className="space-y-1">
-          <Field field={{ label: 'Pay online (Razorpay — UPI, cards, netbanking)', type: 'toggle' }} value={s.payments?.razorpay !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, razorpay: v } }))} />
-          <Field field={{ label: 'Pay on delivery (COD)', type: 'toggle' }} value={s.payments?.cod !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, cod: v } }))} />
-          <p className="text-xs text-zinc-400 pt-1">WhatsApp ordering is always available.</p>
-        </div>
-      </Section>
-
-      <Section title="Our Story Page" subtitle="The full About / Our Story page — image, heading, story text, and value cards.">
-        <AboutEditor value={s.about} onChange={(v) => set('about', v)} />
-      </Section>
-
+      {tab === 'contact' && (
       <Section title="Social Links">
         <div className="grid sm:grid-cols-3 gap-4">
           <Field field={{ label: 'Instagram URL' }} value={s.instagramUrl || s.instagram || ''} onChange={(v) => setS((p) => ({ ...p, instagramUrl: v, instagram: v }))} />
@@ -160,8 +177,37 @@ export function AdminSettings() {
           <Field field={{ label: 'YouTube URL' }} value={s.youtube} onChange={(v) => set('youtube', v)} />
         </div>
       </Section>
+      )}
 
-      {/* ── Theme ──────────────────────────────────────────────────── */}
+      {tab === 'shipping' && (
+      <Section title="Shipping" subtitle="Base charge applies everywhere, unless a city is overridden below or the order qualifies for free shipping.">
+        <ShippingEditor value={s.shipping} onChange={(v) => set('shipping', v)} />
+      </Section>
+      )}
+
+      {tab === 'payments' && (
+      <Section title="Payment Methods" subtitle="Which checkout options customers see.">
+        <div className="space-y-1">
+          <Field field={{ label: 'Pay online (Razorpay — UPI, cards, netbanking)', type: 'toggle' }} value={s.payments?.razorpay !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, razorpay: v } }))} />
+          <Field field={{ label: 'Pay on delivery (COD)', type: 'toggle' }} value={s.payments?.cod !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, cod: v } }))} />
+          <p className="text-xs text-zinc-400 pt-1">WhatsApp ordering is always available.</p>
+        </div>
+      </Section>
+      )}
+
+      {tab === 'story' && (
+      <Section title="Our Story Page" subtitle="The full About / Our Story page — image, heading, story text, and value cards.">
+        <AboutEditor value={s.about} onChange={(v) => set('about', v)} />
+      </Section>
+      )}
+
+      {tab === 'content' && (
+      <Section title="Text & Content" subtitle="Navigation, footer, page headings and button labels across the storefront.">
+        <ContentEditor value={s.content} onChange={(v) => set('content', v)} />
+      </Section>
+      )}
+
+      {tab === 'theme' && (
       <Section title="Theme & Colours" subtitle="Pick a preset or fine-tune each colour individually. Changes apply live after saving.">
 
         {/* Preset grid */}
@@ -218,6 +264,7 @@ export function AdminSettings() {
           </div>
         </div>
       </Section>
+      )}
 
       <div className="flex justify-end mt-6">
         <Btn onClick={save} disabled={saving}>{saved ? <><Check size={16} /> Saved</> : saving ? 'Saving…' : 'Save Changes'}</Btn>
@@ -319,6 +366,109 @@ function ShippingEditor({ value, onChange }) {
         </div>
         <datalist id="admin-in-cities">{INDIAN_CITIES.map((c) => <option key={c} value={c} />)}</datalist>
       </div>
+    </div>
+  )
+}
+
+// A small reusable list-of-links editor ({ label, to }).
+function LinkListEditor({ items, onChange, toLabel = 'Link (path)' }) {
+  const set = (i, k, v) => onChange(items.map((x, idx) => (idx === i ? { ...x, [k]: v } : x)))
+  const add = () => onChange([...items, { label: '', to: '' }])
+  const remove = (i) => onChange(items.filter((_, idx) => idx !== i))
+  return (
+    <div className="space-y-2">
+      {items.map((it, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input value={it.label} onChange={(e) => set(i, 'label', e.target.value)} placeholder="Label"
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm outline-none focus:border-[var(--gold)]" />
+          <input value={it.to} onChange={(e) => set(i, 'to', e.target.value)} placeholder={toLabel}
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-zinc-300 bg-white text-sm outline-none focus:border-[var(--gold)]" />
+          <button onClick={() => remove(i)} className="w-9 h-9 grid place-items-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 cursor-pointer shrink-0"><X size={16} /></button>
+        </div>
+      ))}
+      <Btn variant="outline" onClick={add}>+ Add</Btn>
+    </div>
+  )
+}
+
+function Group({ title, children }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 p-4">
+      <p className="text-[13px] font-bold text-zinc-800 mb-3">{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function ContentEditor({ value, onChange }) {
+  const c = resolveContent(value)
+  const patch = (upd) => onChange({ ...c, ...upd })
+  const patchPage = (page, upd) => patch({ pages: { ...c.pages, [page]: { ...c.pages[page], ...upd } } })
+  const P = c.pages
+
+  return (
+    <div className="space-y-4">
+      <Group title="Navigation menu">
+        <LinkListEditor items={c.nav} onChange={(nav) => patch({ nav })} />
+      </Group>
+
+      <Group title="Footer">
+        <div className="grid sm:grid-cols-2 gap-3 mb-3">
+          <Field field={{ label: 'Company column heading' }} value={c.footer.companyHeading} onChange={(v) => patch({ footer: { ...c.footer, companyHeading: v } })} />
+          <Field field={{ label: 'Contact column heading' }} value={c.footer.reachHeading} onChange={(v) => patch({ footer: { ...c.footer, reachHeading: v } })} />
+        </div>
+        <p className="text-xs font-semibold text-zinc-500 mb-1.5">Company links</p>
+        <LinkListEditor items={c.footer.links} onChange={(links) => patch({ footer: { ...c.footer, links } })} />
+        <div className="mt-3">
+          <Field field={{ label: 'Copyright line', help: 'Leave blank for "© year brand. slogan"' }} value={c.footer.copyright} onChange={(v) => patch({ footer: { ...c.footer, copyright: v } })} />
+        </div>
+      </Group>
+
+      <Group title="Buttons & labels">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field field={{ label: 'Add to bag' }} value={c.product.addToBag} onChange={(v) => patch({ product: { ...c.product, addToBag: v } })} />
+          <Field field={{ label: 'Sold out' }} value={c.product.soldOut} onChange={(v) => patch({ product: { ...c.product, soldOut: v } })} />
+          <Field field={{ label: 'Product packaging note' }} value={c.product.packagingNote} onChange={(v) => patch({ product: { ...c.product, packagingNote: v } })} />
+          <Field field={{ label: 'Home “view all” button' }} value={c.home.ctaViewAll} onChange={(v) => patch({ home: { ...c.home, ctaViewAll: v } })} />
+          <Field field={{ label: 'Home “story” button' }} value={c.home.ctaStory} onChange={(v) => patch({ home: { ...c.home, ctaStory: v } })} />
+          <Field field={{ label: 'Home “see all” button' }} value={c.home.ctaSeeAll} onChange={(v) => patch({ home: { ...c.home, ctaSeeAll: v } })} />
+        </div>
+      </Group>
+
+      <Group title="Jhumkas (products) page">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field field={{ label: 'Eyebrow' }} value={P.products.eyebrow} onChange={(v) => patchPage('products', { eyebrow: v })} />
+          <div />
+          <Field field={{ label: 'Default title' }} value={P.products.titleAll} onChange={(v) => patchPage('products', { titleAll: v })} />
+          <Field field={{ label: 'Default title (Hindi)' }} value={P.products.hindiAll} onChange={(v) => patchPage('products', { hindiAll: v })} />
+          <Field field={{ label: 'Under-599 title' }} value={P.products.titleUnder599} onChange={(v) => patchPage('products', { titleUnder599: v })} />
+          <Field field={{ label: 'Under-599 title (Hindi)' }} value={P.products.hindiUnder599} onChange={(v) => patchPage('products', { hindiUnder599: v })} />
+        </div>
+      </Group>
+
+      <Group title="Collections page">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field field={{ label: 'Heading' }} value={P.collections.heading} onChange={(v) => patchPage('collections', { heading: v })} />
+          <Field field={{ label: 'Heading (Hindi)' }} value={P.collections.hindi} onChange={(v) => patchPage('collections', { hindi: v })} />
+          <Field field={{ label: 'New Arrivals eyebrow' }} value={P.collections.naEyebrow} onChange={(v) => patchPage('collections', { naEyebrow: v })} />
+          <Field field={{ label: 'New Arrivals title' }} value={P.collections.naTitle} onChange={(v) => patchPage('collections', { naTitle: v })} />
+          <Field field={{ label: 'New Arrivals (Hindi)' }} value={P.collections.naHindi} onChange={(v) => patchPage('collections', { naHindi: v })} />
+        </div>
+      </Group>
+
+      <Group title="Contact page">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field field={{ label: 'Eyebrow' }} value={P.contact.eyebrow} onChange={(v) => patchPage('contact', { eyebrow: v })} />
+          <Field field={{ label: 'Heading (Hindi)' }} value={P.contact.hindi} onChange={(v) => patchPage('contact', { hindi: v })} />
+          <div className="sm:col-span-2"><Field field={{ label: 'Heading' }} value={P.contact.heading} onChange={(v) => patchPage('contact', { heading: v })} /></div>
+          <Field field={{ label: 'WhatsApp box heading' }} value={P.contact.waHeading} onChange={(v) => patchPage('contact', { waHeading: v })} />
+          <Field field={{ label: 'WhatsApp box subtext' }} value={P.contact.waSubtext} onChange={(v) => patchPage('contact', { waSubtext: v })} />
+        </div>
+      </Group>
+
+      <Group title="Our Story page (heading only — rest in the “Our Story” tab)">
+        <Field field={{ label: 'Eyebrow' }} value={P.about.eyebrow} onChange={(v) => patchPage('about', { eyebrow: v })} />
+      </Group>
     </div>
   )
 }

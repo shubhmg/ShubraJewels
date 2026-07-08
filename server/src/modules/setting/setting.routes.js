@@ -20,11 +20,15 @@ router.patch(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const doc = await getSettings();
-    const { theme, homepage, shipping, about, ...rest } = req.body || {};
+    const { theme, homepage, shipping, about, content, ...rest } = req.body || {};
     Object.assign(doc, rest);
     if (about && typeof about === 'object') {
       doc.about = about; // admin sends the full object (eyebrow, heading, image, paragraphs[], values[])
       doc.markModified('about');
+    }
+    if (content && typeof content === 'object') {
+      doc.content = content; // nav, footer, page headings, buttons (see src/lib/siteContent.js)
+      doc.markModified('content');
     }
     if (theme && typeof theme === 'object') {
       doc.theme = { ...doc.theme.toObject(), ...theme };

@@ -3,9 +3,11 @@ import { Phone, Mail, MapPin, Instagram, Facebook, Youtube } from 'lucide-react'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
+import { resolveContent } from '../../lib/siteContent.js'
 
 export function Contact() {
   const settings = useSettings()
+  const c = resolveContent(settings.content).pages.contact
   const [form, setForm] = useState({ name: '', message: '' })
 
   const composed = `Hello ${settings.brandName}! ${form.name ? `I'm ${form.name}. ` : ''}${form.message || ''}`
@@ -22,17 +24,17 @@ export function Contact() {
       <div className="relative overflow-hidden text-center" style={{ background: 'var(--maroon-dark)' }}>
         <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-24 md:pt-32 pb-12 md:pb-16 relative">
-          <div className="eyebrow justify-center flex"><Motif size={18} />Get in touch</div>
-          <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">हमसे जुड़ें</p>
-          <h1 className="font-display text-white text-4xl md:text-5xl">We'd Love to Hear From You</h1>
+          <div className="eyebrow justify-center flex"><Motif size={18} />{c.eyebrow}</div>
+          <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">{c.hindi}</p>
+          <h1 className="font-display text-white text-4xl md:text-5xl">{c.heading}</h1>
         </div>
       </div>
 
       <section className="section">
         <div className="container-tight grid md:grid-cols-2 gap-12">
           <div>
-            <h2 className="font-display text-2xl mb-1" style={{ color: 'var(--ink)' }}>Message us on WhatsApp</h2>
-            <p className="text-sm text-stone-500 mb-6">The fastest way to order or ask a question.</p>
+            <h2 className="font-display text-2xl mb-1" style={{ color: 'var(--ink)' }}>{c.waHeading}</h2>
+            <p className="text-sm text-stone-500 mb-6">{c.waSubtext}</p>
             <div className="space-y-4">
               <input
                 value={form.name}

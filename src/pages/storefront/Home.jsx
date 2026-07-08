@@ -7,6 +7,7 @@ import { SectionHeading } from '../../components/ui/SectionHeading.jsx'
 import { Mandala, MehendiDivider, TempleFrame, Motif, EarringMotif } from '../../components/decor/Decor.jsx'
 import { Reveal, Stagger, StaggerItem, Tilt, Magnetic } from '../../components/motion/Motion.jsx'
 import { instagramHandle, instagramUrl, useSettings } from '../../lib/SettingsProvider.jsx'
+import { resolveContent } from '../../lib/siteContent.js'
 
 // Three.js hero is heavy — code-split it so it doesn't bloat the main bundle.
 const HeroJewel = lazy(() => import('../../components/motion/HeroJewel.jsx').then((m) => ({ default: m.HeroJewel })))
@@ -342,6 +343,7 @@ function CategoryGrid({ categories, h = {} }) {
 
 /* ── Featured jhumkas ─────────────────────────────────────────────── */
 function FeaturedJhumkas({ products, h = {} }) {
+  const home = resolveContent(useSettings().content).home
   return (
     <section className="section" style={{ background: 'color-mix(in srgb, var(--beige) 45%, var(--cream))' }}>
       <div className="container-wide">
@@ -351,7 +353,7 @@ function FeaturedJhumkas({ products, h = {} }) {
         </div>
         <Reveal delay={0.1}>
           <div className="text-center mt-12">
-            <Magnetic><Link to="/products" className="btn-outline-gold">View All Jhumkas <ArrowRight size={16} /></Link></Magnetic>
+            <Magnetic><Link to="/products" className="btn-outline-gold">{home.ctaViewAll} <ArrowRight size={16} /></Link></Magnetic>
           </div>
         </Reveal>
       </div>
@@ -361,6 +363,7 @@ function FeaturedJhumkas({ products, h = {} }) {
 
 /* ── Story spotlight (हर झुमका एक कहानी) ──────────────────────────── */
 function StorySpotlight({ product, settings }) {
+  const home = resolveContent(settings.content).home
   return (
     <section className="section relative overflow-hidden" style={{ background: 'var(--maroon)' }}>
       <Mandala size={460} className="absolute -left-32 -bottom-24 opacity-20" />
@@ -378,7 +381,7 @@ function StorySpotlight({ product, settings }) {
           <h2 className="font-display text-white text-4xl md:text-5xl mt-1">{product.name}</h2>
           <p className="text-white/80 mt-5 leading-relaxed max-w-lg">{product.story}</p>
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-8">
-            <Magnetic><Link to={`/products/${product.id}`} className="btn-gold">Discover the Story <ArrowRight size={16} /></Link></Magnetic>
+            <Magnetic><Link to={`/products/${product.id}`} className="btn-gold">{home.ctaStory} <ArrowRight size={16} /></Link></Magnetic>
             <span className="font-display text-2xl text-[var(--gold-light)]">{fmt(product.price)}</span>
           </div>
         </Reveal>
@@ -420,6 +423,7 @@ function RoyalCollections({ collections, h = {} }) {
 
 /* ── Under 599 ────────────────────────────────────────────────────── */
 function Under599({ products, h = {} }) {
+  const home = resolveContent(useSettings().content).home
   return (
     <section className="section" style={{ background: 'var(--ink)' }}>
       <div className="container-wide">
@@ -429,7 +433,7 @@ function Under599({ products, h = {} }) {
             {h.hindi && <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">{h.hindi}</p>}
             <h2 className="font-display text-white text-3xl md:text-5xl">{h.title || 'Under ₹599'}</h2>
           </div>
-          <Magnetic><Link to="/products?under599=1" className="btn-outline-gold">See All <ArrowRight size={16} /></Link></Magnetic>
+          <Magnetic><Link to="/products?under599=1" className="btn-outline-gold">{home.ctaSeeAll} <ArrowRight size={16} /></Link></Magnetic>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7" style={{ display: 'grid' }}>
           {products.map((p) => <ProductCard key={p.id} product={p} />)}

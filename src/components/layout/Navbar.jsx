@@ -5,15 +5,9 @@ import { useCartStore } from '../../store/cartStore.js'
 import { useWishlistStore } from '../../store/wishlistStore.js'
 import { useCustomerStore } from '../../store/customerStore.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
+import { resolveContent } from '../../lib/siteContent.js'
 import { SearchModal } from '../search/SearchModal.jsx'
 import { AuthModal } from '../auth/AuthModal.jsx'
-
-const NAV = [
-  { to: '/collections', label: 'Collections' },
-  { to: '/products',    label: 'Jhumkas'     },
-  { to: '/about',       label: 'Our Story'   },
-  { to: '/contact',     label: 'Contact'     },
-]
 
 // Routes that open with a full-width dark banner (or hero). On these, the
 // navbar starts transparent/merged (white text) and turns solid/light on
@@ -26,6 +20,7 @@ export function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const settings = useSettings()
+  const NAV = resolveContent(settings.content).nav
   const location = useLocation()
   const navigate = useNavigate()
   const { customer, fetchMe, isAuthed } = useCustomerStore()

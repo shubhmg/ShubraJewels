@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
 import { Instagram, Facebook, Youtube, Mail, Phone, MapPin } from 'lucide-react'
 import { instagramHandle, instagramUrl, useSettings } from '../../lib/SettingsProvider.jsx'
+import { resolveContent } from '../../lib/siteContent.js'
 import { Motif, MehendiDivider } from '../decor/Decor.jsx'
 
 export function Footer() {
   const settings = useSettings()
+  const { footer } = resolveContent(settings.content)
   const igUrl = instagramUrl(settings)
   const igHandle = instagramHandle(settings)
 
@@ -43,17 +45,16 @@ export function Footer() {
         {/* Links — even columns; sits beside the brand on desktop, below on mobile */}
         <div className="grid grid-cols-2 gap-6 sm:gap-12 mt-8 pt-8 border-t md:mt-0 md:pt-0 md:border-t-0 md:shrink-0" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
           <div>
-            <h4 className="text-white text-sm font-semibold tracking-wide mb-3.5">Company</h4>
+            <h4 className="text-white text-sm font-semibold tracking-wide mb-3.5">{footer.companyHeading}</h4>
             <ul className="space-y-2.5 text-sm">
-              <li><Link to="/collections" className="hover:text-[var(--gold-light)] transition-colors">Collections</Link></li>
-              <li><Link to="/about" className="hover:text-[var(--gold-light)] transition-colors">Our Story</Link></li>
-              <li><Link to="/contact" className="hover:text-[var(--gold-light)] transition-colors">Contact</Link></li>
-              <li><Link to="/wishlist" className="hover:text-[var(--gold-light)] transition-colors">Wishlist</Link></li>
+              {footer.links.map((l, i) => (
+                <li key={i}><Link to={l.to} className="hover:text-[var(--gold-light)] transition-colors">{l.label}</Link></li>
+              ))}
             </ul>
           </div>
 
           <div>
-            <h4 className="text-white text-sm font-semibold tracking-wide mb-3.5">Reach Us</h4>
+            <h4 className="text-white text-sm font-semibold tracking-wide mb-3.5">{footer.reachHeading}</h4>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2.5">
                 <MapPin size={14} className="flex-shrink-0 mt-0.5 text-[var(--gold-light)]" />
@@ -78,7 +79,7 @@ export function Footer() {
 
       <div className="border-t" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
         <div className="container-wide py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          <p>© {new Date().getFullYear()} {settings.brandName}. {settings.slogan}</p>
+          <p>{footer.copyright || `© ${new Date().getFullYear()} ${settings.brandName}. ${settings.slogan}`}</p>
           <Link to="/admin" className="hover:text-[var(--gold-light)] transition-colors">Admin</Link>
         </div>
       </div>

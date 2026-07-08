@@ -4,12 +4,14 @@ import { Mandala, Motif, MehendiDivider, TempleFrame } from '../../components/de
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
 import { resolveAbout } from '../../lib/aboutContent.js'
+import { resolveContent } from '../../lib/siteContent.js'
 
 const ICON_MAP = { HandHeart, Sparkles, Truck, ShieldCheck, Gem, Award, Heart, Leaf, Crown, Star, Flower, BadgeCheck }
 
 export function About() {
   const settings = useSettings()
   const about = resolveAbout(settings.about)
+  const eyebrow = resolveContent(settings.content).pages.about.eyebrow
   const fillBrand = (t) => String(t || '').replace(/\{brand\}/g, settings.brandName)
 
   return (
@@ -18,7 +20,7 @@ export function About() {
       <div className="relative overflow-hidden text-center" style={{ background: 'var(--maroon-dark)' }}>
         <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-28 md:pt-36 pb-16 md:pb-20 relative">
-          <div className="eyebrow justify-center flex"><Motif size={20} />Our Story</div>
+          <div className="eyebrow justify-center flex"><Motif size={20} />{eyebrow}</div>
           <p className="font-hindi text-2xl md:text-3xl text-[var(--gold-light)] mt-3">{settings.slogan}</p>
           <h1 className="font-display text-white text-4xl md:text-6xl leading-tight mt-1">{settings.brandName}</h1>
           <p className="mt-4 text-white/70 max-w-xl mx-auto text-sm md:text-base">{settings.aboutShort}</p>

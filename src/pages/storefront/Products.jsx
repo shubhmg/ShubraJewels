@@ -5,6 +5,8 @@ import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
 import { useProducts, useCategories, useCollections } from '../../hooks/useApi.js'
+import { useSettings } from '../../lib/SettingsProvider.jsx'
+import { resolveContent } from '../../lib/siteContent.js'
 
 const SORT_OPTIONS = [
   { value: 'featured',   label: 'Featured'        },
@@ -74,17 +76,19 @@ export function Products() {
     return res
   }, [products, inStockOnly, sort])
 
+  const settings = useSettings()
+  const pc = resolveContent(settings.content).pages.products
   const activeCat = (categories || []).find((c) => c.slug === categoryParam || c._id === categoryParam)
   const activeCol = (collections || []).find((c) => c.slug === collectionParam || c._id === collectionParam)
-  const title = activeCat?.name || activeCol?.name || (under599 ? 'Under ₹599' : 'All Jhumkas')
-  const hindi = activeCat?.hindiName || activeCol?.hindiName || (under599 ? '₹599 से कम' : 'सभी झुमके')
+  const title = activeCat?.name || activeCol?.name || (under599 ? pc.titleUnder599 : pc.titleAll)
+  const hindi = activeCat?.hindiName || activeCol?.hindiName || (under599 ? pc.hindiUnder599 : pc.hindiAll)
 
   return (
     <div className="min-h-dvh" style={{ background: 'var(--cream)' }}>
       <div className="relative overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
         <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-24 md:pt-32 pb-12 md:pb-14 relative text-center">
-          <div className="eyebrow justify-center flex"><Motif size={18} />Browse the collection</div>
+          <div className="eyebrow justify-center flex"><Motif size={18} />{pc.eyebrow}</div>
           <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">{hindi}</p>
           <h1 className="font-display text-white text-4xl md:text-5xl">{title}</h1>
         </div>

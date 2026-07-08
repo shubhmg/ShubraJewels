@@ -129,6 +129,11 @@ const settingSchema = new mongoose.Schema(
       // Flexible block list — config shape varies by block type (see homepageDefault.js).
       blocks: { type: [mongoose.Schema.Types.Mixed], default: () => DEFAULT_HOMEPAGE.blocks },
     },
+
+    // Site-wide editable copy: navigation, footer, page headings, buttons.
+    // Shape is flexible (see src/lib/siteContent.js); the storefront merges it
+    // over defaults, so an empty object renders the site unchanged.
+    content: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );
