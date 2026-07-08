@@ -193,7 +193,10 @@ function HeroBackground({ hero, t }) {
   if (bg === 'image' && url) {
     return (
       <>
-        <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        {/* Bias the crop toward the top on wide desktop so a portrait's face +
+            earrings stay in frame (centred cover otherwise cuts the head off);
+            mobile's tall band already shows the whole image. */}
+        <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover object-center md:object-[center_22%]" />
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
         {bottomFade}
       </>
@@ -202,7 +205,7 @@ function HeroBackground({ hero, t }) {
   if (bg === 'video' && url) {
     return (
       <>
-        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" src={url} autoPlay muted loop playsInline />
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover object-center md:object-[center_22%]" src={url} autoPlay muted loop playsInline />
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
         {bottomFade}
       </>
