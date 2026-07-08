@@ -51,5 +51,12 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// One order per Razorpay payment — blocks duplicate/replayed /verify calls.
+// Sparse: COD/WhatsApp orders (empty paymentId) are exempt from uniqueness.
+orderSchema.index(
+  { razorpayPaymentId: 1 },
+  { unique: true, partialFilterExpression: { razorpayPaymentId: { $type: 'string', $gt: '' } } }
+);
+
 const Order = mongoose.model('Order', orderSchema);
 export default Order;

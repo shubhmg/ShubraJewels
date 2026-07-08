@@ -28,7 +28,11 @@ const env = {
   razorpay: {
     keyId: process.env.RAZORPAY_KEY_ID || '',
     keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
   },
+  // Comma-separated allowed origins in production (falls back to reflecting any
+  // origin only if unset — set this to the real domain(s) in prod).
+  corsOrigin: process.env.CORS_ORIGIN || '',
 };
 
 export default env;

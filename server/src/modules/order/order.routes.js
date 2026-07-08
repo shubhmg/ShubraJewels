@@ -6,6 +6,8 @@ import Coupon from '../coupon/coupon.model.js';
 import { getSettings } from '../setting/setting.model.js';
 import { resolveCoupon } from '../coupon/coupon.service.js';
 import { computeShipping } from '../../utils/pricing.js';
+import { resolveItems } from '../../utils/resolveItems.js';
+import { nextOrderNo } from '../../utils/sequence.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -14,12 +16,6 @@ import ApiError from '../../utils/ApiError.js';
 
 const router = express.Router();
 const objectId = Joi.string().hex().length(24);
-
-async function nextOrderNo() {
-  const yy = new Date().getFullYear();
-  const count = await Order.countDocuments();
-  return `SJ-${yy}-${String(count + 1).padStart(5, '0')}`;
-}
 
 // PUBLIC — place an order. Prices are re-read from the DB (never trust client totals).
 // If a signed-in customer places it, the order is linked to their account.
@@ -51,17 +47,7 @@ router.post(
     }),
   }),
   asyncHandler(async (req, res) => {
-    const ids = req.body.items.map((i) => i.productId);
-    const products = await Product.find({ _id: { $in: ids } }).lean();
-    const map = new Map(products.map((p) => [String(p._id), p]));
-
-    const items = req.body.items.map((i) => {
-      const p = map.get(String(i.productId));
-      if (!p) throw ApiError.badRequest('One or more products are no longer available');
-      return { productId: p._id, name: p.name, image: p.images?.[0] || '', price: p.price, qty: i.qty };
-    });
-
-    const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+    const { items, subtotal } = await resolveItems(req.body.items);
     const settings = await getSettings();
     const shipping = computeShipping(settings, req.body.address?.city, subtotal);
 
@@ -221,14 +207,8 @@ router.post(
     }),
   }),
   asyncHandler(async (req, res) => {
-    const products = await Product.find({ _id: { $in: req.body.items.map((i) => i.productId) } }).lean();
-    const map = new Map(products.map((p) => [String(p._id), p]));
-    const items = req.body.items.map((i) => {
-      const p = map.get(String(i.productId));
-      if (!p) throw ApiError.badRequest('One or more products are no longer available');
-      return { productId: p._id, name: p.name, image: p.images?.[0] || '', price: p.price, qty: i.qty };
-    });
-    const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+    // Admin bookkeeping may log past/sold-out items — don't block on availability.
+    const { items, subtotal } = await resolveItems(req.body.items, { requireAvailable: false });
 
     const order = new Order({
       orderNo: await nextOrderNo(),

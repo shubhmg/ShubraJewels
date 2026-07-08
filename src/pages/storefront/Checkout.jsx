@@ -121,8 +121,10 @@ export function Checkout() {
     setError(null)
     setPlacing(true)
     try {
-      const itemsPayload = items.map((i) => ({ productId: i.id || i._id, qty: i.qty }))
-      const ro = await api.post('/payments/create-order', { items: itemsPayload, city: form.city, couponCode: coupon?.code || '' })
+      // Send the full order to create-order so the server snapshots it as a
+      // PaymentIntent — the Razorpay webhook can then finalise even if this
+      // browser closes before the verify call.
+      const ro = await api.post('/payments/create-order', buildPayload('web'), { custAuth: true })
       const ok = await loadRazorpay()
       if (!ok) throw new Error('Could not load payment gateway')
 

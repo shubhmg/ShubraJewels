@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import mongoose from 'mongoose';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
@@ -32,6 +33,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
+// Behind Cloudflare + nginx — trust the first proxy so rate-limit / req.ip see
+// the real client IP (X-Forwarded-For) instead of the proxy's.
+app.set('trust proxy', 1);
+
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -56,14 +61,56 @@ app.use(
   })
 );
 app.use(compression());
-app.use(cors({ origin: env.nodeEnv === 'production' ? (process.env.CORS_ORIGIN || true) : true }));
-app.use(express.json({ limit: '5mb' }));
+
+// In production, restrict to the configured origin(s); dev reflects any origin.
+const corsOrigin = env.nodeEnv === 'production'
+  ? (env.corsOrigin ? env.corsOrigin.split(',').map((s) => s.trim()) : true)
+  : true;
+app.use(cors({ origin: corsOrigin }));
+
+// Capture the raw body so the Razorpay webhook can verify its signature over
+// the exact bytes (express.json otherwise discards them).
+app.use(express.json({ limit: '5mb', verify: (req, _res, buf) => { req.rawBody = buf; } }));
+
+// Rate limiting. Cheap in-memory limiter (single PM2 process). Skips /uploads
+// (static) and the health check.
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300, // generous per-IP/minute for normal browsing + admin
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12, // brute-force guard on admin/customer login
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many attempts. Please try again in a few minutes.' },
+});
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20, // public writes: orders, tracking beacons, coupon checks
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests. Please slow down.' },
+});
 
 // Static uploads
 app.use('/uploads', express.static(UPLOAD_DIR, {
   maxAge: '30d',
   immutable: true,
 }));
+
+// Only rate-limit writes on shared route groups (leaves admin GET lists free).
+const postOnly = (limiter) => (req, res, next) => (req.method === 'POST' ? limiter(req, res, next) : next());
+
+app.use('/api', apiLimiter);
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/customer/login', loginLimiter);
+app.use('/api/customer/register', loginLimiter);
+app.use('/api/analytics/track', postOnly(writeLimiter));
+app.use('/api/coupons/validate', writeLimiter);
+app.use('/api/orders', postOnly(writeLimiter));
 
 // Health check
 app.get('/api/health', (_req, res) => {

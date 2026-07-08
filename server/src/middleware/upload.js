@@ -18,7 +18,9 @@ const storage = multer.diskStorage({
   },
 });
 
-const ALLOWED = /^(image\/(jpe?g|png|webp|gif|avif|svg\+xml)|video\/(mp4|webm|quicktime))$/;
+// SVG intentionally excluded: it can carry inline <script> and /uploads is
+// served same-origin as the admin, so an opened SVG would be stored XSS.
+const ALLOWED = /^(image\/(jpe?g|png|webp|gif|avif)|video\/(mp4|webm|quicktime))$/;
 
 export const upload = multer({
   storage,
