@@ -83,6 +83,30 @@ const settingSchema = new mongoose.Schema(
     // Free-form key facts for footer / about
     aboutShort: { type: String, default: 'Handcrafted jhumkas inspired by the royal heritage of Rajasthan.' },
 
+    // "Our Story" (About) page — fully editable. `{brand}` in paragraphs is
+    // replaced with the brand name at render.
+    about: {
+      eyebrow: { type: String, default: 'Rooted in Rajasthan' },
+      heading: { type: String, default: 'Where every jhumka begins' },
+      image: { type: String, default: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&q=85' },
+      paragraphs: {
+        type: [String],
+        default: [
+          '{brand} was born from a love of the jhumka — the earring that has swung from the ears of queens, dancers, and brides across India for centuries.',
+          'We work directly with artisans in Rajasthan who still shape, paint, and finish each pair by hand. From oxidised silver to hand-painted meenakari, no two are exactly alike.',
+        ],
+      },
+      values: {
+        type: [{ icon: String, title: String, text: String }],
+        default: [
+          { icon: 'HandHeart', title: 'Handcrafted', text: 'Every jhumka is made by hand by Rajasthani artisans.' },
+          { icon: 'Sparkles', title: 'A Story Each', text: 'Every design carries a name and a story of its own.' },
+          { icon: 'Truck', title: 'Delivered with Care', text: 'Carefully packed and shipped across India.' },
+          { icon: 'ShieldCheck', title: 'Quality Promise', text: 'Skin-friendly, long-lasting finish on every pair.' },
+        ],
+      },
+    },
+
     // Which checkout payment methods are offered
     payments: {
       razorpay: { type: Boolean, default: true }, // pay online

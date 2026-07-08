@@ -5,6 +5,7 @@ import { AdminHeader, Btn, Field } from '../../components/admin/AdminUI.jsx'
 import { MediaUploader } from '../../components/admin/MediaUploader.jsx'
 import { useSettingsCtx } from '../../lib/SettingsProvider.jsx'
 import { INDIAN_CITIES } from '../../data/indianCities.js'
+import { resolveAbout, VALUE_ICON_NAMES } from '../../lib/aboutContent.js'
 
 const THEME_KEYS = [
   { key: 'maroon',    label: 'Primary (maroon)' },
@@ -146,6 +147,10 @@ export function AdminSettings() {
           <Field field={{ label: 'Pay on delivery (COD)', type: 'toggle' }} value={s.payments?.cod !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, cod: v } }))} />
           <p className="text-xs text-zinc-400 pt-1">WhatsApp ordering is always available.</p>
         </div>
+      </Section>
+
+      <Section title="Our Story Page" subtitle="The full About / Our Story page — image, heading, story text, and value cards.">
+        <AboutEditor value={s.about} onChange={(v) => set('about', v)} />
       </Section>
 
       <Section title="Social Links">
@@ -313,6 +318,47 @@ function ShippingEditor({ value, onChange }) {
           ))}
         </div>
         <datalist id="admin-in-cities">{INDIAN_CITIES.map((c) => <option key={c} value={c} />)}</datalist>
+      </div>
+    </div>
+  )
+}
+
+function AboutEditor({ value, onChange }) {
+  const a = resolveAbout(value)
+  const patch = (p) => onChange({ ...a, ...p })
+  const setVal = (i, k, v) => patch({ values: a.values.map((x, idx) => (idx === i ? { ...x, [k]: v } : x)) })
+  const addVal = () => patch({ values: [...a.values, { icon: 'Sparkles', title: '', text: '' }] })
+  const removeVal = (i) => patch({ values: a.values.filter((_, idx) => idx !== i) })
+
+  return (
+    <div className="space-y-4">
+      <MediaUploader label="Story image" value={a.image} onChange={(v) => patch({ image: v })} accept="image" />
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field field={{ label: 'Section eyebrow', help: 'Small label above the heading' }} value={a.eyebrow} onChange={(v) => patch({ eyebrow: v })} />
+        <Field field={{ label: 'Heading' }} value={a.heading} onChange={(v) => patch({ heading: v })} />
+      </div>
+      <Field field={{ label: 'Story paragraphs (one per line)', type: 'lines', rows: 5, help: 'Use {brand} to insert the brand name.' }} value={a.paragraphs} onChange={(v) => patch({ paragraphs: v })} />
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[13px] font-semibold text-zinc-700">Value cards</p>
+          <Btn variant="outline" onClick={addVal}>+ Add card</Btn>
+        </div>
+        <div className="space-y-3">
+          {a.values.map((v, i) => (
+            <div key={i} className="rounded-xl border border-zinc-200 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-400">Card {i + 1}</span>
+                <button onClick={() => removeVal(i)} className="w-8 h-8 grid place-items-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 cursor-pointer"><X size={15} /></button>
+              </div>
+              <div className="grid sm:grid-cols-[150px_1fr] gap-2">
+                <Field field={{ label: 'Icon', type: 'select', options: VALUE_ICON_NAMES }} value={v.icon} onChange={(val) => setVal(i, 'icon', val)} />
+                <Field field={{ label: 'Title' }} value={v.title} onChange={(val) => setVal(i, 'title', val)} />
+              </div>
+              <Field field={{ label: 'Text', type: 'textarea', rows: 2 }} value={v.text} onChange={(val) => setVal(i, 'text', val)} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
