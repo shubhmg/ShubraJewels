@@ -51,7 +51,7 @@ export function Footer() {
         </div>
 
         {/* Links — even columns; sits beside the brand on desktop, below on mobile */}
-        <div className="grid grid-cols-2 gap-6 sm:gap-12 mt-8 pt-8 border-t md:mt-0 md:pt-0 md:border-t-0 md:shrink-0" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+        <div className="grid grid-cols-[0.8fr_1.2fr] sm:grid-cols-2 gap-6 sm:gap-12 mt-8 pt-8 border-t md:mt-0 md:pt-0 md:border-t-0 md:shrink-0" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
           <div>
             <h4 className="text-white text-sm font-semibold tracking-wide mb-3.5">{footer.companyHeading}</h4>
             <ul className="space-y-2.5 text-sm">
@@ -77,7 +77,7 @@ export function Footer() {
               {settings.email && (
                 <li className="flex items-start gap-2.5 min-w-0">
                   <Mail size={14} className="text-[var(--gold-light)] shrink-0 mt-0.5" />
-                  <a href={`mailto:${settings.email}`} className="hover:text-[var(--gold-light)] transition-colors break-all">{settings.email}</a>
+                  <a href={`mailto:${settings.email}`} className="hover:text-[var(--gold-light)] transition-colors text-[13px] break-words">{settings.email}</a>
                 </li>
               )}
             </ul>
