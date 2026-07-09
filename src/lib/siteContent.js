@@ -56,7 +56,7 @@ Our website may use cookies and basic analytics to understand how visitors use t
 You may ask us to access, correct or delete the personal information we hold about you at any time by writing to {email}.
 
 ## Contact
-For any privacy questions, reach us at {email} or {phone}.`,
+For any privacy questions, reach us at {email}.`,
     },
     terms: {
       title: 'Terms & Conditions',
@@ -88,7 +88,7 @@ Questions about these terms? Write to {email}.`,
 You may request a return within 7 days of delivery if the item is damaged, defective or not what you ordered. The item must be unused and in its original packaging.
 
 ## How to request a return
-Message us on WhatsApp at {whatsapp} or email {email} with your order number and a photo of the item, and we'll guide you through the next steps.
+Email us at {email} with your order number and a photo of the item, and we'll guide you through the next steps.
 
 ## Refunds
 Once we receive and inspect the returned item, we'll process your refund to the original payment method within 5–7 business days. Shipping charges are non-refundable unless the return is due to our error.
@@ -100,7 +100,7 @@ We're happy to exchange an item for a different piece of equal value, subject to
 For hygiene reasons, earrings can only be returned if they arrive damaged or defective. Sale items may not be eligible for return unless faulty.
 
 ## Contact
-For any return or refund help, reach us at {email} or {phone}.`,
+For any return or refund help, reach us at {email}.`,
     },
     shipping: {
       title: 'Shipping Policy',
@@ -122,7 +122,7 @@ Shipping charges, if any, are shown at checkout before you pay. Free-shipping of
 Occasionally deliveries may be delayed due to weather, festivals or courier issues. We'll always help you track your parcel — just reach out.
 
 ## Contact
-Questions about your delivery? Message us at {whatsapp} or email {email}.`,
+Questions about your delivery? Email us at {email}.`,
     },
   },
   pages: {
