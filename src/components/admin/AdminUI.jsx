@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { MediaUploader } from './MediaUploader.jsx'
 import { Dropdown } from '../ui/Dropdown.jsx'
@@ -34,17 +35,27 @@ export function Btn({ children, variant = 'primary', className = '', ...props })
 }
 
 export function Modal({ open, onClose, title, children, footer, wide }) {
+  // Lock the page behind the modal so it can't scroll/chain underneath.
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [open])
+
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-3 sm:p-4">
       <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} bg-white rounded-2xl shadow-2xl ring-1 ring-zinc-200 my-6 sm:my-10 animate-slide-up`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 sticky top-0 bg-white rounded-t-2xl z-10">
+      {/* Self-contained card: header + footer fixed, body scrolls INSIDE the card
+          (no position:sticky against the viewport — that was detaching them). */}
+      <div className={`relative w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} bg-white rounded-2xl shadow-2xl ring-1 ring-zinc-200 flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] animate-slide-up`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 bg-white rounded-t-2xl shrink-0">
           <h2 className="text-base font-semibold text-zinc-900">{title}</h2>
           <button onClick={onClose} className="w-8 h-8 grid place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"><X size={18} /></button>
         </div>
-        <div className="px-6 py-5 space-y-4">{children}</div>
-        {footer && <div className="px-6 py-4 border-t border-zinc-100 flex justify-end gap-2 sticky bottom-0 bg-white rounded-b-2xl">{footer}</div>}
+        <div className="px-6 py-5 space-y-4 overflow-y-auto">{children}</div>
+        {footer && <div className="px-6 py-4 border-t border-zinc-100 flex justify-end gap-2 bg-white rounded-b-2xl shrink-0">{footer}</div>}
       </div>
     </div>
   )

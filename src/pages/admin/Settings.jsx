@@ -119,7 +119,7 @@ export function AdminSettings() {
       </AdminHeader>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-1.5 mb-6 sticky top-0 z-10 py-2 -mx-1 px-1" style={{ background: 'var(--cream)' }}>
+      <div className="flex flex-wrap gap-1.5 mb-6">
         {TABS.map((tb) => (
           <button
             key={tb.id}
