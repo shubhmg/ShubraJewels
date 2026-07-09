@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Phone, Mail, MapPin, Instagram, Facebook, Youtube } from 'lucide-react'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
-import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
+import { useSettings, whatsappLink, instagramUrl, instagramHandle } from '../../lib/SettingsProvider.jsx'
 import { resolveContent } from '../../lib/siteContent.js'
+
+const IG_GRADIENT = 'linear-gradient(45deg,#feda75 0%,#fa7e1e 22%,#d62976 52%,#962fbf 78%,#4f5bd5 100%)'
 
 export function Contact() {
   const settings = useSettings()
@@ -13,10 +15,11 @@ export function Contact() {
   const composed = `Hello ${settings.brandName}! ${form.name ? `I'm ${form.name}. ` : ''}${form.message || ''}`
   const wa = whatsappLink(settings, composed)
 
-  const socials = [
-    { icon: Instagram, url: settings.instagram },
-    { icon: Facebook, url: settings.facebook },
-    { icon: Youtube, url: settings.youtube },
+  const igUrl = instagramUrl(settings)
+  const igHandle = instagramHandle(settings)
+  const otherSocials = [
+    { icon: Facebook, url: settings.facebook, label: 'Facebook' },
+    { icon: Youtube, url: settings.youtube, label: 'YouTube' },
   ].filter((s) => s.url)
 
   return (
@@ -63,13 +66,26 @@ export function Contact() {
             {settings.phone && <ContactRow icon={Phone} label="Phone" value={settings.phone} href={`tel:${settings.phone}`} />}
             {settings.email && <ContactRow icon={Mail} label="Email" value={settings.email} href={`mailto:${settings.email}`} />}
             <ContactRow icon={MapPin} label="Shipping" value={settings.shippingNote || `Free shipping in ${settings.freeShippingCity}`} />
-            {socials.length > 0 && (
+            {(igUrl || otherSocials.length > 0) && (
               <div className="pt-2">
                 <p className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--maroon)' }}>Follow us</p>
-                <div className="flex gap-3">
-                  {socials.map(({ icon: Icon, url }, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="w-10 h-10 grid place-items-center rounded-full transition" style={{ background: 'color-mix(in srgb, var(--maroon) 10%, transparent)', color: 'var(--maroon)' }}>
-                      <Icon size={17} />
+                <div className="flex flex-wrap items-center gap-3">
+                  {igUrl && (
+                    <a href={igUrl} target="_blank" rel="noopener noreferrer"
+                       className="inline-flex items-center gap-3 pl-2.5 pr-5 py-2.5 rounded-full text-white shadow-md hover:opacity-95 transition-opacity"
+                       style={{ background: IG_GRADIENT }}>
+                      <span className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: 'rgba(255,255,255,0.22)' }}>
+                        <Instagram size={19} />
+                      </span>
+                      <span className="leading-tight text-left">
+                        <span className="block text-[10px] uppercase tracking-wider opacity-80">Instagram</span>
+                        <span className="block text-sm font-semibold">{igHandle || 'Follow us'}</span>
+                      </span>
+                    </a>
+                  )}
+                  {otherSocials.map(({ icon: Icon, url, label }, i) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" aria-label={label} className="w-11 h-11 grid place-items-center rounded-full transition hover:opacity-80" style={{ background: 'color-mix(in srgb, var(--maroon) 10%, transparent)', color: 'var(--maroon)' }}>
+                      <Icon size={18} />
                     </a>
                   ))}
                 </div>
