@@ -75,9 +75,9 @@ export function Footer() {
                 </li>
               )}
               {settings.email && (
-                <li className="flex items-center gap-2.5 min-w-0">
-                  <Mail size={14} className="text-[var(--gold-light)] shrink-0" />
-                  <a href={`mailto:${settings.email}`} className="hover:text-[var(--gold-light)] transition-colors truncate">{settings.email}</a>
+                <li className="flex items-start gap-2.5 min-w-0">
+                  <Mail size={14} className="text-[var(--gold-light)] shrink-0 mt-0.5" />
+                  <a href={`mailto:${settings.email}`} className="hover:text-[var(--gold-light)] transition-colors break-all">{settings.email}</a>
                 </li>
               )}
             </ul>
