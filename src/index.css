@@ -37,6 +37,9 @@
      into a scroll container, so position: sticky keeps working. */
   html, body { overflow-x: clip; max-width: 100%; }
 
+  /* Kill the browser overscroll rubber-band / bounce at the top & bottom. */
+  html, body { overscroll-behavior: none; }
+
   body {
     @apply font-sans antialiased bg-cream-50 text-dark-900 transition-colors duration-300;
   }

@@ -1,7 +1,7 @@
 import { lazy, Suspense, Fragment, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Truck, Gift, Star, Quote, Instagram } from 'lucide-react'
+import { ArrowRight, Truck, Gift, Star, Quote, Instagram, Heart, MessageCircle, Bookmark, BadgeCheck } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { SectionHeading } from '../../components/ui/SectionHeading.jsx'
 import { Mandala, MehendiDivider, TempleFrame, Motif, EarringMotif } from '../../components/decor/Decor.jsx'
@@ -468,35 +468,81 @@ function VideoSection({ videos, h = {} }) {
   )
 }
 
-/* ── Reviews ──────────────────────────────────────────────────────── */
+/* ── Reviews (Instagram-themed) ───────────────────────────────────── */
+const IG_GRADIENT = 'linear-gradient(45deg,#feda75 0%,#fa7e1e 22%,#d62976 52%,#962fbf 78%,#4f5bd5 100%)'
+const igHandleOf = (name) =>
+  (name || 'guest').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'guest'
+
 function Reviews({ reviews, h = {} }) {
   const dark = h.dark
+  const settings = useSettings()
+  const igUrl = instagramUrl(settings)
   return (
     <section className="section" style={{ background: dark ? 'var(--ink)' : 'color-mix(in srgb, var(--beige) 55%, var(--cream))' }}>
       <div className="container-wide">
-        <Reveal><SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} light={dark} /></Reveal>
+        <Reveal>
+          <div className="flex flex-col items-center">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-white text-xs font-semibold tracking-wide mb-4 shadow-sm" style={{ background: IG_GRADIENT }}>
+              <Instagram size={15} /> From our Instagram
+            </span>
+          </div>
+          <SectionHeading eyebrow={h.eyebrow} hindi={h.hindi} title={h.title} subtitle={h.subtitle} light={dark} />
+        </Reveal>
         <Stagger className="grid md:grid-cols-3 gap-5">
-          {reviews.slice(0, 6).map((r) => (
-            <StaggerItem key={r._id}><div className="rounded-2xl p-6 bg-white shadow-card relative h-full">
-              <Quote size={28} className="absolute top-5 right-5 opacity-10" style={{ color: 'var(--maroon)' }} />
-              <div className="flex gap-0.5 mb-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} size={15} className={i < r.rating ? 'fill-current' : ''} style={{ color: i < r.rating ? 'var(--gold)' : '#d6d3d1' }} />
-                ))}
-              </div>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>“{r.text}”</p>
-              <div className="mt-4 flex items-center gap-3">
-                {r.image
-                  ? <img src={r.image} alt={r.name} className="w-9 h-9 rounded-full object-cover" />
-                  : <div className="w-9 h-9 rounded-full grid place-items-center font-display text-sm" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{r.name?.[0]}</div>}
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{r.name}</p>
-                  {r.location && <p className="text-xs text-stone-400">{r.location}</p>}
+          {reviews.slice(0, 6).map((r) => {
+            const handle = igHandleOf(r.name)
+            return (
+              <StaggerItem key={r._id}>
+                <div className="rounded-2xl bg-white shadow-card h-full flex flex-col overflow-hidden">
+                  {/* IG post header */}
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="p-[2px] rounded-full shrink-0" style={{ background: IG_GRADIENT }}>
+                      <div className="p-[2px] rounded-full bg-white">
+                        {r.image
+                          ? <img src={r.image} alt={r.name} className="w-9 h-9 rounded-full object-cover" />
+                          : <div className="w-9 h-9 rounded-full grid place-items-center font-display text-sm" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{r.name?.[0]?.toUpperCase()}</div>}
+                      </div>
+                    </div>
+                    <div className="min-w-0 leading-tight">
+                      <div className="flex items-center gap-1">
+                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--ink)' }}>{handle}</p>
+                        <BadgeCheck size={14} className="shrink-0" style={{ color: '#3897f0' }} />
+                      </div>
+                      {r.location && <p className="text-xs text-stone-400 truncate">{r.location}</p>}
+                    </div>
+                    <Instagram size={17} className="ml-auto shrink-0" style={{ opacity: 0.28 }} />
+                  </div>
+
+                  {/* caption / comment */}
+                  <div className="px-4 pb-2 flex-1">
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--ink)' }}>
+                      <span className="font-semibold mr-1.5">{handle}</span>
+                      {r.text}
+                    </p>
+                  </div>
+
+                  {/* IG action row */}
+                  <div className="px-4 py-3 border-t flex items-center gap-4" style={{ borderColor: 'color-mix(in srgb, var(--color-muted) 70%, transparent)' }}>
+                    <Heart size={19} className="fill-current" style={{ color: '#ed4956' }} />
+                    <MessageCircle size={19} style={{ color: 'var(--ink)', opacity: 0.55 }} />
+                    <Bookmark size={19} className="ml-auto" style={{ color: 'var(--ink)', opacity: 0.55 }} />
+                  </div>
                 </div>
-              </div>
-            </div></StaggerItem>
-          ))}
+              </StaggerItem>
+            )
+          })}
         </Stagger>
+        {igUrl && (
+          <Reveal>
+            <div className="text-center mt-10">
+              <a href={igUrl} target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-white text-sm font-semibold shadow-md hover:opacity-95 transition-opacity"
+                 style={{ background: IG_GRADIENT }}>
+                <Instagram size={17} /> Follow us on Instagram
+              </a>
+            </div>
+          </Reveal>
+        )}
       </div>
     </section>
   )
