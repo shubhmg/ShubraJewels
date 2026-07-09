@@ -102,9 +102,6 @@ export function Navbar() {
                   <span className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-bold" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{(customer?.name || customer?.email || 'U')[0]?.toUpperCase()}</span>
                 ) : <User size={18} />}
               </IconBtn>
-              <Link to="/admin" className="hidden md:flex ml-2">
-                <button className={`px-4 py-2 rounded-full border text-xs font-semibold transition-colors cursor-pointer ${heroBg ? 'border-gold-400/50 text-gold-300 hover:text-gold-200' : 'border-gold-500/40 text-gold-600 hover:bg-gold-500/10'}`}>Admin</button>
-              </Link>
               <IconBtn heroBg={heroBg} className="md:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
                 {mobileOpen ? <X size={20} /> : <Menu size={20} />}
               </IconBtn>
@@ -121,7 +118,6 @@ export function Navbar() {
               </NavLink>
             ))}
             <Link to="/wishlist" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-xl text-base font-medium text-stone-700 hover:bg-cream-100">Wishlist{wishCount > 0 ? ` (${wishCount})` : ''}</Link>
-            <Link to="/admin" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-xl text-base font-medium text-gold-600 hover:bg-gold-500/10">Admin</Link>
           </div>
         </div>
       </header>

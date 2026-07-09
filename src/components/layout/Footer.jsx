@@ -92,9 +92,8 @@ export function Footer() {
               <Link key={l.to} to={l.to} className="hover:text-[var(--gold-light)] transition-colors">{l.label}</Link>
             ))}
           </nav>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+          <div className="text-center pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
             <p>{footer.copyright || `© ${new Date().getFullYear()} ${settings.brandName}. ${settings.slogan}`}</p>
-            <Link to="/admin" className="hover:text-[var(--gold-light)] transition-colors">Admin</Link>
           </div>
         </div>
       </div>
