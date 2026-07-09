@@ -16,6 +16,7 @@ import { Checkout }      from './pages/storefront/Checkout.jsx'
 import { About }         from './pages/storefront/About.jsx'
 import { Contact }       from './pages/storefront/Contact.jsx'
 import { Account }       from './pages/storefront/Account.jsx'
+import { PolicyPage }    from './pages/storefront/PolicyPage.jsx'
 
 // Admin pages
 import { AdminLogin }       from './pages/admin/Login.jsx'
@@ -66,6 +67,10 @@ const router = createBrowserRouter([
       { path: '/about',             element: <About />         },
       { path: '/contact',           element: <Contact />       },
       { path: '/account',           element: <Account />       },
+      { path: '/privacy',           element: <PolicyPage pageKey="privacy" />  },
+      { path: '/terms',             element: <PolicyPage pageKey="terms" />     },
+      { path: '/refund',            element: <PolicyPage pageKey="refund" />    },
+      { path: '/shipping',          element: <PolicyPage pageKey="shipping" />  },
     ],
   },
   { path: '/admin/login', element: <AdminLogin /> },

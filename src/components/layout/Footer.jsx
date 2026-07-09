@@ -4,6 +4,14 @@ import { instagramHandle, instagramUrl, useSettings } from '../../lib/SettingsPr
 import { resolveContent } from '../../lib/siteContent.js'
 import { Motif, MehendiDivider } from '../decor/Decor.jsx'
 
+const LEGAL_LINKS = [
+  { label: 'Privacy Policy', to: '/privacy' },
+  { label: 'Terms & Conditions', to: '/terms' },
+  { label: 'Refund & Returns', to: '/refund' },
+  { label: 'Shipping Policy', to: '/shipping' },
+  { label: 'Contact', to: '/contact' },
+]
+
 export function Footer() {
   const settings = useSettings()
   const { footer } = resolveContent(settings.content)
@@ -78,9 +86,16 @@ export function Footer() {
       </div>
 
       <div className="border-t" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-        <div className="container-wide py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          <p>{footer.copyright || `© ${new Date().getFullYear()} ${settings.brandName}. ${settings.slogan}`}</p>
-          <Link to="/admin" className="hover:text-[var(--gold-light)] transition-colors">Admin</Link>
+        <div className="container-wide py-5 flex flex-col gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            {LEGAL_LINKS.map((l) => (
+              <Link key={l.to} to={l.to} className="hover:text-[var(--gold-light)] transition-colors">{l.label}</Link>
+            ))}
+          </nav>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+            <p>{footer.copyright || `© ${new Date().getFullYear()} ${settings.brandName}. ${settings.slogan}`}</p>
+            <Link to="/admin" className="hover:text-[var(--gold-light)] transition-colors">Admin</Link>
+          </div>
         </div>
       </div>
     </footer>

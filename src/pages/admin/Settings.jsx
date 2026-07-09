@@ -15,6 +15,7 @@ const TABS = [
   { id: 'payments', label: 'Payments' },
   { id: 'story', label: 'Our Story' },
   { id: 'content', label: 'Text & Content' },
+  { id: 'policies', label: 'Legal Pages' },
   { id: 'theme', label: 'Theme' },
 ]
 
@@ -204,6 +205,12 @@ export function AdminSettings() {
       {tab === 'content' && (
       <Section title="Text & Content" subtitle="Navigation, footer, page headings and button labels across the storefront.">
         <ContentEditor value={s.content} onChange={(v) => set('content', v)} />
+      </Section>
+      )}
+
+      {tab === 'policies' && (
+      <Section title="Legal Pages" subtitle="Privacy, Terms, Refund/Return and Shipping. These are linked in the footer and are usually required by payment gateways (Razorpay) and Indian e-commerce rules.">
+        <PoliciesEditor value={s.content} onChange={(v) => set('content', v)} />
       </Section>
       )}
 
@@ -469,6 +476,37 @@ function ContentEditor({ value, onChange }) {
       <Group title="Our Story page (heading only — rest in the “Our Story” tab)">
         <Field field={{ label: 'Eyebrow' }} value={P.about.eyebrow} onChange={(v) => patchPage('about', { eyebrow: v })} />
       </Group>
+    </div>
+  )
+}
+
+function PoliciesEditor({ value, onChange }) {
+  const c = resolveContent(value)
+  const P = c.policies
+  const setPolicy = (key, upd) => onChange({ ...c, policies: { ...c.policies, [key]: { ...c.policies[key], ...upd } } })
+  const items = [
+    ['privacy', 'Privacy Policy'],
+    ['terms', 'Terms & Conditions'],
+    ['refund', 'Refund & Return Policy'],
+    ['shipping', 'Shipping Policy'],
+  ]
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-stone-500 leading-relaxed">
+        Formatting: start a line with <code className="px-1 rounded bg-zinc-100">## </code> for a sub-heading and
+        <code className="px-1 rounded bg-zinc-100">- </code> for a bullet. Blank lines separate paragraphs.
+        Placeholders <code className="px-1 rounded bg-zinc-100">{'{brand}'}</code>, <code className="px-1 rounded bg-zinc-100">{'{email}'}</code>,
+        <code className="px-1 rounded bg-zinc-100">{'{phone}'}</code>, <code className="px-1 rounded bg-zinc-100">{'{whatsapp}'}</code> and
+        <code className="px-1 rounded bg-zinc-100">{'{city}'}</code> fill in automatically from your Contact & Shipping settings.
+      </p>
+      {items.map(([key, label]) => (
+        <Group key={key} title={label}>
+          <Field field={{ label: 'Page title' }} value={P[key].title} onChange={(v) => setPolicy(key, { title: v })} />
+          <div className="mt-3">
+            <Field field={{ label: 'Content', type: 'textarea', rows: 12 }} value={P[key].body} onChange={(v) => setPolicy(key, { body: v })} />
+          </div>
+        </Group>
+      ))}
     </div>
   )
 }
