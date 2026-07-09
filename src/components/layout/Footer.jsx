@@ -86,7 +86,7 @@ export function Footer() {
       </div>
 
       <div className="border-t" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-        <div className="container-wide py-5 flex flex-col gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        <div className="container-wide pt-5 flex flex-col gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.5)', paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}>
           <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             {LEGAL_LINKS.map((l) => (
               <Link key={l.to} to={l.to} className="hover:text-[var(--gold-light)] transition-colors">{l.label}</Link>
