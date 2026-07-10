@@ -65,7 +65,13 @@ export function Contact() {
           <div className="space-y-5">
             {settings.phone && <ContactRow icon={Phone} label="Phone" value={settings.phone} href={`tel:${settings.phone}`} />}
             {settings.email && <ContactRow icon={Mail} label="Email" value={settings.email} href={`mailto:${settings.email}`} />}
+            {settings.businessAddress && <ContactRow icon={MapPin} label="Address" value={settings.businessAddress} />}
             <ContactRow icon={MapPin} label="Shipping" value={settings.shippingNote || `Free shipping in ${settings.freeShippingCity}`} />
+            {settings.legalName && (
+              <p className="text-xs leading-relaxed pt-1" style={{ color: 'color-mix(in srgb, var(--ink) 60%, transparent)' }}>
+                {settings.brandName} is a {settings.businessType || 'sole proprietorship'} owned and operated by {settings.legalName}.
+              </p>
+            )}
             {(igUrl || otherSocials.length > 0) && (
               <div className="pt-2">
                 <p className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--maroon)' }}>Follow us</p>

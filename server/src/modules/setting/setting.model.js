@@ -36,6 +36,13 @@ const settingSchema = new mongoose.Schema(
   {
     brandName: { type: String, default: 'Shubra Jewels' },
     brandNameHindi: { type: String, default: 'शुभ्रा' },
+
+    // Legal identity (payment-gateway compliance). For a sole proprietorship the
+    // legal name is the proprietor's own full name (as on PAN/bank account);
+    // "Shubra Jewels" is only the trade name. Shown in footer, Contact, policies.
+    legalName: { type: String, default: 'Tanisha Rana' },
+    businessType: { type: String, default: 'sole proprietorship' },
+    businessAddress: { type: String, default: '' }, // full operating/contact address
     slogan: { type: String, default: 'हर झुमका एक कहानी' },
     sloganEnglish: { type: String, default: 'Every jhumka tells a story' },
     logo: { type: String, default: '' },

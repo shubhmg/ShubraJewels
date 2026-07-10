@@ -11,6 +11,9 @@ export function PolicyPage({ pageKey }) {
 
   const vars = {
     brand: settings.brandName || 'our store',
+    legalName: settings.legalName || settings.brandName || 'our store',
+    businessType: settings.businessType || 'sole proprietorship',
+    address: settings.businessAddress || '',
     email: settings.email || 'our email address',
     phone: settings.phone || settings.whatsappNumber || 'us',
     whatsapp: settings.whatsappNumber || settings.phone || 'us',
@@ -18,6 +21,12 @@ export function PolicyPage({ pageKey }) {
   }
   const fill = (t) => (t || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : `{${k}}`))
   const blocks = parseBody(fill(policy?.body))
+
+  // Legal-entity line — required by payment gateways. For a sole proprietorship
+  // this names the proprietor (the actual legal person behind the trade name).
+  const entityLine = settings.legalName
+    ? `${settings.brandName} is a ${settings.businessType || 'sole proprietorship'} owned and operated by ${settings.legalName}.`
+    : null
 
   return (
     <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
@@ -31,6 +40,13 @@ export function PolicyPage({ pageKey }) {
 
       <section className="section">
         <div className="container-tight">
+          {(entityLine || settings.businessAddress) && (
+            <div className="rounded-xl p-4 mb-8 text-[14px] leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 12%, var(--cream))', border: '1px solid color-mix(in srgb, var(--gold) 35%, transparent)', color: 'var(--ink)' }}>
+              {entityLine && <p className="font-medium">{entityLine}</p>}
+              {settings.businessAddress && <p className="mt-1" style={{ color: 'color-mix(in srgb, var(--ink) 78%, transparent)' }}>{settings.businessAddress}</p>}
+              {settings.email && <p className="mt-1" style={{ color: 'color-mix(in srgb, var(--ink) 78%, transparent)' }}>Email: {settings.email}</p>}
+            </div>
+          )}
           {blocks.map((b, i) => {
             if (b.type === 'h')
               return <h2 key={i} className="font-display text-xl md:text-2xl mt-8 mb-2" style={{ color: 'var(--maroon)' }}>{b.text}</h2>

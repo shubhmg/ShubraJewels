@@ -92,8 +92,14 @@ export function Footer() {
               <Link key={l.to} to={l.to} className="hover:text-[var(--gold-light)] transition-colors">{l.label}</Link>
             ))}
           </nav>
-          <div className="text-center pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-            <p>{footer.copyright || `© ${new Date().getFullYear()} ${settings.brandName}. ${settings.slogan}`}</p>
+          <div className="text-center pt-1 border-t space-y-1" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+            {settings.legalName && (
+              <p style={{ color: 'rgba(255,255,255,0.55)' }}>
+                {settings.brandName} is a {settings.businessType || 'sole proprietorship'} owned and operated by {settings.legalName}.
+                {settings.businessAddress ? ` ${settings.businessAddress}.` : ''}
+              </p>
+            )}
+            <p>© {new Date().getFullYear()} {settings.legalName || settings.brandName}. All rights reserved.</p>
           </div>
         </div>
       </div>

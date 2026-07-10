@@ -157,6 +157,18 @@ export function AdminSettings() {
       </Section>
       )}
 
+      {tab === 'brand' && (
+      <Section title="Legal / Business Identity" subtitle="Required for payment-gateway approval. For a sole proprietorship, the legal name is the proprietor's own full name (as on PAN & bank account) — shown on the footer, Contact page, and all legal pages.">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field field={{ label: 'Legal name (proprietor)', help: 'Full name as on PAN / bank account, e.g. Tanisha Rana' }} value={s.legalName} onChange={(v) => set('legalName', v)} />
+          <Field field={{ label: 'Business type', help: 'e.g. sole proprietorship' }} value={s.businessType} onChange={(v) => set('businessType', v)} />
+          <div className="sm:col-span-2">
+            <Field field={{ label: 'Business address', type: 'textarea', rows: 2, help: 'Full operating/contact address shown publicly (required by gateways).' }} value={s.businessAddress} onChange={(v) => set('businessAddress', v)} />
+          </div>
+        </div>
+      </Section>
+      )}
+
       {tab === 'contact' && (
       <Section title="Ordering & Contact">
         <div className="grid sm:grid-cols-2 gap-4">
