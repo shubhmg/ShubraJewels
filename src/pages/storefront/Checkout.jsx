@@ -551,34 +551,41 @@ export function Checkout() {
 }
 
 const inputBase = 'mt-1 w-full px-4 py-3 rounded-xl border bg-white text-base sm:text-sm outline-none focus:ring-2 transition-shadow disabled:bg-stone-50 disabled:text-stone-400'
+
+// Hard-block browser autofill: the field is `readonly` in the DOM during the
+// browser's autofill pass (page load), so Chrome/Safari never offer it; focus
+// strips readonly imperatively so typing works. `autocomplete=off` alone is
+// ignored by Chrome for address-labelled fields.
+export const noAutofill = {
+  ref: (el) => { if (el && !el.dataset.roInit) { el.setAttribute('readonly', 'readonly'); el.dataset.roInit = '1' } },
+  autoComplete: 'off',
+  autoCorrect: 'off',
+  spellCheck: false,
+  'data-lpignore': 'true',
+  'data-1p-ignore': 'true',
+}
 const okBorder = { borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)', '--tw-ring-color': 'color-mix(in srgb, var(--gold) 45%, transparent)' }
 const errBorder = { borderColor: '#dc2626', '--tw-ring-color': 'rgba(220,38,38,0.25)' }
 
 function Field({ label, value, onChange, onBlur, placeholder, type = 'text', list, error, required, disabled, inputMode, maxLength, prefix, autoComplete = 'off' }) {
-  // readonly-until-focus: the field is read-only during the browser's autofill
-  // pass at page load, so Chrome/Safari skip it; focus makes it editable.
-  const [editable, setEditable] = useState(false)
   return (
     <label className="block" data-error={!!error}>
       <span className="text-xs font-medium text-stone-500">{label}{required && <span className="text-red-500"> *</span>}</span>
       <div className="relative">
         {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 mt-[2px] text-sm text-stone-400 pointer-events-none">{prefix}</span>}
         <input
+          {...noAutofill}
           type={type}
           list={list}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setEditable(true)}
-          onBlur={onBlur}
+          onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+          onBlur={(e) => { e.currentTarget.setAttribute('readonly', 'readonly'); onBlur?.() }}
           placeholder={placeholder}
           disabled={disabled}
-          readOnly={!editable}
           inputMode={inputMode}
           maxLength={maxLength}
           autoComplete={autoComplete}
-          name={`f_${Math.random().toString(36).slice(2, 8)}`}
-          data-lpignore="true"
-          data-1p-ignore="true"
           className={inputBase}
           style={{ ...(error ? errBorder : okBorder), ...(prefix ? { paddingLeft: '3rem' } : null) }}
         />
