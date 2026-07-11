@@ -29,45 +29,18 @@ export function MediaUploader({ value, onChange, accept = 'image', label }) {
     <div>
       {label && <p className="text-xs font-medium text-stone-500 mb-1.5">{label}</p>}
       {value ? (
-        <div
-          className="relative w-full rounded-xl overflow-hidden border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800"
-          onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={(e) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]) }}
-        >
+        <div className="relative w-full rounded-xl overflow-hidden border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800">
           {isVideo(value)
             ? <video src={value} className="w-full h-40 object-cover" muted />
             : <img src={value} alt="" className="w-full h-40 object-cover" />}
-          {/* Tap anywhere on the media to replace it */}
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
-            className="absolute inset-0 cursor-pointer"
-            aria-label="Replace"
-          />
-          {(busy || drag) && (
-            <div className="absolute inset-0 grid place-items-center bg-black/40 text-white pointer-events-none">
-              {busy ? <Loader2 size={22} className="animate-spin" /> : <UploadCloud size={22} />}
-            </div>
-          )}
-          {/* Always-visible actions (touch devices have no hover) */}
-          <div className="absolute top-2 right-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="h-7 px-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 text-white text-xs font-medium cursor-pointer hover:bg-black/75 transition"
-            >
-              <UploadCloud size={13} /> Replace
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              className="w-7 h-7 grid place-items-center rounded-full bg-black/60 text-white cursor-pointer hover:bg-black/75 transition"
-              aria-label="Remove"
-            >
-              <X size={14} />
-            </button>
-          </div>
+            onClick={() => onChange('')}
+            className="absolute top-2 right-2 w-7 h-7 grid place-items-center rounded-full bg-black/60 text-white cursor-pointer hover:bg-black/75 transition"
+            aria-label="Remove"
+          >
+            <X size={14} />
+          </button>
         </div>
       ) : (
         <button
