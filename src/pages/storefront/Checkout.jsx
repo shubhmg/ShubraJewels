@@ -327,11 +327,9 @@ export function Checkout() {
   }
 
   const submitUpiProof = async () => {
-    const ref = upiRef.trim()
-    if (ref.length < 6) { setUpiErr('Enter the UPI reference / UTR number from your payment app'); return }
     setSubmittingProof(true); setUpiErr('')
     try {
-      await api.patch(`/orders/${upiOrder._id}/upi-proof`, { upiRef: ref })
+      await api.patch(`/orders/${upiOrder._id}/upi-proof`, { upiRef: upiRef.trim() })
       setPlaced({ ...upiOrder, paymentStatus: 'submitted', _upi: true })
       setUpiOrder(null)
     } catch (e) {
@@ -441,9 +439,8 @@ export function Checkout() {
             {/* Steps */}
             <ol className="mt-6 space-y-2.5 text-sm text-stone-600">
               {[
-                <>Pay <span className="font-semibold" style={{ color: 'var(--ink)' }}>exactly {fmt(upiOrder.total)}</span> using the QR or UPI ID above.</>,
-                <>Keep order no. <span className="font-semibold" style={{ color: 'var(--ink)' }}>{upiOrder.orderNo}</span> in the payment note (it's pre-filled if you scan).</>,
-                <>After paying, enter the <span className="font-semibold" style={{ color: 'var(--ink)' }}>UPI reference / UTR number</span> from your app below.</>,
+                <>Pay <span className="font-semibold" style={{ color: 'var(--ink)' }}>exactly {fmt(upiOrder.total)}</span> using the QR or UPI ID above (order no. <span className="font-semibold" style={{ color: 'var(--ink)' }}>{upiOrder.orderNo}</span> is pre-filled in the note).</>,
+                <>Come back here and tap <span className="font-semibold" style={{ color: 'var(--ink)' }}>“I've paid”</span>. That's it — we'll verify and confirm.</>,
               ].map((t, i) => (
                 <li key={i} className="flex gap-2.5">
                   <span className="shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{i + 1}</span>
@@ -452,25 +449,25 @@ export function Checkout() {
               ))}
             </ol>
 
-            {/* Reference */}
+            {/* Optional reference — speeds up verification but not required */}
             <div className="mt-5">
-              <span className="text-xs font-medium text-stone-500">UPI Reference / UTR number <span className="text-red-500">*</span></span>
+              <span className="text-xs font-medium text-stone-500">UPI Reference / UTR number <span className="text-stone-400 font-normal">(optional — speeds up confirmation)</span></span>
               <input
                 {...noAutofill}
                 value={upiRef}
                 onChange={(e) => setUpiRef(e.target.value.replace(/[^\w]/g, ''))}
                 onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                placeholder="e.g. 4312 8765 9021"
+                placeholder="e.g. 431287659021"
                 inputMode="numeric"
                 className={inputBase}
-                style={upiErr ? errBorder : okBorder}
+                style={okBorder}
               />
-              <p className="text-[11px] text-stone-400 mt-1">Find it in your UPI app under the payment's details / receipt.</p>
+              <p className="text-[11px] text-stone-400 mt-1">Optional — in your UPI app, open the payment's details / receipt to find it.</p>
               {upiErr && <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5"><AlertCircle size={15} />{upiErr}</p>}
             </div>
 
             <button onClick={submitUpiProof} disabled={submittingProof} className="btn-gold w-full !py-3.5 text-base mt-4 disabled:opacity-60">
-              {submittingProof ? 'Submitting…' : "I've paid — submit reference"}
+              {submittingProof ? 'Submitting…' : "I've paid"}
             </button>
             <p className="text-xs text-stone-400 text-center mt-3">Your order is saved. We'll verify the payment and confirm on WhatsApp.</p>
           </div>

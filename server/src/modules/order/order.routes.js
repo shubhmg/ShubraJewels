@@ -93,8 +93,10 @@ router.post(
 router.patch(
   '/:id/upi-proof',
   validate({
+    // Reference is optional — the order-number note + amount is the primary
+    // matcher against the bank statement; the UTR just speeds verification.
     body: Joi.object({
-      upiRef: Joi.string().trim().min(6).max(40).required(),
+      upiRef: Joi.string().trim().allow('').max(40).default(''),
     }),
   }),
   asyncHandler(async (req, res) => {
@@ -103,7 +105,7 @@ router.patch(
     if (order.paymentStatus === 'paid') throw ApiError.badRequest('This order is already paid');
     order.paymentMethod = 'upi';
     order.paymentStatus = 'submitted';
-    order.upiRef = req.body.upiRef.trim();
+    order.upiRef = (req.body.upiRef || '').trim();
     order.paymentSubmittedAt = new Date();
     await order.save();
     res.json({ success: true, data: { orderNo: order.orderNo, total: order.total, paymentStatus: order.paymentStatus } });
