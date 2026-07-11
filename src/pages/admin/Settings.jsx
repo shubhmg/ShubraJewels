@@ -532,7 +532,9 @@ function AboutEditor({ value, onChange }) {
 
   return (
     <div className="space-y-4">
-      <MediaUploader label="Story image" value={a.image} onChange={(v) => patch({ image: v })} accept="image" />
+      {/* Use the RAW stored image (not resolved) so removing it sticks — resolveAbout
+          falls back to the default on empty, which would otherwise re-fill instantly. */}
+      <MediaUploader label="Story image" value={value?.image ?? a.image} onChange={(v) => patch({ image: v })} accept="image" />
       <div className="grid sm:grid-cols-2 gap-4">
         <Field field={{ label: 'Section eyebrow', help: 'Small label above the heading' }} value={a.eyebrow} onChange={(v) => patch({ eyebrow: v })} />
         <Field field={{ label: 'Heading' }} value={a.heading} onChange={(v) => patch({ heading: v })} />
