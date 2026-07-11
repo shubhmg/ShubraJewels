@@ -10,6 +10,7 @@ import { api } from '../../lib/api.js'
 import { loadRazorpay } from '../../lib/razorpay.js'
 import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
 import { INDIAN_STATES, CITIES_BY_STATE } from '../../data/indianCities.js'
+import { Combobox } from '../../components/ui/Combobox.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
@@ -410,14 +411,13 @@ export function Checkout() {
                       {pinStatus === 'ok' && !showErr('pincode') && <span className="text-xs text-emerald-600 mt-1 flex items-center gap-1"><Check size={12} /> Auto-filled below</span>}
                       {pinStatus === 'notfound' && !showErr('pincode') && <span className="text-xs text-amber-600 mt-1 block">PIN not found — pick state & city.</span>}
                     </div>
-                    <SelectField label="State" required value={addr.state} onChange={onStateChange} onBlur={() => markTouched('state')} options={INDIAN_STATES} placeholder="Select state" error={showErr('state')} />
-                    <Field
-                      label="City" required value={addr.city} onChange={(v) => setA('city', v)} onBlur={() => markTouched('city')}
-                      placeholder={addr.state ? 'Start typing…' : 'Select state first'} disabled={!addr.state}
-                      list="city-list" error={showErr('city')}
-                    />
+                    <ComboField label="State" required error={showErr('state')}>
+                      <Combobox value={addr.state} onChange={onStateChange} onBlur={() => markTouched('state')} options={INDIAN_STATES} placeholder="Search state…" error={!!showErr('state')} inputStyle={showErr('state') ? errBorder : okBorder} />
+                    </ComboField>
+                    <ComboField label="City" required error={showErr('city')}>
+                      <Combobox value={addr.city} onChange={(v) => setA('city', v)} onBlur={() => markTouched('city')} options={cityOptions} allowCustom disabled={!addr.state} placeholder={addr.state ? 'Search city…' : 'Select state first'} error={!!showErr('city')} inputStyle={showErr('city') ? errBorder : okBorder} />
+                    </ComboField>
                   </div>
-                  <datalist id="city-list">{cityOptions.map((c) => <option key={c} value={c} />)}</datalist>
 
                   {signedIn && (
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -544,21 +544,13 @@ function Field({ label, value, onChange, onBlur, placeholder, type = 'text', lis
   )
 }
 
-function SelectField({ label, value, onChange, onBlur, options, placeholder, error, required }) {
+// Label wrapper around a Combobox so it matches the other fields.
+function ComboField({ label, required, error, children }) {
   return (
-    <label className="block" data-error={!!error}>
+    <div data-error={!!error}>
       <span className="text-xs font-medium text-stone-500">{label}{required && <span className="text-red-500"> *</span>}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        className={inputBase + ' appearance-none cursor-pointer'}
-        style={{ ...(error ? errBorder : okBorder), color: value ? 'var(--ink)' : '#a8a29e' }}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((o) => <option key={o} value={o} style={{ color: 'var(--ink)' }}>{o}</option>)}
-      </select>
+      <div className="mt-1">{children}</div>
       {error && <span className="text-xs text-red-600 mt-1 block">{error}</span>}
-    </label>
+    </div>
   )
 }
