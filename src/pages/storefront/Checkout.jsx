@@ -555,6 +555,9 @@ const okBorder = { borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent
 const errBorder = { borderColor: '#dc2626', '--tw-ring-color': 'rgba(220,38,38,0.25)' }
 
 function Field({ label, value, onChange, onBlur, placeholder, type = 'text', list, error, required, disabled, inputMode, maxLength, prefix, autoComplete = 'off' }) {
+  // readonly-until-focus: the field is read-only during the browser's autofill
+  // pass at page load, so Chrome/Safari skip it; focus makes it editable.
+  const [editable, setEditable] = useState(false)
   return (
     <label className="block" data-error={!!error}>
       <span className="text-xs font-medium text-stone-500">{label}{required && <span className="text-red-500"> *</span>}</span>
@@ -565,12 +568,15 @@ function Field({ label, value, onChange, onBlur, placeholder, type = 'text', lis
           list={list}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setEditable(true)}
           onBlur={onBlur}
           placeholder={placeholder}
           disabled={disabled}
+          readOnly={!editable}
           inputMode={inputMode}
           maxLength={maxLength}
           autoComplete={autoComplete}
+          name={`f_${Math.random().toString(36).slice(2, 8)}`}
           data-lpignore="true"
           data-1p-ignore="true"
           className={inputBase}

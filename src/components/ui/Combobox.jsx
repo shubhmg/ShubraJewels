@@ -15,6 +15,7 @@ export function Combobox({
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const [pos, setPos] = useState(null)
+  const [editable, setEditable] = useState(false) // readonly-until-focus: blocks browser autofill
   const inputRef = useRef(null)
   const menuRef = useRef(null)
 
@@ -48,7 +49,7 @@ export function Combobox({
     }
   }, [open])
 
-  const openMenu = () => { if (disabled) return; setQuery(value || ''); setActive(0); setOpen(true) }
+  const openMenu = () => { if (disabled) return; setEditable(true); setQuery(value || ''); setActive(0); setOpen(true) }
 
   const commit = (val) => {
     onChange(val)
@@ -85,6 +86,10 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           autoComplete="off"
+          readOnly={!editable}
+          name={`c_${Math.random().toString(36).slice(2, 8)}`}
+          data-lpignore="true"
+          data-1p-ignore="true"
           disabled={disabled}
           value={open ? query : (value || '')}
           placeholder={placeholder}
