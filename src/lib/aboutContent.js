@@ -32,7 +32,10 @@ export function resolveAbout(about) {
     eyebrow: a.eyebrow ?? ABOUT_DEFAULTS.eyebrow,
     heading: a.heading ?? ABOUT_DEFAULTS.heading,
     image: a.image || ABOUT_DEFAULTS.image,
-    paragraphs: a.paragraphs?.length ? a.paragraphs : ABOUT_DEFAULTS.paragraphs,
-    values: a.values?.length ? a.values : ABOUT_DEFAULTS.values,
+    // Fall back to defaults only when the field was never set (undefined). An
+    // explicit empty array means "the admin cleared these" — respect it, so
+    // removing the last card/paragraph doesn't re-add the defaults.
+    paragraphs: Array.isArray(a.paragraphs) ? a.paragraphs : ABOUT_DEFAULTS.paragraphs,
+    values: Array.isArray(a.values) ? a.values : ABOUT_DEFAULTS.values,
   }
 }

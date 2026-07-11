@@ -525,7 +525,10 @@ function PoliciesEditor({ value, onChange }) {
 
 function AboutEditor({ value, onChange }) {
   const a = resolveAbout(value)
-  const patch = (p) => onChange({ ...a, ...p })
+  // Spread the RAW value (not the resolved one) so cleared fields — an empty
+  // image, or an emptied cards/paragraphs list — aren't re-filled with defaults
+  // when another field is edited.
+  const patch = (p) => onChange({ ...(value || {}), ...p })
   const setVal = (i, k, v) => patch({ values: a.values.map((x, idx) => (idx === i ? { ...x, [k]: v } : x)) })
   const addVal = () => patch({ values: [...a.values, { icon: 'Sparkles', title: '', text: '' }] })
   const removeVal = (i) => patch({ values: a.values.filter((_, idx) => idx !== i) })
