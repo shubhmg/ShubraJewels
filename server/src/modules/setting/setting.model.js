@@ -119,6 +119,13 @@ const settingSchema = new mongoose.Schema(
     payments: {
       razorpay: { type: Boolean, default: true }, // pay online
       cod: { type: Boolean, default: true },       // pay on delivery
+      // Direct UPI: customer scans a QR / pays to the VPA, then submits the UPI
+      // reference number for manual verification against the bank statement.
+      upi: {
+        enabled: { type: Boolean, default: false },
+        vpa: { type: String, default: '' },        // e.g. shubra@okaxis
+        payeeName: { type: String, default: '' },  // shown in the UPI app
+      },
     },
 
     // Fully admin-editable homepage layout (hero + ordered sections)

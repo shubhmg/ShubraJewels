@@ -43,9 +43,15 @@ const orderSchema = new mongoose.Schema(
     stockApplied: { type: Boolean, default: false },
     // Payment
     paymentMethod: { type: String, enum: ['none', 'razorpay', 'cod', 'whatsapp', 'cash', 'upi', 'bank'], default: 'none' },
-    paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
+    // 'submitted' = customer paid via UPI and submitted a reference; awaiting
+    // admin verification against the bank statement.
+    paymentStatus: { type: String, enum: ['unpaid', 'submitted', 'paid'], default: 'unpaid' },
     razorpayOrderId: { type: String, default: '' },
     razorpayPaymentId: { type: String, default: '' },
+    // Direct-UPI manual flow
+    upiRef: { type: String, default: '' },          // UTR / UPI reference no. from the customer
+    paymentSubmittedAt: { type: Date, default: null },
+    paymentVerifiedAt: { type: Date, default: null },
     notes: { type: String, default: '' },
   },
   { timestamps: true }

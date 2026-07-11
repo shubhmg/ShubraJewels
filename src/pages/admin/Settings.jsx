@@ -208,6 +208,19 @@ export function AdminSettings() {
       </Section>
       )}
 
+      {tab === 'payments' && (
+      <Section title="Direct UPI (QR)" subtitle="No gateway needed. Customer scans your QR / pays to your UPI ID, then submits the reference number. You verify it against your bank statement and mark the order paid.">
+        <div className="space-y-3">
+          <Field field={{ label: 'Enable direct UPI payments', type: 'toggle' }} value={!!s.payments?.upi?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, enabled: v } } }))} />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field field={{ label: 'Your UPI ID (VPA)', placeholder: 'name@okaxis', help: 'Where customers send money' }} value={s.payments?.upi?.vpa || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, vpa: v.trim() } } }))} />
+            <Field field={{ label: 'Payee name', placeholder: 'Shubra Jewels', help: 'Shown in the customer’s UPI app' }} value={s.payments?.upi?.payeeName || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, payeeName: v } } }))} />
+          </div>
+          <p className="text-xs text-zinc-400">Tip: use a UPI ID you can monitor (e.g. a dedicated one). The order number rides along in the payment note so you can match it easily.</p>
+        </div>
+      </Section>
+      )}
+
       {tab === 'story' && (
       <Section title="Our Story Page" subtitle="The full About / Our Story page — image, heading, story text, and value cards.">
         <AboutEditor value={s.about} onChange={(v) => set('about', v)} />

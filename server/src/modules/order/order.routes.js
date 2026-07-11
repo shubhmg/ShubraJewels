@@ -41,7 +41,7 @@ router.post(
         pincode: Joi.string().allow('').max(12),
       }).default({}),
       channel: Joi.string().valid('web', 'whatsapp').default('web'),
-      paymentMethod: Joi.string().valid('cod', 'whatsapp', 'none').optional(),
+      paymentMethod: Joi.string().valid('cod', 'whatsapp', 'none', 'upi').optional(),
       couponCode: Joi.string().allow('').max(40).default(''),
       notes: Joi.string().allow('').max(1000),
     }),
@@ -84,6 +84,29 @@ router.post(
     if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
 
     res.status(201).json({ success: true, data: order });
+  })
+);
+
+// PUBLIC — customer submits the UPI reference number after paying to the QR/VPA.
+// Marks the order 'submitted' (awaiting manual verification). Only allowed while
+// the order is still unpaid/submitted; admin verifies against the bank statement.
+router.patch(
+  '/:id/upi-proof',
+  validate({
+    body: Joi.object({
+      upiRef: Joi.string().trim().min(6).max(40).required(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id);
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.paymentStatus === 'paid') throw ApiError.badRequest('This order is already paid');
+    order.paymentMethod = 'upi';
+    order.paymentStatus = 'submitted';
+    order.upiRef = req.body.upiRef.trim();
+    order.paymentSubmittedAt = new Date();
+    await order.save();
+    res.json({ success: true, data: { orderNo: order.orderNo, total: order.total, paymentStatus: order.paymentStatus } });
   })
 );
 
@@ -146,7 +169,7 @@ router.patch(
     params: Joi.object({ id: objectId.required() }),
     body: Joi.object({
       status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled'),
-      paymentStatus: Joi.string().valid('unpaid', 'paid'),
+      paymentStatus: Joi.string().valid('unpaid', 'submitted', 'paid'),
       paymentMethod: Joi.string().valid('none', 'razorpay', 'cod', 'whatsapp', 'cash', 'upi', 'bank'),
       notes: Joi.string().allow('').max(1000),
     }).min(1),
@@ -169,15 +192,17 @@ router.patch(
     }
 
     // Cash is collected on delivery — COD/WhatsApp orders become paid when delivered
-    // (and revert to unpaid if moved back). Razorpay orders are already paid.
+    // (and revert to unpaid if moved back). Razorpay + UPI keep their own status.
+    const collectOnDelivery = ['cod', 'whatsapp', 'cash', 'none'].includes(order.paymentMethod);
     if (delivered) {
       if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
-    } else if (order.paymentMethod !== 'razorpay') {
+    } else if (collectOnDelivery) {
       order.paymentStatus = 'unpaid';
     }
 
-    // Explicit payment status from admin wins (e.g. "mark paid" before delivery).
+    // Explicit payment status from admin wins (e.g. verifying a UPI payment).
     if (req.body.paymentStatus !== undefined) order.paymentStatus = req.body.paymentStatus;
+    if (order.paymentStatus === 'paid' && !order.paymentVerifiedAt) order.paymentVerifiedAt = new Date();
 
     await order.save();
     res.json({ success: true, data: order });

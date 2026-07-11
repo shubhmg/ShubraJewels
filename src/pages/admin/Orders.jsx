@@ -21,9 +21,11 @@ const STATUS_COLOR = {
   cancelled: 'bg-red-50 text-red-600',
 }
 
-// Payment badge — Paid (Razorpay or collected on delivery), else COD / WhatsApp.
+// Payment badge — Paid, UPI-submitted (needs verifying), else COD / WhatsApp.
 function payBadge(o) {
   if (o.paymentStatus === 'paid') return { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
+  if (o.paymentMethod === 'upi' && o.paymentStatus === 'submitted') return { label: 'UPI · verify', cls: 'bg-blue-100 text-blue-700' }
+  if (o.paymentMethod === 'upi') return { label: 'UPI', cls: 'bg-blue-100 text-blue-700' }
   if (o.paymentMethod === 'whatsapp') return { label: 'WhatsApp', cls: 'bg-green-100 text-green-700' }
   return { label: 'COD', cls: 'bg-amber-100 text-amber-700' }
 }
@@ -189,6 +191,14 @@ export function AdminOrders() {
                         <p className="text-[11px] text-zinc-400 mt-2">Marking <b>Delivered</b> deducts stock and marks the order paid.</p>
 
                         <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold mt-4">Payment</p>
+                        {/* Direct-UPI: show the customer-submitted reference to verify against the bank statement */}
+                        {o.paymentMethod === 'upi' && o.upiRef && (
+                          <div className="mb-2.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs">
+                            <p className="text-blue-700 font-semibold">UPI reference submitted</p>
+                            <p className="text-zinc-700 mt-0.5">Ref: <span className="font-mono font-bold">{o.upiRef}</span> · Amount: <b>₹{new Intl.NumberFormat('en-IN').format(o.total || 0)}</b></p>
+                            <p className="text-zinc-500 mt-0.5">Match this against your bank statement (note = {o.orderNo}), then Mark paid.</p>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 flex-wrap">
                           <Dropdown value={o.paymentMethod || 'cod'} onChange={(v) => patchOrder(o._id, { paymentMethod: v })} align="left" options={PAY_METHODS} />
                           <button

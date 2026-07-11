@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, AlertCircle } from 'lucide-react'
+import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, AlertCircle, QrCode, Copy, Smartphone, Clock } from 'lucide-react'
+import { buildUpiUri, upiQrDataUrl } from '../../lib/upi.js'
 import { useCartStore } from '../../store/cartStore.js'
 import { useCustomerStore } from '../../store/customerStore.js'
 import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
@@ -90,7 +91,18 @@ export function Checkout() {
   const [couponErr, setCouponErr] = useState('')
   const [applyingCoupon, setApplyingCoupon] = useState(false)
 
+  // Direct-UPI flow
+  const [upiOrder, setUpiOrder] = useState(null) // created order awaiting payment
+  const [upiUri, setUpiUri] = useState('')
+  const [upiQr, setUpiQr] = useState('')
+  const [upiRef, setUpiRef] = useState('')
+  const [upiErr, setUpiErr] = useState('')
+  const [submittingProof, setSubmittingProof] = useState(false)
+  const [copied, setCopied] = useState(false)
+
   const signedIn = isAuthed()
+  const upiCfg = settings.payments?.upi || {}
+  const upiEnabled = !!(upiCfg.enabled && upiCfg.vpa)
 
   // Saved addresses (address book). Fall back to the legacy single address.
   const savedAddresses = useMemo(() => {
@@ -298,6 +310,39 @@ export function Checkout() {
     }
   }
 
+  // Direct UPI: create the (unpaid) order, then show the QR + reference form.
+  const payUpi = async () => {
+    if (!gate()) return
+    setPlacing(true)
+    try {
+      const order = await api.post('/orders', { ...buildPayload('web'), paymentMethod: 'upi' }, { custAuth: true })
+      await persistAddress()
+      const uri = buildUpiUri({ vpa: upiCfg.vpa, payeeName: upiCfg.payeeName || settings.brandName, amount: order.total, note: order.orderNo })
+      const qr = await upiQrDataUrl(uri)
+      setUpiOrder(order); setUpiUri(uri); setUpiQr(qr); setUpiRef(''); setUpiErr('')
+      clearCart()
+    } catch (e) {
+      setError(e.message || 'Could not start UPI payment.')
+    } finally { setPlacing(false) }
+  }
+
+  const submitUpiProof = async () => {
+    const ref = upiRef.trim()
+    if (ref.length < 6) { setUpiErr('Enter the UPI reference / UTR number from your payment app'); return }
+    setSubmittingProof(true); setUpiErr('')
+    try {
+      await api.patch(`/orders/${upiOrder._id}/upi-proof`, { upiRef: ref })
+      setPlaced({ ...upiOrder, paymentStatus: 'submitted', _upi: true })
+      setUpiOrder(null)
+    } catch (e) {
+      setUpiErr(e.message || 'Could not submit. Please try again.')
+    } finally { setSubmittingProof(false) }
+  }
+
+  const copyVpa = async () => {
+    try { await navigator.clipboard.writeText(upiCfg.vpa); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* ignore */ }
+  }
+
   const orderViaWhatsApp = () => {
     if (items.length === 0) return
     if (!gate()) return
@@ -324,19 +369,110 @@ export function Checkout() {
 
   /* ── Success ── */
   if (placed) {
+    const isUpi = placed._upi
     return (
       <div className="pt-20 min-h-dvh flex items-center justify-center animate-fade-in" style={{ background: 'var(--cream)' }}>
         <div className="text-center max-w-md px-4 py-16">
           <div className="w-20 h-20 rounded-full grid place-items-center mx-auto mb-6" style={{ background: 'color-mix(in srgb, var(--maroon) 12%, transparent)' }}>
-            <Check size={34} style={{ color: 'var(--maroon)' }} />
+            {isUpi ? <Clock size={32} style={{ color: 'var(--maroon)' }} /> : <Check size={34} style={{ color: 'var(--maroon)' }} />}
           </div>
           <div className="eyebrow justify-center flex"><Motif size={18} /><span className="font-hindi">{settings.slogan}</span></div>
-          <h1 className="font-display text-3xl mt-2 mb-2" style={{ color: 'var(--ink)' }}>Order Placed!</h1>
-          <p className="text-stone-500">Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> has been received. We'll reach out on WhatsApp to confirm.</p>
+          <h1 className="font-display text-3xl mt-2 mb-2" style={{ color: 'var(--ink)' }}>{isUpi ? 'Payment Submitted!' : 'Order Placed!'}</h1>
+          <p className="text-stone-500">
+            {isUpi
+              ? <>We've received your payment reference for order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span>. We'll verify it and confirm your order shortly.</>
+              : <>Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> has been received. We'll reach out on WhatsApp to confirm.</>}
+          </p>
           <p className="text-sm mt-2" style={{ color: 'var(--maroon)' }}>Total: {fmt(placed.total)}</p>
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <Link to="/products" className="btn-maroon">Continue Shopping</Link>
             <WhatsAppButton message={`Hi! About my order ${placed.orderNo}…`} label="Message us" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── UPI payment (order created, awaiting payment + reference) ── */
+  if (upiOrder) {
+    return (
+      <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
+        <div className="relative overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
+          <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
+          <div className="container-wide pt-24 md:pt-28 pb-8 md:pb-10 relative">
+            <h1 className="font-display text-white text-3xl md:text-4xl">Complete your payment</h1>
+            <p className="text-white/70 text-sm mt-1">Order {upiOrder.orderNo}</p>
+          </div>
+        </div>
+
+        <div className="container-tight py-8">
+          <div className="bg-white rounded-2xl p-5 md:p-8 shadow-card max-w-md mx-auto">
+            <div className="text-center">
+              <p className="text-xs uppercase tracking-wider text-stone-400">Amount to pay</p>
+              <p className="font-display text-4xl mt-1" style={{ color: 'var(--maroon)' }}>{fmt(upiOrder.total)}</p>
+            </div>
+
+            {/* QR */}
+            {upiQr && (
+              <div className="mt-6 flex flex-col items-center">
+                <div className="p-3 rounded-2xl border" style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}>
+                  <img src={upiQr} alt="UPI QR code" className="w-52 h-52" />
+                </div>
+                <p className="text-xs text-stone-500 mt-2 flex items-center gap-1.5"><QrCode size={13} /> Scan with any UPI app (GPay, PhonePe, Paytm…)</p>
+              </div>
+            )}
+
+            {/* Mobile: open UPI app */}
+            <a href={upiUri} className="btn-maroon w-full mt-5 flex items-center justify-center gap-2 md:hidden">
+              <Smartphone size={17} /> Pay with UPI app
+            </a>
+
+            {/* VPA */}
+            <div className="mt-5 rounded-xl border p-3.5 flex items-center justify-between gap-3" style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}>
+              <div className="min-w-0">
+                <p className="text-xs text-stone-400">Or pay to UPI ID</p>
+                <p className="font-semibold truncate" style={{ color: 'var(--ink)' }}>{upiCfg.vpa}</p>
+              </div>
+              <button onClick={copyVpa} className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg cursor-pointer" style={{ background: 'color-mix(in srgb, var(--maroon) 8%, transparent)', color: 'var(--maroon)' }}>
+                {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+              </button>
+            </div>
+
+            {/* Steps */}
+            <ol className="mt-6 space-y-2.5 text-sm text-stone-600">
+              {[
+                <>Pay <span className="font-semibold" style={{ color: 'var(--ink)' }}>exactly {fmt(upiOrder.total)}</span> using the QR or UPI ID above.</>,
+                <>Keep order no. <span className="font-semibold" style={{ color: 'var(--ink)' }}>{upiOrder.orderNo}</span> in the payment note (it's pre-filled if you scan).</>,
+                <>After paying, enter the <span className="font-semibold" style={{ color: 'var(--ink)' }}>UPI reference / UTR number</span> from your app below.</>,
+              ].map((t, i) => (
+                <li key={i} className="flex gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{i + 1}</span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ol>
+
+            {/* Reference */}
+            <div className="mt-5">
+              <span className="text-xs font-medium text-stone-500">UPI Reference / UTR number <span className="text-red-500">*</span></span>
+              <input
+                {...noAutofill}
+                value={upiRef}
+                onChange={(e) => setUpiRef(e.target.value.replace(/[^\w]/g, ''))}
+                onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
+                placeholder="e.g. 4312 8765 9021"
+                inputMode="numeric"
+                className={inputBase}
+                style={upiErr ? errBorder : okBorder}
+              />
+              <p className="text-[11px] text-stone-400 mt-1">Find it in your UPI app under the payment's details / receipt.</p>
+              {upiErr && <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5"><AlertCircle size={15} />{upiErr}</p>}
+            </div>
+
+            <button onClick={submitUpiProof} disabled={submittingProof} className="btn-gold w-full !py-3.5 text-base mt-4 disabled:opacity-60">
+              {submittingProof ? 'Submitting…' : "I've paid — submit reference"}
+            </button>
+            <p className="text-xs text-stone-400 text-center mt-3">Your order is saved. We'll verify the payment and confirm on WhatsApp.</p>
           </div>
         </div>
       </div>
@@ -472,8 +608,13 @@ export function Checkout() {
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2.5 flex items-center gap-2"><AlertCircle size={16} className="shrink-0" />{error}</p>
               )}
 
+              {upiEnabled && (
+                <button onClick={payUpi} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60 flex items-center justify-center gap-2">
+                  <QrCode size={18} /> {placing ? 'Processing…' : `Pay via UPI · ${fmt(total)}`}
+                </button>
+              )}
               {settings.payments?.razorpay !== false && (
-                <button onClick={payOnline} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60">
+                <button onClick={payOnline} disabled={placing} className={`w-full !py-3.5 text-base disabled:opacity-60 ${upiEnabled ? 'btn-outline-gold' : 'btn-gold'}`}>
                   {placing ? 'Processing…' : `Pay Online · ${fmt(total)}`}
                 </button>
               )}
