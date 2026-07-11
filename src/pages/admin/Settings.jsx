@@ -355,7 +355,7 @@ function ShippingEditor({ value, onChange }) {
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-[13px] font-semibold text-zinc-700">City overrides <span className="text-zinc-400 font-normal">(₹0 = free)</span></p>
+          <p className="text-[13px] font-semibold text-zinc-700">City overrides <span className="text-zinc-400 font-normal">(₹0 = free · e.g. “Delhi” also covers North/South/West Delhi & the state)</span></p>
           <Btn variant="outline" onClick={addCity}>+ Add city</Btn>
         </div>
         {cities.length === 0 && <p className="text-xs text-zinc-400">No overrides — every city pays the base charge.</p>}

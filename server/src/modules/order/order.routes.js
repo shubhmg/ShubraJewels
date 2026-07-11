@@ -49,7 +49,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { items, subtotal } = await resolveItems(req.body.items);
     const settings = await getSettings();
-    const shipping = computeShipping(settings, req.body.address?.city, subtotal);
+    const shipping = computeShipping(settings, req.body.address || {}, subtotal);
 
     // Re-validate the coupon server-side (never trust a client-sent discount).
     let discount = 0;

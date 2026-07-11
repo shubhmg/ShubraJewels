@@ -16,12 +16,19 @@ const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
 const EMPTY_ADDR = { line1: '', line2: '', city: '', state: '', pincode: '' }
 
-// Mirrors server computeShipping — must match so the shown total is right.
-function calcShipping(settings, city, subtotal) {
+// Mirrors server computeShipping — tolerant city match + state fallback, so a
+// configured "Delhi" still matches a PIN-derived "North West Delhi".
+function calcShipping(settings, addr, subtotal) {
   const s = settings.shipping || {}
   if (Number(s.freeAboveSubtotal) > 0 && subtotal >= Number(s.freeAboveSubtotal)) return 0
   const norm = (v) => String(v || '').toLowerCase().trim()
-  const m = (s.cities || []).find((c) => norm(c.name) === norm(city))
+  const city = norm(addr?.city)
+  const state = norm(addr?.state)
+  const m = (s.cities || []).find((c) => {
+    const n = norm(c.name)
+    if (!n) return false
+    return n === city || n === state || (!!city && (city.includes(n) || n.includes(city)))
+  })
   if (m) return Math.max(0, Number(m.charge) || 0)
   return Math.max(0, Number(s.defaultCharge) || 0)
 }
@@ -76,7 +83,7 @@ export function Checkout() {
     ? { line1: chosen.line1 || '', line2: chosen.line2 || '', city: chosen.city || '', state: chosen.state || '', pincode: chosen.pincode || '' }
     : addr
 
-  const shipping = calcShipping(settings, effAddr.city, subtotal)
+  const shipping = calcShipping(settings, effAddr, subtotal)
   const discount = coupon?.discount || 0
   const total = Math.max(0, subtotal + shipping - discount)
 
@@ -146,7 +153,8 @@ export function Checkout() {
           const po = rec.PostOffice[0]
           const matched = INDIAN_STATES.find((s) => s.toLowerCase() === String(po.State || '').toLowerCase()) || po.State || ''
           const city = po.District || po.Division || ''
-          setAddr((a) => ({ ...a, state: a.state || matched, city: a.city || city }))
+          // Authoritative: a PIN change re-fills state + city.
+          setAddr((a) => ({ ...a, state: matched || a.state, city: city || a.city }))
           setPinStatus('ok')
         } else {
           setPinStatus('notfound')
@@ -519,7 +527,7 @@ const inputBase = 'mt-1 w-full px-4 py-3 rounded-xl border bg-white text-base sm
 const okBorder = { borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)', '--tw-ring-color': 'color-mix(in srgb, var(--gold) 45%, transparent)' }
 const errBorder = { borderColor: '#dc2626', '--tw-ring-color': 'rgba(220,38,38,0.25)' }
 
-function Field({ label, value, onChange, onBlur, placeholder, type = 'text', list, error, required, disabled, inputMode, maxLength, prefix }) {
+function Field({ label, value, onChange, onBlur, placeholder, type = 'text', list, error, required, disabled, inputMode, maxLength, prefix, autoComplete = 'off' }) {
   return (
     <label className="block" data-error={!!error}>
       <span className="text-xs font-medium text-stone-500">{label}{required && <span className="text-red-500"> *</span>}</span>
@@ -535,6 +543,9 @@ function Field({ label, value, onChange, onBlur, placeholder, type = 'text', lis
           disabled={disabled}
           inputMode={inputMode}
           maxLength={maxLength}
+          autoComplete={autoComplete}
+          data-lpignore="true"
+          data-1p-ignore="true"
           className={inputBase}
           style={{ ...(error ? errBorder : okBorder), ...(prefix ? { paddingLeft: '3rem' } : null) }}
         />

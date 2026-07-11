@@ -46,10 +46,10 @@ const addressSchema = Joi.object({
 });
 
 // Full server-side pricing: subtotal + shipping − validated discount.
-async function priceOrder({ items, city, couponCode }) {
+async function priceOrder({ items, address, couponCode }) {
   const priced = await resolveItems(items);
   const settings = await getSettings();
-  const shipping = computeShipping(settings, city, priced.subtotal);
+  const shipping = computeShipping(settings, address || {}, priced.subtotal);
   let discount = 0;
   let coupon = null;
   if (couponCode) {
@@ -124,8 +124,7 @@ router.post(
   }),
   asyncHandler(async (req, res) => {
     if (!rzp) throw ApiError.badRequest('Online payments are not configured');
-    const city = req.body.address?.city || req.body.city;
-    const priced = await priceOrder({ items: req.body.items, city, couponCode: req.body.couponCode });
+    const priced = await priceOrder({ items: req.body.items, address: req.body.address || {}, couponCode: req.body.couponCode });
     const amount = Math.round(priced.total * 100);
     if (amount < 100) throw ApiError.badRequest('Amount must be at least ₹1');
 

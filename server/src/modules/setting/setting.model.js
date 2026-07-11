@@ -63,7 +63,8 @@ const settingSchema = new mongoose.Schema(
     freeShippingCity: { type: String, default: 'Delhi' },
     shippingNote: { type: String, default: 'Fast, tracked delivery across India.' },
 
-    // Delivery charges — city is chosen from `cities` at checkout (deterministic).
+    // Delivery charges — matched by the order's city (tolerant: a configured
+    // "Delhi" also matches districts like "North West Delhi" and the state).
     shipping: {
       cities: { type: [{ name: String, charge: Number }], default: [{ name: 'Delhi', charge: 0 }] },
       defaultCharge: { type: Number, default: 0 }, // fee for "Other city" not in the list
