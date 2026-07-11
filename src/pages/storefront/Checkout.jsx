@@ -37,11 +37,21 @@ function summarizeAddr(a) {
   return [a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(', ')
 }
 
+// Single-city union territories — every PIN in them should resolve to one
+// canonical city, regardless of which sub-district/division India Post returns
+// (so Delhi PINs don't flip between "Delhi" and "New Delhi").
+const CANONICAL_CITY_BY_STATE = {
+  'delhi': 'Delhi',
+  'chandigarh': 'Chandigarh',
+}
+
 // India Post only returns District/State (e.g. "North West Delhi") — not a city.
 // Map that to a real city from our curated list for the resolved state: pick the
 // most specific known city that appears (as a whole word) in any of the API
 // fields. Falls back to the district only when nothing matches.
 function deriveCityFromPin(po, stateKey) {
+  const canonical = CANONICAL_CITY_BY_STATE[String(stateKey || '').toLowerCase()]
+  if (canonical) return canonical
   const cities = CITIES_BY_STATE[stateKey] || []
   const cand = [po.District, po.Block, po.Division, po.Region, po.Name]
     .map((x) => String(x || '').toLowerCase()).filter(Boolean)
