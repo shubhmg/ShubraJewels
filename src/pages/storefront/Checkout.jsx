@@ -37,6 +37,23 @@ function summarizeAddr(a) {
   return [a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(', ')
 }
 
+// India Post only returns District/State (e.g. "North West Delhi") — not a city.
+// Map that to a real city from our curated list for the resolved state: pick the
+// most specific known city that appears (as a whole word) in any of the API
+// fields. Falls back to the district only when nothing matches.
+function deriveCityFromPin(po, stateKey) {
+  const cities = CITIES_BY_STATE[stateKey] || []
+  const cand = [po.District, po.Block, po.Division, po.Region, po.Name]
+    .map((x) => String(x || '').toLowerCase()).filter(Boolean)
+  const sorted = [...cities].sort((a, b) => b.length - a.length)
+  for (const k of sorted) {
+    const esc = k.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`\\b${esc}\\b`)
+    if (cand.some((c) => re.test(c))) return k
+  }
+  return po.District || po.Division || ''
+}
+
 export function Checkout() {
   const settings = useSettings()
   const { items, clearCart } = useCartStore()
@@ -152,7 +169,7 @@ export function Checkout() {
         if (rec?.Status === 'Success' && rec.PostOffice?.length) {
           const po = rec.PostOffice[0]
           const matched = INDIAN_STATES.find((s) => s.toLowerCase() === String(po.State || '').toLowerCase()) || po.State || ''
-          const city = po.District || po.Division || ''
+          const city = deriveCityFromPin(po, matched)
           // Authoritative: a PIN change re-fills state + city.
           setAddr((a) => ({ ...a, state: matched || a.state, city: city || a.city }))
           setPinStatus('ok')
