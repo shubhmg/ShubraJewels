@@ -42,6 +42,13 @@ const BY_STATE = {
 
 export const INDIAN_CITIES = [...new Set(Object.values(BY_STATE).flat())].sort((a, b) => a.localeCompare(b))
 
+// State-first address entry: pick a state, then the city field autocompletes to
+// just that state's cities.
+export const INDIAN_STATES = Object.keys(BY_STATE).sort((a, b) => a.localeCompare(b))
+export const CITIES_BY_STATE = Object.fromEntries(
+  Object.entries(BY_STATE).map(([state, cities]) => [state, [...new Set(cities)].sort((a, b) => a.localeCompare(b))])
+)
+
 export const CITY_STATE = Object.fromEntries(
   Object.entries(BY_STATE).flatMap(([state, cities]) => cities.map((c) => [c.toLowerCase(), state]))
 )

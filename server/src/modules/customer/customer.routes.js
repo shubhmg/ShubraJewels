@@ -97,6 +97,51 @@ router.patch(
   })
 );
 
+/* ── Address book ─────────────────────────────────────────────────── */
+const addressBody = Joi.object({
+  label: Joi.string().allow('').max(40),
+  name: Joi.string().allow('').max(120),
+  phone: Joi.string().allow('').max(20),
+  line1: Joi.string().allow('').max(200),
+  line2: Joi.string().allow('').max(200),
+  city: Joi.string().allow('').max(80),
+  state: Joi.string().allow('').max(80),
+  pincode: Joi.string().allow('').max(12),
+});
+
+// Add a saved address. De-dupes on line1+pincode+city so repeat checkouts with
+// the same address don't pile up duplicates.
+router.post(
+  '/addresses',
+  requireCustomer,
+  validate({ body: addressBody }),
+  asyncHandler(async (req, res) => {
+    const c = await Customer.findById(req.customer.id);
+    if (!c) throw ApiError.unauthorized('Account not found');
+    const norm = (v) => String(v || '').toLowerCase().trim();
+    const dupe = (c.addresses || []).find(
+      (a) => norm(a.line1) === norm(req.body.line1) && norm(a.pincode) === norm(req.body.pincode) && norm(a.city) === norm(req.body.city)
+    );
+    if (!dupe) {
+      c.addresses.push(req.body);
+      await c.save();
+    }
+    res.json({ success: true, data: c.toPublic() });
+  })
+);
+
+router.delete(
+  '/addresses/:addrId',
+  requireCustomer,
+  asyncHandler(async (req, res) => {
+    const c = await Customer.findById(req.customer.id);
+    if (!c) throw ApiError.unauthorized('Account not found');
+    c.addresses = (c.addresses || []).filter((a) => String(a._id) !== String(req.params.addrId));
+    await c.save();
+    res.json({ success: true, data: c.toPublic() });
+  })
+);
+
 /* ── Order history ────────────────────────────────────────────────── */
 router.get('/orders', requireCustomer, asyncHandler(async (req, res) => {
   const orders = await Order.find({ customerId: req.customer.id }).sort({ createdAt: -1 }).lean();

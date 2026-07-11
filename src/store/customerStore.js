@@ -50,6 +50,18 @@ export const useCustomerStore = create((set, get) => ({
     return customer
   },
 
+  async addAddress(addr) {
+    const customer = await api.post('/customer/addresses', addr, { custAuth: true })
+    set({ customer })
+    return customer
+  },
+
+  async deleteAddress(id) {
+    const customer = await api.del(`/customer/addresses/${id}`, { custAuth: true })
+    set({ customer })
+    return customer
+  },
+
   logout() {
     setCustomerToken('')
     set({ token: '', customer: null })
