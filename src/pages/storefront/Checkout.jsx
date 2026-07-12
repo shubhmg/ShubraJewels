@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, AlertCircle, QrCode, Copy, Smartphone, Clock } from 'lucide-react'
+import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, AlertCircle, QrCode, Copy, Smartphone, Clock, Camera } from 'lucide-react'
 import { buildUpiUri, upiQrDataUrl } from '../../lib/upi.js'
 import { useCartStore } from '../../store/cartStore.js'
 import { useCustomerStore } from '../../store/customerStore.js'
@@ -105,7 +105,6 @@ export function Checkout() {
   const [upiOrder, setUpiOrder] = useState(null) // created order awaiting payment
   const [upiUri, setUpiUri] = useState('')
   const [upiQr, setUpiQr] = useState('')
-  const [upiRef, setUpiRef] = useState('')
   const [upiErr, setUpiErr] = useState('')
   const [submittingProof, setSubmittingProof] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -355,22 +354,42 @@ export function Checkout() {
       await persistAddress()
       const uri = buildUpiUri({ vpa: upiCfg.vpa, payeeName: upiCfg.payeeName || settings.brandName, amount: order.total, note: order.orderNo })
       const qr = await upiQrDataUrl(uri)
-      setUpiOrder(order); setUpiUri(uri); setUpiQr(qr); setUpiRef(''); setUpiErr('')
+      setUpiOrder(order); setUpiUri(uri); setUpiQr(qr); setUpiErr('')
       clearCart()
     } catch (e) {
       setError(e.message || 'Could not start UPI payment.')
     } finally { setPlacing(false) }
   }
 
-  const submitUpiProof = async () => {
+  // Mark the order as payment-submitted (awaiting verification).
+  const markSubmitted = async () => {
     setSubmittingProof(true); setUpiErr('')
     try {
-      await api.patch(`/orders/${upiOrder._id}/upi-proof`, { upiRef: upiRef.trim() })
+      await api.patch(`/orders/${upiOrder._id}/upi-proof`, { upiRef: '' })
       setPlaced({ ...upiOrder, paymentStatus: 'submitted', _upi: true })
       setUpiOrder(null)
+      return true
     } catch (e) {
       setUpiErr(e.message || 'Could not submit. Please try again.')
+      return false
     } finally { setSubmittingProof(false) }
+  }
+
+  const upiWaMessage = () => [
+    `Hi! I've paid for my order ${upiOrder.orderNo} ✅`,
+    `Amount: ${fmt(upiOrder.total)}`,
+    `Name: ${contact.name.trim()}`,
+    contact.phone ? `Phone: ${contact.phone.replace(/\D/g, '')}` : '',
+    '',
+    'Attaching my payment screenshot 📎',
+  ].filter(Boolean).join('\n')
+
+  // Primary confirm: open WhatsApp with a ready message (customer attaches the
+  // screenshot) and mark the order submitted.
+  const confirmViaWhatsApp = () => {
+    const link = whatsappLink(settings, upiWaMessage())
+    if (link) window.open(link, '_blank')
+    markSubmitted()
   }
 
   const copyVpa = async () => {
@@ -499,40 +518,50 @@ export function Checkout() {
               </button>
             </div>
 
-            {/* Steps */}
-            <ol className="mt-6 space-y-2.5 text-sm text-stone-600">
-              {[
-                <>Pay <span className="font-semibold" style={{ color: 'var(--ink)' }}>exactly {fmt(upiOrder.total)}</span> using the QR or UPI ID above (order no. <span className="font-semibold" style={{ color: 'var(--ink)' }}>{upiOrder.orderNo}</span> is pre-filled in the note).</>,
-                <>Come back here and tap <span className="font-semibold" style={{ color: 'var(--ink)' }}>“I've paid”</span>. That's it — we'll verify and confirm.</>,
-              ].map((t, i) => (
-                <li key={i} className="flex gap-2.5">
-                  <span className="shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{i + 1}</span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ol>
+            {/* After paying — send the screenshot on WhatsApp (one tap) */}
+            {(() => {
+              const hasWa = !!whatsappLink(settings, 'x')
+              return (
+                <div className="mt-6 rounded-2xl p-4" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--gold) 35%, transparent)' }}>
+                  <p className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+                    <Camera size={16} style={{ color: 'var(--maroon)' }} /> Paid? Send us the screenshot
+                  </p>
+                  <p className="text-[13px] text-stone-600 mt-1.5 leading-relaxed">
+                    Take a screenshot of your payment, then tap below — WhatsApp opens with your order details ready. Just attach the screenshot and send.
+                  </p>
 
-            {/* Optional reference — speeds up verification but not required */}
-            <div className="mt-5">
-              <span className="text-xs font-medium text-stone-500">UPI Reference / UTR number <span className="text-stone-400 font-normal">(optional — speeds up confirmation)</span></span>
-              <input
-                {...noAutofill}
-                value={upiRef}
-                onChange={(e) => setUpiRef(e.target.value.replace(/[^\w]/g, ''))}
-                onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-                placeholder="e.g. 431287659021"
-                inputMode="numeric"
-                className={inputBase}
-                style={okBorder}
-              />
-              <p className="text-[11px] text-stone-400 mt-1">Optional — in your UPI app, open the payment's details / receipt to find it.</p>
-              {upiErr && <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5"><AlertCircle size={15} />{upiErr}</p>}
-            </div>
+                  {hasWa ? (
+                    <button
+                      onClick={confirmViaWhatsApp}
+                      disabled={submittingProof}
+                      className="btn-whatsapp w-full !py-3.5 text-base mt-3.5 flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      {submittingProof ? 'Opening…' : 'Send payment screenshot on WhatsApp'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={markSubmitted}
+                      disabled={submittingProof}
+                      className="btn-gold w-full !py-3.5 text-base mt-3.5 disabled:opacity-60"
+                    >
+                      {submittingProof ? 'Submitting…' : "I've paid"}
+                    </button>
+                  )}
 
-            <button onClick={submitUpiProof} disabled={submittingProof} className="btn-gold w-full !py-3.5 text-base mt-4 disabled:opacity-60">
-              {submittingProof ? 'Submitting…' : "I've paid"}
-            </button>
-            <p className="text-xs text-stone-400 text-center mt-3">Your order is saved. We'll verify the payment and confirm on WhatsApp.</p>
+                  {hasWa && (
+                    <button
+                      onClick={markSubmitted}
+                      disabled={submittingProof}
+                      className="w-full text-center text-xs text-stone-500 mt-3 underline underline-offset-2 disabled:opacity-60"
+                    >
+                      Paid but can't use WhatsApp? Tap here
+                    </button>
+                  )}
+                  {upiErr && <p className="text-sm text-red-600 mt-2.5 flex items-center gap-1.5 justify-center"><AlertCircle size={15} />{upiErr}</p>}
+                </div>
+              )
+            })()}
+            <p className="text-xs text-stone-400 text-center mt-4">Your order is saved. We'll verify the payment and confirm on WhatsApp.</p>
           </div>
         </div>
       </div>

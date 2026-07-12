@@ -233,7 +233,10 @@ export function AdminSettings() {
 
         {/* 4 — direct UPI */}
         <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mb-2">4 · Direct UPI (QR) — no gateway needed</p>
-        <p className="text-xs text-zinc-500 mb-3">Customer scans your QR / pays to your UPI ID, then submits the reference. You match it against your bank statement and mark the order paid in Orders.</p>
+        <p className="text-xs text-zinc-500 mb-3">Customer scans your QR / pays to your UPI ID, then sends the payment screenshot on WhatsApp. You match it against your bank statement and mark the order paid in Orders.</p>
+        <p className="text-xs mb-3 rounded-lg px-3 py-2" style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)', color: '#92600a' }}>
+          <b>Temporary flow.</b> This is a stopgap until your payment gateway is approved. When Razorpay is live: turn <b>this OFF</b> and enable <b>Online payment (§1)</b> — nothing else changes for customers.
+        </p>
         <div className="space-y-3">
           <Field field={{ label: 'Enable direct UPI payments', type: 'toggle' }} value={!!s.payments?.upi?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, enabled: v } } }))} />
           <div className="grid sm:grid-cols-2 gap-4">
