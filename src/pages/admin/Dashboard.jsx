@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, Users, ShoppingCart, IndianRupee, Loader2, Smartphone, Monitor, Tablet, Receipt, Percent, Clock, Rocket, AlertTriangle } from 'lucide-react'
+import { Eye, Users, ShoppingCart, IndianRupee, Loader2, Smartphone, Monitor, Tablet, Receipt, Percent, Clock, Rocket, AlertTriangle, Mail, CheckCircle, XCircle } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Modal } from '../../components/admin/AdminUI.jsx'
@@ -170,7 +170,71 @@ export function AdminDashboard() {
             <p className="text-stone-400 text-sm">No data yet.</p>
           )}
         </div>
+        </div>
       </div>
+      <div className="mt-6">
+        <TestEmailCard />
+      </div>
+    </div>
+  )
+}
+
+function TestEmailCard() {
+  const [to, setTo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null) // null | { ok, error }
+
+  const send = async () => {
+    if (!to.trim()) return
+    setBusy(true); setResult(null)
+    try {
+      const res = await api.post('/admin/test-email', { to: to.trim() }, { auth: true })
+      setResult({ ok: true })
+    } catch (e) {
+      setResult({ ok: false, error: e.message || 'Send failed' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-card">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-full grid place-items-center" style={{ background: 'color-mix(in srgb, var(--maroon) 10%, transparent)', color: 'var(--maroon)' }}>
+          <Mail size={15} />
+        </div>
+        <div>
+          <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>Test Order Email</p>
+          <p className="text-xs text-zinc-400">Send a sample confirmation email to verify SMTP</p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="email"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()}
+          placeholder="recipient@example.com"
+          className="flex-1 px-3 py-2 text-sm rounded-xl border border-zinc-200 outline-none focus:border-[var(--gold)] transition"
+        />
+        <button
+          onClick={send}
+          disabled={busy || !to.trim()}
+          className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 cursor-pointer"
+          style={{ background: 'var(--maroon)' }}
+        >
+          {busy ? <Loader2 size={15} className="animate-spin" /> : 'Send'}
+        </button>
+      </div>
+      {result && (
+        <div className={`mt-2.5 flex items-center gap-1.5 text-xs font-medium ${
+          result.ok ? 'text-emerald-600' : 'text-red-600'
+        }`}>
+          {result.ok
+            ? <><CheckCircle size={13} /> Email sent successfully! Check your inbox.</>  
+            : <><XCircle size={13} /> {result.error}</>}
+        </div>
+      )}
     </div>
   )
 }

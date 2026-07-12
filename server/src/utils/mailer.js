@@ -19,6 +19,9 @@ function getTransport() {
     port: Number(env.brevoSmtpPort) || 587,
     secure: false, // STARTTLS on 587
     auth: { user: env.brevoSmtpUser, pass: env.brevoSmtpPass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
   return _transport;
 }
@@ -303,9 +306,11 @@ function buildOrderConfirmationHtml(order, settings = {}) {
  * Best-effort — never throws. Returns { ok, error }.
  */
 export async function sendOrderConfirmation(order, settings = {}) {
+  console.log('[mailer] called for', order?.orderNo, '| email:', order?.customer?.email);
   if (!order.customer?.email) return { ok: false, error: 'no customer email' };
 
   const transport = getTransport();
+  console.log('[mailer] transport:', transport ? 'ok' : 'null — SMTP not configured');
   if (!transport) return { ok: false, error: 'SMTP not configured' };
 
   const storeName = settings.brandName || 'Shubra Jewels';
