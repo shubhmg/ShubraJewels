@@ -97,7 +97,9 @@ router.post(
     sendTelegram(settings, orderMessage(order), { photos: orderPhotos(order) }).catch(() => {});
 
     // Send order confirmation email to the customer (best-effort).
-    sendOrderConfirmation(order.toObject(), settings).catch(() => {});
+    sendOrderConfirmation(order.toObject(), settings)
+      .then((r) => { if (!r.ok) console.error('[mailer] order email failed:', r.error); })
+      .catch((e) => console.error('[mailer] unexpected error:', e.message));
 
     res.status(201).json({ success: true, data: order });
   })
