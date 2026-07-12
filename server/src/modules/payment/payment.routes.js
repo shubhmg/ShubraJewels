@@ -15,7 +15,7 @@ import { resolveCoupon } from '../coupon/coupon.service.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { nextOrderNo } from '../../utils/sequence.js';
-import { sendTelegram, orderMessage } from '../../utils/notify.js';
+import { sendTelegram, orderMessage, orderPhoto } from '../../utils/notify.js';
 
 const router = express.Router();
 const objectId = Joi.string().hex().length(24);
@@ -42,7 +42,7 @@ const customerSchema = Joi.object({
   email: Joi.string().email().allow('').default(''),
 });
 const addressSchema = Joi.object({
-  line1: Joi.string().allow('').max(200), line2: Joi.string().allow('').max(200),
+  line1: Joi.string().allow('').max(200), line2: Joi.string().allow('').max(200), landmark: Joi.string().allow('').max(120),
   city: Joi.string().allow('').max(80), state: Joi.string().allow('').max(80), pincode: Joi.string().allow('').max(12),
 });
 
@@ -108,7 +108,7 @@ async function finalizeIntent(intent, paymentId) {
   await intent.save();
 
   // Notify the owner of the new (paid) online order — best-effort.
-  getSettings().then((s) => sendTelegram(s, orderMessage(order))).catch(() => {});
+  getSettings().then((s) => sendTelegram(s, orderMessage(order), { photo: orderPhoto(order) })).catch(() => {});
 
   return order;
 }

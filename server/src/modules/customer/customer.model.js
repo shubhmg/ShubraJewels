@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const addressSchema = new mongoose.Schema(
-  { line1: String, line2: String, city: String, state: String, pincode: String },
+  { line1: String, line2: String, landmark: String, city: String, state: String, pincode: String },
   { _id: false }
 );
 
@@ -15,6 +15,7 @@ const savedAddressSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     line1: { type: String, default: '' },
     line2: { type: String, default: '' },
+    landmark: { type: String, default: '' },
     city: { type: String, default: '' },
     state: { type: String, default: '' },
     pincode: { type: String, default: '' },

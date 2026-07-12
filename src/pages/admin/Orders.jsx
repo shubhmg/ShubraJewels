@@ -181,7 +181,7 @@ export function AdminOrders() {
                         <a href={`tel:${o.customer?.phone}`} className="inline-flex items-center gap-1.5 mt-0.5" style={{ color: 'var(--maroon)' }}><Phone size={12} />{o.customer?.phone}</a>
                         {o.customer?.email && <p className="text-zinc-500">{o.customer.email}</p>}
                         {(o.address?.line1 || o.address?.city) && (
-                          <p className="text-zinc-500 mt-2">{[o.address.line1, o.address.line2, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</p>
+                          <p className="text-zinc-500 mt-2">{[o.address.line1, o.address.line2, o.address.landmark && `Near ${o.address.landmark}`, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</p>
                         )}
                         {o.notes && <p className="text-zinc-500 mt-2 italic">“{o.notes}”</p>}
                       </div>

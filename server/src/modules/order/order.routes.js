@@ -8,7 +8,7 @@ import { resolveCoupon } from '../coupon/coupon.service.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
-import { sendTelegram, orderMessage, paymentSubmittedMessage, verifyKeyboard } from '../../utils/notify.js';
+import { sendTelegram, orderMessage, paymentSubmittedMessage, verifyKeyboard, orderPhoto } from '../../utils/notify.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -37,6 +37,7 @@ router.post(
       address: Joi.object({
         line1: Joi.string().allow('').max(200),
         line2: Joi.string().allow('').max(200),
+        landmark: Joi.string().allow('').max(120),
         city: Joi.string().allow('').max(80),
         state: Joi.string().allow('').max(80),
         pincode: Joi.string().allow('').max(12),
@@ -99,7 +100,10 @@ router.post(
     // Ping the owner on Telegram (best-effort — never blocks the response).
     // UPI orders carry Mark-paid / Cancel buttons so payment can be confirmed
     // straight from the alert, even before the customer submits a screenshot.
-    sendTelegram(settings, orderMessage(order), order.paymentMethod === 'upi' ? { replyMarkup: verifyKeyboard(order._id) } : undefined).catch(() => {});
+    sendTelegram(settings, orderMessage(order), {
+      photo: orderPhoto(order),
+      ...(order.paymentMethod === 'upi' ? { replyMarkup: verifyKeyboard(order._id) } : {}),
+    }).catch(() => {});
 
     res.status(201).json({ success: true, data: order });
   })
@@ -130,7 +134,7 @@ router.patch(
 
     // Alert the owner that a UPI payment needs verification, with inline
     // Mark-paid / Cancel buttons.
-    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order), { replyMarkup: verifyKeyboard(order._id) })).catch(() => {});
+    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order), { photo: orderPhoto(order), replyMarkup: verifyKeyboard(order._id) })).catch(() => {});
 
     res.json({ success: true, data: { orderNo: order.orderNo, total: order.total, paymentStatus: order.paymentStatus } });
   })
@@ -249,7 +253,7 @@ router.post(
         email: Joi.string().email().allow('').default(''),
       }).required(),
       address: Joi.object({
-        line1: Joi.string().allow('').max(200), line2: Joi.string().allow('').max(200),
+        line1: Joi.string().allow('').max(200), line2: Joi.string().allow('').max(200), landmark: Joi.string().allow('').max(120),
         city: Joi.string().allow('').max(80), state: Joi.string().allow('').max(80), pincode: Joi.string().allow('').max(12),
       }).default({}),
       status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled').default('pending'),

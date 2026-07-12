@@ -86,7 +86,7 @@ router.patch(
       name: Joi.string().max(120),
       phone: Joi.string().max(20).allow(''),
       address: Joi.object({
-        line1: Joi.string().allow(''), line2: Joi.string().allow(''), city: Joi.string().allow(''),
+        line1: Joi.string().allow(''), line2: Joi.string().allow(''), landmark: Joi.string().allow(''), city: Joi.string().allow(''),
         state: Joi.string().allow(''), pincode: Joi.string().allow(''),
       }),
     }).min(1),
@@ -104,6 +104,7 @@ const addressBody = Joi.object({
   phone: Joi.string().allow('').max(20),
   line1: Joi.string().allow('').max(200),
   line2: Joi.string().allow('').max(200),
+  landmark: Joi.string().allow('').max(120),
   city: Joi.string().allow('').max(80),
   state: Joi.string().allow('').max(80),
   pincode: Joi.string().allow('').max(12),

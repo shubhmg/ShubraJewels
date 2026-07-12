@@ -15,7 +15,7 @@ import { Combobox } from '../../components/ui/Combobox.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 
-const EMPTY_ADDR = { line1: '', line2: '', city: '', state: '', pincode: '' }
+const EMPTY_ADDR = { line1: '', line2: '', landmark: '', city: '', state: '', pincode: '' }
 
 // Mirrors server computeShipping — tolerant city match + state fallback, so a
 // configured "Delhi" still matches a PIN-derived "North West Delhi".
@@ -35,7 +35,7 @@ function calcShipping(settings, addr, subtotal) {
 }
 
 function summarizeAddr(a) {
-  return [a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(', ')
+  return [a.line1, a.line2, a.landmark && `Near ${a.landmark}`, a.city, a.state, a.pincode].filter(Boolean).join(', ')
 }
 
 // Shipping + COD fee for the selected payment method — mirrors server computeCharges.
@@ -152,7 +152,7 @@ export function Checkout() {
   const usingSaved = addrMode === 'saved' && savedAddresses.length > 0
   const chosen = usingSaved ? savedAddresses.find((a) => String(a._id) === String(selectedAddrId)) : null
   const effAddr = chosen
-    ? { line1: chosen.line1 || '', line2: chosen.line2 || '', city: chosen.city || '', state: chosen.state || '', pincode: chosen.pincode || '' }
+    ? { line1: chosen.line1 || '', line2: chosen.line2 || '', landmark: chosen.landmark || '', city: chosen.city || '', state: chosen.state || '', pincode: chosen.pincode || '' }
     : addr
 
   const { shipping, codFee } = calcCharges(settings, effAddr, subtotal, choice)
@@ -671,7 +671,8 @@ export function Checkout() {
               {showAddrForm && (
                 <div className="space-y-4">
                   <Field label="Street Address" required value={addr.line1} onChange={(v) => setA('line1', v)} onBlur={() => markTouched('line1')} placeholder="House no., building, street" error={showErr('line1')} />
-                  <Field label="Landmark / Area (optional)" value={addr.line2} onChange={(v) => setA('line2', v)} placeholder="Landmark, locality" />
+                  <Field label="Area / Locality (optional)" value={addr.line2} onChange={(v) => setA('line2', v)} placeholder="Colony, sector, locality" />
+                  <Field label="Landmark (optional)" value={addr.landmark} onChange={(v) => setA('landmark', v)} placeholder="Near bus stand, opposite temple…" />
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <Field label="PIN Code" required type="tel" inputMode="numeric" maxLength={6} value={addr.pincode} onChange={(v) => setA('pincode', v.replace(/\D/g, ''))} onBlur={() => markTouched('pincode')} placeholder="6-digit PIN" error={showErr('pincode')} />

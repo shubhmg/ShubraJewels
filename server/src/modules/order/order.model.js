@@ -24,6 +24,7 @@ const orderSchema = new mongoose.Schema(
     address: {
       line1: { type: String, default: '' },
       line2: { type: String, default: '' },
+      landmark: { type: String, default: '' },
       city: { type: String, default: '' },
       state: { type: String, default: '' },
       pincode: { type: String, default: '' },
