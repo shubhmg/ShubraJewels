@@ -170,7 +170,6 @@ export function AdminDashboard() {
             <p className="text-stone-400 text-sm">No data yet.</p>
           )}
         </div>
-        </div>
       </div>
       <div className="mt-6">
         <TestEmailCard />
