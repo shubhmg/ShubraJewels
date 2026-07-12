@@ -204,12 +204,13 @@
   .btn-gold:hover { transform: translateY(-1px); filter: brightness(1.04); }
 
   .btn-whatsapp {
-    background: #25D366;
-    color: #06351b;
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    color: #ffffff;
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold transition-all duration-200 cursor-pointer;
-    box-shadow: 0 6px 20px -6px rgba(37,211,102,0.6);
+    box-shadow: 0 8px 22px -8px rgba(18,140,126,0.7), inset 0 1px 0 rgba(255,255,255,0.18);
   }
-  .btn-whatsapp:hover { background: #1fbe5a; transform: translateY(-1px); }
+  .btn-whatsapp:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 12px 26px -8px rgba(18,140,126,0.75), inset 0 1px 0 rgba(255,255,255,0.22); }
+  .btn-whatsapp:active { transform: translateY(0); filter: brightness(0.98); }
 
   .btn-outline-gold {
     border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent);
