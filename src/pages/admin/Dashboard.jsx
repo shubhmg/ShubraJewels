@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Eye, Users, ShoppingCart, IndianRupee, Loader2, Smartphone, Monitor, Tablet, Receipt, Percent, Clock } from 'lucide-react'
+import { Eye, Users, ShoppingCart, IndianRupee, Loader2, Smartphone, Monitor, Tablet, Receipt, Percent, Clock, Rocket, AlertTriangle } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { api } from '../../lib/api.js'
-import { AdminHeader } from '../../components/admin/AdminUI.jsx'
+import { AdminHeader, Btn, Modal } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
@@ -47,10 +47,10 @@ function Spark({ data, dataKey, color }) {
 export function AdminDashboard() {
   const [data, setData] = useState(null)
   const [days, setDays] = useState(30)
+  const [goLive, setGoLive] = useState(false)
 
-  useEffect(() => {
-    api.get(`/analytics/summary?days=${days}`, { auth: true }).then(setData)
-  }, [days])
+  const load = () => api.get(`/analytics/summary?days=${days}`, { auth: true }).then(setData)
+  useEffect(() => { load() }, [days]) // eslint-disable-line
 
   if (!data) return <div className="flex justify-center py-20"><Loader2 className="animate-spin" style={{ color: 'var(--gold)' }} /></div>
 
@@ -74,12 +74,14 @@ export function AdminDashboard() {
   return (
     <div>
       <AdminHeader title="Dashboard" subtitle={`Last ${days} days · ${nf(data.todayViews)} views today`}>
+        <Btn variant="outline" onClick={() => setGoLive(true)}><Rocket size={15} /> Go Live</Btn>
         <Dropdown
           value={days}
           onChange={setDays}
           options={[7, 30, 90, 365].map((d) => ({ value: d, label: `Last ${d} days` }))}
         />
       </AdminHeader>
+      {goLive && <GoLiveModal onClose={() => setGoLive(false)} onDone={load} />}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
@@ -170,5 +172,52 @@ export function AdminDashboard() {
         </div>
       </div>
     </div>
+  )
+}
+
+// One-time launch reset: wipes test visits + orders (+ payment intents) for a
+// clean slate, keeping all configured data (products, settings, content…).
+function GoLiveModal({ onClose, onDone }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [done, setDone] = useState(null)
+  const armed = text.trim().toUpperCase() === 'GO LIVE'
+
+  const run = async () => {
+    if (!armed) return
+    setBusy(true); setErr('')
+    try {
+      const res = await api.post('/analytics/go-live', { confirm: 'GO_LIVE' }, { auth: true })
+      setDone(res)
+      onDone?.()
+    } catch (e) { setErr(e.message || 'Could not reset'); setBusy(false) }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Go Live — clean slate" footer={done ? (
+      <Btn onClick={onClose}>Done</Btn>
+    ) : (<>
+      <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      <Btn variant="danger" onClick={run} disabled={!armed || busy}>{busy ? 'Resetting…' : 'Reset & Go Live'}</Btn>
+    </>)}>
+      {done ? (
+        <div className="text-sm text-zinc-700 space-y-1">
+          <p className="font-semibold text-emerald-600">You're live! 🚀</p>
+          <p>Cleared {done.orders} order(s), {done.visits} visit(s), {done.intents} payment session(s).</p>
+          <p>Restored stock for {done.stockRestored} order(s). Products, settings and content are untouched.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex gap-2.5 rounded-xl p-3" style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)' }}>
+            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-zinc-700">This permanently deletes <b>all orders</b> and <b>all analytics</b> (page views, visitors) so you launch with real numbers. It <b>keeps</b> your products, settings, content, categories, collections, coupons and customers. Stock reserved by test orders is restored.</p>
+          </div>
+          <label className="block text-sm text-zinc-600">Type <b>GO LIVE</b> to confirm:</label>
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="GO LIVE" className="w-full px-3 py-2 rounded-xl border border-zinc-300 outline-none focus:border-[var(--gold)]" />
+          {err && <p className="text-sm text-red-600">{err}</p>}
+        </div>
+      )}
+    </Modal>
   )
 }

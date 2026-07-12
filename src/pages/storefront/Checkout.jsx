@@ -142,7 +142,7 @@ export function Checkout() {
   const discount = coupon?.discount || 0
   const total = Math.max(0, subtotal + shipping + codFee - discount)
 
-  // Optional COD advance (paid via WhatsApp to confirm the order)
+  // Optional COD advance (paid online via Razorpay to confirm the order)
   const advCfg = settings.payments?.codAdvance || {}
   const advanceActive = choice === 'cod' && !!advCfg.enabled && Number(advCfg.percent) > 0
   const advancePercent = Number(advCfg.percent) || 0
@@ -659,9 +659,9 @@ export function Checkout() {
             )}
             <div className="h-px" style={{ background: 'color-mix(in srgb, var(--gold) 30%, transparent)' }} />
             <div className="flex justify-between font-semibold text-lg" style={{ color: 'var(--maroon)' }}><span>Total</span><span>{fmt(total)}</span></div>
-            {advanceActive && (
+            {codAdvanceOnline && (
               <p className="text-xs mt-1 rounded-lg px-3 py-2" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)', color: 'var(--maroon-dark)' }}>
-                Pay {advancePercent}% advance ({fmt(advanceAmount)}) on WhatsApp to confirm · {fmt(total - advanceAmount)} on delivery.
+                Pay {advancePercent}% advance ({fmt(advanceAmount)}) online now to confirm · {fmt(total - advanceAmount)} on delivery.
               </p>
             )}
           </aside>

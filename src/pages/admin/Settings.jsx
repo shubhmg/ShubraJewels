@@ -221,8 +221,8 @@ export function AdminSettings() {
           <p className="mt-1.5 font-mono text-[13px] text-zinc-700">Items − Discount + Shipping + COD fee</p>
           <ul className="mt-2 space-y-1 text-[13px] text-zinc-600 list-disc pl-5">
             <li><b>Shipping</b> = the base rule in §2 (per-city, or free above a value).</li>
-            <li>Paying now (UPI/online) can <b>waive shipping</b> if you enable that reward in §3.</li>
-            <li><b>COD</b> pays the base shipping <b>plus</b> the COD fee, and can require a small advance on WhatsApp.</li>
+            <li>Paying online can <b>waive shipping</b> if you enable that reward in §3.</li>
+            <li><b>COD</b> pays the base shipping <b>plus</b> the COD fee, and can require a small advance paid online.</li>
           </ul>
         </div>
 

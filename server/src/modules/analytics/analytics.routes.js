@@ -3,13 +3,21 @@ import Joi from 'joi';
 import Visit from './visit.model.js';
 import Order from '../order/order.model.js';
 import Product from '../product/product.model.js';
+import PaymentIntent from '../payment/paymentIntent.model.js';
+import { applyOrderStock } from '../order/orderStock.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 
 const router = express.Router();
 
-const dayStr = (d) => new Date(d).toISOString().slice(0, 10);
+// Group by IST calendar day so "today" and the daily series align to the
+// store's local midnight (not UTC, which rolls over at 5:30am IST).
+const IST_MS = 5.5 * 60 * 60 * 1000;
+const dayStr = (d) => new Date(new Date(d).getTime() + IST_MS).toISOString().slice(0, 10);
+
+// Bots/crawlers/monitors that shouldn't count as real visitors.
+const BOT_RE = /bot|crawl|spider|slurp|facebookexternalhit|bingpreview|whatsapp|telegram|preview|monitor|uptime|pingdom|curl|wget|python-requests|axios|node-fetch|headless|lighthouse|phantom|puppeteer/i;
 
 const PAGE_LABELS = {
   '/': 'Home',
@@ -51,15 +59,40 @@ router.post(
     }),
   }),
   asyncHandler(async (req, res) => {
+    const ua = (req.headers['user-agent'] || '').slice(0, 300);
+    // Skip bots/crawlers/monitors so they don't inflate views & visitors.
+    if (BOT_RE.test(ua)) return res.json({ success: true, data: { skipped: true } });
     await Visit.create({
       path: req.body.path || '/',
       sessionId: req.body.sessionId || '',
       referrer: req.body.referrer || '',
       device: req.body.device || '',
-      ua: (req.headers['user-agent'] || '').slice(0, 300),
+      ua,
       day: dayStr(Date.now()),
     });
     res.json({ success: true });
+  })
+);
+
+// ADMIN — GO LIVE: wipe all test data (visits, orders, payment intents) for a
+// clean launch. Keeps everything configured (products, settings, content,
+// categories, collections, coupons, customers). Restores product stock that
+// test orders had reserved so inventory returns to what was configured.
+router.post(
+  '/go-live',
+  requireAdmin,
+  validate({ body: Joi.object({ confirm: Joi.string().valid('GO_LIVE').required() }) }),
+  asyncHandler(async (_req, res) => {
+    // Give back stock held by any live order before deleting.
+    const held = await Order.find({ stockApplied: true });
+    for (const o of held) await applyOrderStock(o, +1);
+
+    const [v, o, pi] = await Promise.all([
+      Visit.deleteMany({}),
+      Order.deleteMany({}),
+      PaymentIntent.deleteMany({}),
+    ]);
+    res.json({ success: true, data: { visits: v.deletedCount, orders: o.deletedCount, intents: pi.deletedCount, stockRestored: held.length } });
   })
 );
 
