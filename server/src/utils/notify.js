@@ -103,37 +103,6 @@ export async function sendTelegram(settings, text, { replyMarkup, photo, photos 
   return { ok: anyOk, error: anyOk ? null : lastError };
 }
 
-// Inline keyboard shown under the "payment submitted" alert so the owner can
-// confirm/cancel from Telegram. callback_data is compact: "pay:<id>".
-export function verifyKeyboard(orderId) {
-  return {
-    inline_keyboard: [[
-      { text: '✅ Mark paid', callback_data: `pay:${orderId}` },
-      { text: '✖ Cancel order', callback_data: `cancel:${orderId}` },
-    ]],
-  };
-}
-
-// Register/refresh the bot webhook so button taps reach us. `secret` is echoed
-// back by Telegram in the X-Telegram-Bot-Api-Secret-Token header for verification.
-export async function setTelegramWebhook(token, url, secret) {
-  return tgApi(token, 'setWebhook', {
-    url,
-    secret_token: secret,
-    allowed_updates: ['callback_query'],
-  });
-}
-
-export async function deleteTelegramWebhook(token) {
-  return tgApi(token, 'deleteWebhook', {});
-}
-
-// Diagnostics: what does Telegram think our webhook is? Surfaces the last
-// delivery error so button-tap failures are debuggable from the admin panel.
-export async function getWebhookInfo(token) {
-  return tgApi(token, 'getWebhookInfo', {});
-}
-
 const PAYMENT_LABEL = {
   none: 'Not set', razorpay: 'Online', cod: 'COD', whatsapp: 'WhatsApp', cash: 'Cash', upi: 'UPI', bank: 'Bank',
 };
@@ -173,14 +142,3 @@ export function orderMessage(order) {
   ].filter(Boolean).join('\n');
 }
 
-// Compose the "UPI payment submitted — verify" message.
-export function paymentSubmittedMessage(order) {
-  return [
-    `💰 <b>Payment Submitted</b>   <code>${esc(order.orderNo)}</code>`,
-    `━━━━━━━━━━━━━━`,
-    `<b>${fmt(order.total)}</b> paid via UPI.`,
-    `Verify against your bank, then tap ✅ Mark paid.`,
-    order.upiRef ? `\n🔖 Ref: <code>${esc(order.upiRef)}</code>` : '',
-    `\n👤 <b>${esc(order.customer?.name)}</b> · 📞 ${esc(order.customer?.phone)}`,
-  ].filter(Boolean).join('\n');
-}

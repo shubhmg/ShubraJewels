@@ -90,13 +90,8 @@ export function AdminSettings() {
     setTgTest({ loading: true })
     try {
       await api.patch('/settings', { notifications: s.notifications }, { auth: true }) // save first so the test uses current values
-      const data = await api.post('/settings/test-telegram', {}, { auth: true })
-      const w = data?.webhook || {}
-      let msg = 'Sent! Check your Telegram. '
-      if (w.registered && !w.lastError) msg += 'Buttons are active ✓'
-      else if (w.registered && w.lastError) msg += `Buttons registered but Telegram reports: "${w.lastError}"`
-      else msg += `Buttons NOT registered${w.registerError ? ` — ${w.registerError}` : ''}.`
-      setTgTest({ ok: true, warn: !w.registered || !!w.lastError, msg })
+      await api.post('/settings/test-telegram', {}, { auth: true })
+      setTgTest({ ok: true, msg: 'Sent! Check your Telegram.' })
     } catch (e) {
       setTgTest({ ok: false, msg: e.message || 'Could not send.' })
     }
@@ -109,8 +104,9 @@ export function AdminSettings() {
   const save = async () => {
     setSaving(true)
     try {
-      // Coerce shipping fields (which may be '' while typing) to numbers.
+      // Coerce numeric fields (which may be '' while typing) to numbers.
       const sh = s.shipping || {}
+      const pay = s.payments || {}
       const payload = {
         ...s,
         shipping: {
@@ -118,6 +114,11 @@ export function AdminSettings() {
           defaultCharge: Number(sh.defaultCharge) || 0,
           freeAboveSubtotal: Number(sh.freeAboveSubtotal) || 0,
           cities: (sh.cities || []).filter((c) => c.name?.trim()).map((c) => ({ name: c.name.trim(), charge: Number(c.charge) || 0 })),
+        },
+        payments: {
+          ...pay,
+          codFee: Number(pay.codFee) || 0,
+          codAdvance: { ...(pay.codAdvance || {}), percent: Number(pay.codAdvance?.percent) || 0 },
         },
       }
       await api.patch('/settings', payload, { auth: true })
@@ -230,7 +231,6 @@ export function AdminSettings() {
         <div className="space-y-1 mb-7">
           <Field field={{ label: 'Pay online (Razorpay — UPI, cards, netbanking)', type: 'toggle' }} value={s.payments?.razorpay !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, razorpay: v } }))} />
           <Field field={{ label: 'Cash on Delivery (COD)', type: 'toggle' }} value={s.payments?.cod !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, cod: v } }))} />
-          <p className="text-xs text-zinc-400 pt-1">WhatsApp ordering is always available. Direct UPI is set up in §4 below.</p>
         </div>
 
         {/* 2 — base shipping */}
@@ -243,41 +243,19 @@ export function AdminSettings() {
         <p className="text-xs text-zinc-500 mb-3">Layered on top of shipping to cut fake COD orders and reward paying now. All optional — leave at 0 / off to ignore.</p>
         <div className="space-y-4 mb-7">
           <Field field={{ label: 'COD fee (₹)', type: 'number', help: 'Added ONLY to Cash-on-Delivery orders, on top of the base shipping above. 0 = no fee.' }} value={s.payments?.codFee || 0} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codFee: v === '' ? 0 : Number(v) } }))} />
-          <Field field={{ label: 'Free shipping when paying now (UPI / online)', type: 'toggle', help: 'When on, prepaid orders pay ₹0 shipping (COD still pays the base shipping). Makes prepaying cheaper than COD.' }} value={!!s.payments?.prepaidFreeShipping} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, prepaidFreeShipping: v } }))} />
+          <Field field={{ label: 'Free shipping when paying online', type: 'toggle', help: 'When on, prepaid (online) orders pay ₹0 shipping (COD still pays the base shipping). Makes prepaying cheaper than COD.' }} value={!!s.payments?.prepaidFreeShipping} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, prepaidFreeShipping: v } }))} />
           <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
-            <Field field={{ label: 'Require an advance on COD (via WhatsApp)', type: 'toggle', help: 'Ask the customer to pay a small % of the total upfront on WhatsApp to confirm a COD order — cuts fake orders / returns. This is NOT an extra charge; it is part of the total, paid early.' }} value={!!s.payments?.codAdvance?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, enabled: v } } }))} />
+            <Field field={{ label: 'Require an advance on COD', type: 'toggle', help: 'Ask the customer to pay a small % of the total online (Razorpay) to confirm a COD order — cuts fake orders / returns. This is NOT an extra charge; it is part of the total, paid early. The balance is collected on delivery.' }} value={!!s.payments?.codAdvance?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, enabled: v } } }))} />
             {s.payments?.codAdvance?.enabled && (
-              <Field field={{ label: 'Advance percent (%)', type: 'number', help: '% of the order total paid upfront on WhatsApp. The rest is collected on delivery.' }} value={s.payments?.codAdvance?.percent ?? 5} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, percent: v === '' ? 0 : Number(v) } } }))} />
+              <Field field={{ label: 'Advance percent (%)', type: 'number', placeholder: '5', help: '% of the order total paid upfront online. The rest is collected on delivery.' }} value={s.payments?.codAdvance?.percent ?? ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, percent: v === '' ? '' : Number(v) } } }))} />
             )}
-          </div>
-        </div>
-
-        {/* 4 — direct UPI */}
-        <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mb-2">4 · Direct UPI (QR) — no gateway needed</p>
-        <p className="text-xs text-zinc-500 mb-3">Customer scans your QR / pays to your UPI ID, then sends the payment screenshot on WhatsApp. You match it against your bank statement and mark the order paid in Orders.</p>
-        <p className="text-xs mb-3 rounded-lg px-3 py-2" style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)', color: '#92600a' }}>
-          <b>Temporary flow.</b> This is a stopgap until your payment gateway is approved. When Razorpay is live: turn <b>this OFF</b> and enable <b>Online payment (§1)</b> — nothing else changes for customers.
-        </p>
-        <div className="space-y-3">
-          <Field field={{ label: 'Enable direct UPI payments', type: 'toggle' }} value={!!s.payments?.upi?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, enabled: v } } }))} />
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Field field={{ label: 'Your UPI ID (VPA)', placeholder: 'name@okaxis', help: 'Where customers send money' }} value={s.payments?.upi?.vpa || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, vpa: v.trim() } } }))} />
-            <Field field={{ label: 'Payee name', placeholder: 'Shubra Jewels', help: 'Shown in the customer’s UPI app' }} value={s.payments?.upi?.payeeName || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, payeeName: v } } }))} />
-          </div>
-          <p className="text-xs text-zinc-400">Tip: use a UPI ID you can monitor. The order number rides along in the payment note so you can match it easily.</p>
-          <div className="pt-1">
-            <Field
-              field={{ label: 'Auto-remove unpaid UPI orders after (minutes)', type: 'number', placeholder: '0', help: 'Abandoned UPI orders that are never paid are permanently deleted after this many minutes. 0 = keep forever. Paid or screenshot-submitted orders are never touched. Suggested: 1440 (24h).' }}
-              value={s.payments?.upiExpiryMinutes ?? 0}
-              onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upiExpiryMinutes: Number(v) || 0 } }))}
-            />
           </div>
         </div>
       </Section>
       )}
 
       {tab === 'notifications' && (
-      <Section title="Order Notifications" subtitle="Get an instant Telegram alert on your phone the moment an order comes in — and when a UPI payment needs verifying.">
+      <Section title="Order Notifications" subtitle="Get an instant Telegram alert on your phone the moment an order comes in.">
         <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
           <p className="font-semibold mb-1.5">One-time setup (2 minutes):</p>
           <ol className="list-decimal ml-5 space-y-1 text-zinc-600">
@@ -303,9 +281,6 @@ export function AdminSettings() {
             )}
           </div>
           <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>
-          <div className="rounded-xl p-3.5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, #16a34a 8%, transparent)', color: 'var(--ink)' }}>
-            <b>UPI verify buttons:</b> when a customer submits a UPI payment, the alert comes with <b>✅ Mark paid</b> and <b>✖ Cancel order</b> buttons — tap right inside Telegram to update the order, no need to open the admin panel.
-          </div>
         </div>
       </Section>
       )}

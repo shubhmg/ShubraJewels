@@ -43,10 +43,10 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'],
       default: 'confirmed',
     },
-    // Shipment tracking — filled by the owner when marking the order Shipped.
+    // Shipment tracking — a single free-text message the owner pastes when
+    // marking the order Shipped (the delivery partner's note with tracking id +
+    // link). Shown as-is to the customer.
     tracking: {
-      courier: { type: String, default: '' },
-      url: { type: String, default: '' },
       message: { type: String, default: '' },
       shippedAt: { type: Date, default: null },
     },

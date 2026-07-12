@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, LogOut, Package, Star, X, Check, Truck, ExternalLink } from 'lucide-react'
+import { Loader2, LogOut, Package, Star, X, Check, Truck } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { useCustomerStore } from '../../store/customerStore.js'
 import { AuthModal } from '../../components/auth/AuthModal.jsx'
@@ -138,17 +138,12 @@ export function Account() {
 
                   {/* Progress + tracking */}
                   <OrderProgress status={o.status} />
-                  {(o.status === 'shipped' || o.status === 'delivered') && (o.tracking?.message || o.tracking?.url || o.tracking?.courier) && (
+                  {(o.status === 'shipped' || o.status === 'delivered') && o.tracking?.message && (
                     <div className="mt-3 rounded-xl p-3" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)' }}>
                       <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--ink)' }}>
-                        <Truck size={15} style={{ color: 'var(--maroon)' }} /> Shipment {o.tracking?.courier ? `· ${o.tracking.courier}` : ''}
+                        <Truck size={15} style={{ color: 'var(--maroon)' }} /> Shipment tracking
                       </p>
-                      {o.tracking?.message && <p className="text-[13px] text-stone-600 mt-1">{o.tracking.message}</p>}
-                      {o.tracking?.url && (
-                        <a href={o.tracking.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-sm font-semibold" style={{ color: 'var(--maroon)' }}>
-                          Track shipment <ExternalLink size={13} />
-                        </a>
-                      )}
+                      <p className="text-[13px] text-stone-600 mt-1 whitespace-pre-wrap break-words">{o.tracking.message}</p>
                     </div>
                   )}
                   {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (

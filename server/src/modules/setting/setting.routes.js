@@ -1,32 +1,10 @@
 import express from 'express';
-import crypto from 'crypto';
 import requireAdmin from '../../middleware/auth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
-import env from '../../config/env.js';
 import { getSettings } from './setting.model.js';
-import { sendTelegram, setTelegramWebhook, deleteTelegramWebhook, getWebhookInfo } from '../../utils/notify.js';
+import { sendTelegram } from '../../utils/notify.js';
 
 const router = express.Router();
-
-// Public base URL for the Telegram webhook (Cloudflare/nginx → this server).
-const publicBase = () => (env.publicUrl || 'https://shubrajewels.shop').replace(/\/$/, '');
-
-// Register (or tear down) the bot webhook so inline button taps reach us.
-// Ensures a webhook secret exists. Best-effort; mutates + saves the doc.
-async function syncTelegramWebhook(doc) {
-  const tg = doc.notifications?.telegram;
-  if (!tg) return null;
-  if (tg.enabled && tg.botToken) {
-    if (!tg.webhookSecret) {
-      tg.webhookSecret = crypto.randomBytes(16).toString('hex');
-      doc.markModified('notifications');
-      await doc.save();
-    }
-    return setTelegramWebhook(tg.botToken, `${publicBase()}/api/telegram/webhook`, tg.webhookSecret);
-  }
-  if (tg.botToken) return deleteTelegramWebhook(tg.botToken);
-  return null;
-}
 
 // Public: current settings. SECRETS (notifications.telegram — the bot token)
 // are stripped so they never reach the storefront.
@@ -87,8 +65,6 @@ router.patch(
       doc.markModified('homepage');
     }
     await doc.save();
-    // Keep the Telegram webhook in sync whenever notification config changes.
-    if (notifications && typeof notifications === 'object') await syncTelegramWebhook(doc).catch(() => {});
     const obj = doc.toObject();
     delete obj.notifications;
     res.json({ success: true, data: obj });
@@ -101,22 +77,9 @@ router.post(
   requireAdmin,
   asyncHandler(async (_req, res) => {
     const doc = await getSettings();
-    const reg = await syncTelegramWebhook(doc).catch((e) => ({ ok: false, description: e.message }));
-    const r = await sendTelegram(doc, '✅ Test alert from Shubra Jewels — order notifications are working. Payment-verify buttons are active.');
-
-    // Report the webhook state so button failures are diagnosable in the UI.
-    const info = await getWebhookInfo(doc.notifications?.telegram?.botToken).catch(() => null);
-    const w = info?.result || {};
-    const webhook = {
-      registered: !!w.url,
-      url: w.url || '',
-      lastError: w.last_error_message || '',
-      pending: w.pending_update_count || 0,
-      registerError: reg && reg.ok === false ? reg.description : '',
-    };
-
-    if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Could not send. Check the token and chat id.', data: { webhook } });
-    res.json({ success: true, data: { sent: true, webhook } });
+    const r = await sendTelegram(doc, '✅ Test alert from Shubra Jewels — order notifications are working.');
+    if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Could not send. Check the token and chat id.' });
+    res.json({ success: true, data: { sent: true } });
   })
 );
 

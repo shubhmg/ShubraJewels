@@ -1,14 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, AlertCircle, QrCode, Copy, Smartphone, Clock, Camera } from 'lucide-react'
-import { buildUpiUri, upiQrDataUrl } from '../../lib/upi.js'
+import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, AlertCircle, QrCode, Smartphone } from 'lucide-react'
 import { useCartStore } from '../../store/cartStore.js'
 import { useCustomerStore } from '../../store/customerStore.js'
 import { AuthModal } from '../../components/auth/AuthModal.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { api } from '../../lib/api.js'
 import { loadRazorpay } from '../../lib/razorpay.js'
-import { useSettings, whatsappLink } from '../../lib/SettingsProvider.jsx'
+import { useSettings } from '../../lib/SettingsProvider.jsx'
 import { INDIAN_STATES, CITIES_BY_STATE } from '../../data/indianCities.js'
 import { Combobox } from '../../components/ui/Combobox.jsx'
 
@@ -100,40 +99,25 @@ export function Checkout() {
   const [couponErr, setCouponErr] = useState('')
   const [applyingCoupon, setApplyingCoupon] = useState(false)
 
-  // Direct-UPI flow
-  const [upiOrder, setUpiOrder] = useState(null) // created order awaiting payment
-  const [upiUri, setUpiUri] = useState('')
-  const [upiQr, setUpiQr] = useState('')
-  const [upiErr, setUpiErr] = useState('')
-  const [submittingProof, setSubmittingProof] = useState(false)
-  const [copied, setCopied] = useState(false)
-
   const signedIn = isAuthed()
-  const upiCfg = settings.payments?.upi || {}
-  const upiEnabled = !!(upiCfg.enabled && upiCfg.vpa)
   const codEnabled = settings.payments?.cod !== false
   const razorpayEnabled = settings.payments?.razorpay !== false
 
-  // Which flow backs the single "Pay online" tile. The direct-UPI stopgap wins
-  // while it's on; once the gateway is live the admin turns UPI off and Razorpay
-  // takes over — the customer always sees just one "Pay online" option.
-  const onlineMode = upiEnabled ? 'upi' : (razorpayEnabled ? 'razorpay' : null)
-
   // Available payment methods, in display order (prepaid first). Website-only —
-  // no WhatsApp ordering.
+  // pay online (Razorpay) or Cash on Delivery.
   const methods = useMemo(() => {
     const m = []
-    if (onlineMode) m.push('online')
+    if (razorpayEnabled) m.push('online')
     if (codEnabled) m.push('cod')
     return m
-  }, [onlineMode, codEnabled])
+  }, [razorpayEnabled, codEnabled])
 
   const [paymentChoice, setPaymentChoice] = useState(null)
   useEffect(() => { if (!paymentChoice && methods.length) setPaymentChoice(methods[0]) }, [methods]) // eslint-disable-line
 
-  // Switching into the UPI payment / success screens must start at the top —
-  // otherwise the page keeps the checkout's scroll position (lands on the footer).
-  useEffect(() => { if (upiOrder || placed) window.scrollTo({ top: 0, behavior: 'auto' }) }, [upiOrder, placed])
+  // The success screen must start at the top — otherwise the page keeps the
+  // checkout's scroll position (lands on the footer).
+  useEffect(() => { if (placed) window.scrollTo({ top: 0, behavior: 'auto' }) }, [placed])
   const choice = paymentChoice || methods[0]
 
   // Saved addresses (address book). Fall back to the legacy single address.
@@ -350,57 +334,6 @@ export function Checkout() {
     }
   }
 
-  // Direct UPI: create the (unpaid) order, then show the QR + reference form.
-  const payUpi = async () => {
-    if (!gate()) return
-    setPlacing(true)
-    try {
-      const order = await api.post('/orders', { ...buildPayload('web'), paymentMethod: 'upi' }, { custAuth: true })
-      await persistAddress()
-      const uri = buildUpiUri({ vpa: upiCfg.vpa, payeeName: upiCfg.payeeName || settings.brandName, amount: order.total, note: order.orderNo })
-      const qr = await upiQrDataUrl(uri)
-      setUpiOrder(order); setUpiUri(uri); setUpiQr(qr); setUpiErr('')
-      clearCart()
-    } catch (e) {
-      setError(e.message || 'Could not start UPI payment.')
-    } finally { setPlacing(false) }
-  }
-
-  // Mark the order as payment-submitted (awaiting verification).
-  const markSubmitted = async () => {
-    setSubmittingProof(true); setUpiErr('')
-    try {
-      await api.patch(`/orders/${upiOrder._id}/upi-proof`, { upiRef: '' })
-      setPlaced({ ...upiOrder, paymentStatus: 'submitted', _upi: true })
-      setUpiOrder(null)
-      return true
-    } catch (e) {
-      setUpiErr(e.message || 'Could not submit. Please try again.')
-      return false
-    } finally { setSubmittingProof(false) }
-  }
-
-  const upiWaMessage = () => [
-    `Hi! I've paid for my order ${upiOrder.orderNo} ✅`,
-    `Amount: ${fmt(upiOrder.total)}`,
-    `Name: ${contact.name.trim()}`,
-    contact.phone ? `Phone: ${contact.phone.replace(/\D/g, '')}` : '',
-    '',
-    'Attaching my payment screenshot 📎',
-  ].filter(Boolean).join('\n')
-
-  // Primary confirm: open WhatsApp with a ready message (customer attaches the
-  // screenshot) and mark the order submitted.
-  const confirmViaWhatsApp = () => {
-    const link = whatsappLink(settings, upiWaMessage())
-    if (link) window.open(link, '_blank')
-    markSubmitted()
-  }
-
-  const copyVpa = async () => {
-    try { await navigator.clipboard.writeText(upiCfg.vpa); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* ignore */ }
-  }
-
   // COD with advance — collect the advance % via Razorpay, then the backend
   // creates the confirmed COD order (balance due on delivery).
   const payCodAdvance = async () => {
@@ -454,14 +387,13 @@ export function Checkout() {
     } catch { /* ignore */ }
   }
 
-  // Collect the COD advance online only when Razorpay is the live gateway
-  // (not during the UPI stopgap). Otherwise COD is placed plainly.
-  const codAdvanceOnline = advanceActive && onlineMode === 'razorpay'
+  // Collect the COD advance online via Razorpay when configured; otherwise COD
+  // is placed plainly.
+  const codAdvanceOnline = advanceActive && razorpayEnabled
 
-  // Single primary CTA — runs the flow for the selected payment method. The
-  // "online" tile dispatches to whichever backend flow the admin has enabled.
+  // Single primary CTA — runs the flow for the selected payment method.
   const primary = () => {
-    if (choice === 'online') return onlineMode === 'upi' ? payUpi() : payOnline()
+    if (choice === 'online') return payOnline()
     if (codAdvanceOnline) return payCodAdvance()
     return placeCodOrder()
   }
@@ -472,19 +404,16 @@ export function Checkout() {
 
   /* ── Success ── */
   if (placed) {
-    const isUpi = placed._upi
     return (
       <div className="pt-20 min-h-dvh flex items-center justify-center animate-fade-in" style={{ background: 'var(--cream)' }}>
         <div className="text-center max-w-md px-4 py-16">
           <div className="w-20 h-20 rounded-full grid place-items-center mx-auto mb-6" style={{ background: 'color-mix(in srgb, var(--maroon) 12%, transparent)' }}>
-            {isUpi ? <Clock size={32} style={{ color: 'var(--maroon)' }} /> : <Check size={34} style={{ color: 'var(--maroon)' }} />}
+            <Check size={34} style={{ color: 'var(--maroon)' }} />
           </div>
           <div className="eyebrow justify-center flex"><Motif size={18} /><span className="font-hindi">{settings.slogan}</span></div>
-          <h1 className="font-display text-3xl mt-2 mb-2" style={{ color: 'var(--ink)' }}>{isUpi ? 'Payment Submitted!' : 'Order Placed!'}</h1>
+          <h1 className="font-display text-3xl mt-2 mb-2" style={{ color: 'var(--ink)' }}>Order Placed!</h1>
           <p className="text-stone-500">
-            {isUpi
-              ? <>We've received your payment for order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span>. We'll verify it and confirm your order shortly.</>
-              : <>Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> is confirmed. Track it anytime in <Link to="/account" className="font-semibold underline" style={{ color: 'var(--maroon)' }}>your account</Link>.</>}
+            Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> is confirmed. Track it anytime in <Link to="/account" className="font-semibold underline" style={{ color: 'var(--maroon)' }}>your account</Link>.
           </p>
           <p className="text-sm mt-2" style={{ color: 'var(--maroon)' }}>Total: {fmt(placed.total)}</p>
 
@@ -499,102 +428,6 @@ export function Checkout() {
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <Link to="/products" className="btn-maroon">Continue Shopping</Link>
             <Link to="/account" className="btn-outline-gold">View my orders</Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  /* ── UPI payment (order created, awaiting payment + reference) ── */
-  if (upiOrder) {
-    return (
-      <div className="min-h-dvh animate-fade-in" style={{ background: 'var(--cream)' }}>
-        <div className="relative overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
-          <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
-          <div className="container-wide pt-24 md:pt-28 pb-8 md:pb-10 relative">
-            <h1 className="font-display text-white text-3xl md:text-4xl">Complete your payment</h1>
-            <p className="text-white/70 text-sm mt-1">Order {upiOrder.orderNo}</p>
-          </div>
-        </div>
-
-        <div className="container-tight py-8">
-          <div className="bg-white rounded-2xl p-5 md:p-8 shadow-card max-w-md mx-auto">
-            <div className="text-center">
-              <p className="text-xs uppercase tracking-wider text-stone-400">Amount to pay</p>
-              <p className="font-display text-4xl mt-1" style={{ color: 'var(--maroon)' }}>{fmt(upiOrder.total)}</p>
-            </div>
-
-            {/* QR */}
-            {upiQr && (
-              <div className="mt-6 flex flex-col items-center">
-                <div className="p-3 rounded-2xl border" style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}>
-                  <img src={upiQr} alt="UPI QR code" className="w-52 h-52" />
-                </div>
-                <p className="text-xs text-stone-500 mt-2 flex items-center gap-1.5"><QrCode size={13} /> Scan with any UPI app (GPay, PhonePe, Paytm…)</p>
-              </div>
-            )}
-
-            {/* Mobile: open UPI app */}
-            <a href={upiUri} className="btn-maroon w-full mt-5 flex items-center justify-center gap-2 md:hidden">
-              <Smartphone size={17} /> Pay with UPI app
-            </a>
-
-            {/* VPA */}
-            <div className="mt-5 rounded-xl border p-3.5 flex items-center justify-between gap-3" style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}>
-              <div className="min-w-0">
-                <p className="text-xs text-stone-400">Or pay to UPI ID</p>
-                <p className="font-semibold truncate" style={{ color: 'var(--ink)' }}>{upiCfg.vpa}</p>
-              </div>
-              <button onClick={copyVpa} className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg cursor-pointer" style={{ background: 'color-mix(in srgb, var(--maroon) 8%, transparent)', color: 'var(--maroon)' }}>
-                {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
-              </button>
-            </div>
-
-            {/* After paying — send the screenshot on WhatsApp (one tap) */}
-            {(() => {
-              const hasWa = !!whatsappLink(settings, 'x')
-              return (
-                <div className="mt-6 rounded-2xl p-4" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--gold) 35%, transparent)' }}>
-                  <p className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                    <Camera size={16} style={{ color: 'var(--maroon)' }} /> Paid? Send us the screenshot
-                  </p>
-                  <p className="text-[13px] text-stone-600 mt-1.5 leading-relaxed">
-                    Take a screenshot of your payment, then tap below — WhatsApp opens with your order details ready. Just attach the screenshot and send.
-                  </p>
-
-                  {hasWa ? (
-                    <button
-                      onClick={confirmViaWhatsApp}
-                      disabled={submittingProof}
-                      className="btn-whatsapp w-full !py-3.5 text-base mt-3.5 flex items-center justify-center gap-2 disabled:opacity-60"
-                    >
-                      <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 1.8c2.16 0 4.19.84 5.72 2.37a8.06 8.06 0 0 1 2.37 5.72c0 4.48-3.65 8.12-8.13 8.12a8.1 8.1 0 0 1-4.13-1.13l-.3-.18-3.06.8.82-2.98-.2-.31a8.05 8.05 0 0 1-1.24-4.32c0-4.48 3.65-8.12 8.13-8.12Zm4.6 10.36c-.25-.13-1.47-.72-1.7-.81-.23-.08-.4-.13-.56.13-.17.25-.65.8-.79.97-.15.17-.29.19-.54.06-.25-.13-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.39.11-.51.11-.11.25-.29.38-.43.12-.15.16-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.42l-.48-.01c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.07 0 1.22.9 2.4 1.02 2.56.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.43.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.23-.17-.48-.29Z" /></svg>
-                      {submittingProof ? 'Opening…' : 'Send payment screenshot'}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={markSubmitted}
-                      disabled={submittingProof}
-                      className="btn-gold w-full !py-3.5 text-base mt-3.5 disabled:opacity-60"
-                    >
-                      {submittingProof ? 'Submitting…' : "I've paid"}
-                    </button>
-                  )}
-
-                  {hasWa && (
-                    <button
-                      onClick={markSubmitted}
-                      disabled={submittingProof}
-                      className="w-full text-center text-xs text-stone-500 mt-3 underline underline-offset-2 disabled:opacity-60"
-                    >
-                      Paid but can't use WhatsApp? Tap here
-                    </button>
-                  )}
-                  {upiErr && <p className="text-sm text-red-600 mt-2.5 flex items-center gap-1.5 justify-center"><AlertCircle size={15} />{upiErr}</p>}
-                </div>
-              )
-            })()}
-            <p className="text-xs text-stone-400 text-center mt-4">Your order is saved. We'll verify the payment and confirm on WhatsApp.</p>
           </div>
         </div>
       </div>

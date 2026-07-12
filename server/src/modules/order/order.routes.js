@@ -7,7 +7,7 @@ import { resolveCoupon } from '../coupon/coupon.service.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
-import { sendTelegram, orderMessage, paymentSubmittedMessage, verifyKeyboard, orderPhotos } from '../../utils/notify.js';
+import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
 import { reconcileOrderStock } from './orderStock.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
@@ -42,8 +42,8 @@ router.post(
         state: Joi.string().allow('').max(80),
         pincode: Joi.string().allow('').max(12),
       }).default({}),
-      channel: Joi.string().valid('web', 'whatsapp').default('web'),
-      paymentMethod: Joi.string().valid('cod', 'whatsapp', 'none', 'upi').optional(),
+      channel: Joi.string().valid('web').default('web'),
+      paymentMethod: Joi.string().valid('cod').default('cod'),
       couponCode: Joi.string().allow('').max(40).default(''),
       notes: Joi.string().allow('').max(1000),
     }),
@@ -51,7 +51,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { items, subtotal } = await resolveItems(req.body.items);
     const settings = await getSettings();
-    const paymentMethod = req.body.paymentMethod || (req.body.channel === 'whatsapp' ? 'whatsapp' : 'cod');
+    const paymentMethod = 'cod';
     const { shipping, codFee } = computeCharges(settings, req.body.address || {}, paymentMethod, subtotal);
 
     // Re-validate the coupon server-side (never trust a client-sent discount).
@@ -68,14 +68,6 @@ router.post(
 
     const total = Math.max(0, subtotal + shipping + codFee - discount);
 
-    // Abandoned direct-UPI orders self-destruct after the configured window
-    // (TTL index on expiresAt). Only UPI — COD/WhatsApp orders are legitimate
-    // unpaid orders and must never auto-expire.
-    const expiryMin = Number(settings.payments?.upiExpiryMinutes) || 0;
-    const expiresAt = paymentMethod === 'upi' && expiryMin > 0
-      ? new Date(Date.now() + expiryMin * 60000)
-      : null;
-
     const order = await Order.create({
       orderNo: await nextOrderNo(),
       customerId: req.customer?.id || null,
@@ -88,61 +80,22 @@ router.post(
       discount,
       couponCode,
       total,
-      channel: req.body.channel || 'web',
+      channel: 'web',
       paymentMethod,
-      paymentStatus: 'unpaid', // COD / WhatsApp orders are collected later
-      expiresAt,
+      paymentStatus: 'unpaid', // COD collected on delivery
       notes: req.body.notes || '',
     });
 
     if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
 
-    // Reserve inventory now (order is created Confirmed). Unpaid manual-UPI
-    // orders reserve later, on payment submit — see reconcileOrderStock.
+    // Reserve inventory now (order is created Confirmed).
     await reconcileOrderStock(order);
     await order.save();
 
     // Ping the owner on Telegram (best-effort — never blocks the response).
-    // UPI orders carry Mark-paid / Cancel buttons so payment can be confirmed
-    // straight from the alert, even before the customer submits a screenshot.
-    sendTelegram(settings, orderMessage(order), {
-      photos: orderPhotos(order),
-      ...(order.paymentMethod === 'upi' ? { replyMarkup: verifyKeyboard(order._id) } : {}),
-    }).catch(() => {});
+    sendTelegram(settings, orderMessage(order), { photos: orderPhotos(order) }).catch(() => {});
 
     res.status(201).json({ success: true, data: order });
-  })
-);
-
-// PUBLIC — customer submits the UPI reference number after paying to the QR/VPA.
-// Marks the order 'submitted' (awaiting manual verification). Only allowed while
-// the order is still unpaid/submitted; admin verifies against the bank statement.
-router.patch(
-  '/:id/upi-proof',
-  validate({
-    // Reference is optional — the order-number note + amount is the primary
-    // matcher against the bank statement; the UTR just speeds verification.
-    body: Joi.object({
-      upiRef: Joi.string().trim().allow('').max(40).default(''),
-    }),
-  }),
-  asyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id);
-    if (!order) throw ApiError.notFound('Order not found');
-    if (order.paymentStatus === 'paid') throw ApiError.badRequest('This order is already paid');
-    order.paymentMethod = 'upi';
-    order.paymentStatus = 'submitted';
-    order.upiRef = (req.body.upiRef || '').trim();
-    order.paymentSubmittedAt = new Date();
-    order.expiresAt = null; // submitted — no longer an abandoned order
-    await reconcileOrderStock(order); // reserve stock now that payment is claimed
-    await order.save();
-
-    // Alert the owner that a UPI payment needs verification, with inline
-    // Mark-paid / Cancel buttons.
-    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order), { photos: orderPhotos(order), replyMarkup: verifyKeyboard(order._id) })).catch(() => {});
-
-    res.json({ success: true, data: { orderNo: order.orderNo, total: order.total, paymentStatus: order.paymentStatus } });
   })
 );
 
@@ -197,9 +150,7 @@ router.patch(
       paymentMethod: Joi.string().valid('none', 'razorpay', 'cod', 'whatsapp', 'cash', 'upi', 'bank'),
       notes: Joi.string().allow('').max(1000),
       tracking: Joi.object({
-        courier: Joi.string().allow('').max(80),
-        url: Joi.string().allow('').max(500),
-        message: Joi.string().allow('').max(500),
+        message: Joi.string().allow('').max(1000),
       }),
     }).min(1),
   }),
@@ -212,12 +163,9 @@ router.patch(
     if (req.body.paymentMethod !== undefined) order.paymentMethod = req.body.paymentMethod;
     order.expiresAt = null; // admin touched it — keep it, never auto-expire
 
-    // Shipment tracking (courier / link / message), typically set with Shipped.
-    if (req.body.tracking && typeof req.body.tracking === 'object') {
-      const t = req.body.tracking;
-      if (t.courier !== undefined) order.tracking.courier = t.courier;
-      if (t.url !== undefined) order.tracking.url = t.url;
-      if (t.message !== undefined) order.tracking.message = t.message;
+    // Shipment tracking message (delivery-partner note), typically set with Shipped.
+    if (req.body.tracking && typeof req.body.tracking === 'object' && req.body.tracking.message !== undefined) {
+      order.tracking.message = req.body.tracking.message;
     }
     if (order.status === 'shipped' && !order.tracking.shippedAt) order.tracking.shippedAt = new Date();
 

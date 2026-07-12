@@ -59,12 +59,11 @@ function Stepper({ status }) {
   )
 }
 
-// Payment badge — Paid, UPI-submitted (needs verifying), else COD / WhatsApp.
+// Payment badge — Paid, advance-paid COD, else COD.
 function payBadge(o) {
   if (o.paymentStatus === 'paid') return { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
-  if (o.paymentMethod === 'upi' && o.paymentStatus === 'submitted') return { label: 'UPI · verify', cls: 'bg-blue-100 text-blue-700' }
+  if (o.advancePaid > 0) return { label: 'Advance paid', cls: 'bg-blue-100 text-blue-700' }
   if (o.paymentMethod === 'upi') return { label: 'UPI', cls: 'bg-blue-100 text-blue-700' }
-  if (o.paymentMethod === 'whatsapp') return { label: 'WhatsApp', cls: 'bg-green-100 text-green-700' }
   return { label: 'COD', cls: 'bg-amber-100 text-amber-700' }
 }
 
@@ -198,6 +197,9 @@ export function AdminOrders() {
                     </div>
                     <p className="text-sm text-zinc-700 truncate mt-0.5">{o.customer?.name}</p>
                     <p className="text-xs text-zinc-400">{date} · {o.items?.length} item(s)</p>
+                    {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
+                      <p className="text-[11px] font-semibold mt-1" style={{ color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} paid · {fmt(o.total - o.advancePaid)} due on delivery</p>
+                    )}
                   </div>
                   <div className="flex flex-col items-end shrink-0 gap-2">
                     <p className="font-bold text-lg leading-none" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</p>
@@ -223,13 +225,12 @@ export function AdminOrders() {
                     {/* Progress */}
                     <div className="bg-white rounded-xl p-3 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
 
-                    {/* Tracking summary when shipped */}
-                    {(o.status === 'shipped' || o.status === 'delivered') && (o.tracking?.message || o.tracking?.url || o.tracking?.courier) && (
+                    {/* Tracking message when shipped */}
+                    {(o.status === 'shipped' || o.status === 'delivered') && o.tracking?.message && (
                       <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #8b5cf6 8%, transparent)' }}>
-                        <p className="font-semibold text-violet-700 flex items-center gap-1.5"><Truck size={14} /> {o.tracking?.courier || 'Shipment'}</p>
-                        {o.tracking?.message && <p className="text-zinc-600 mt-0.5">{o.tracking.message}</p>}
-                        {o.tracking?.url && <a href={o.tracking.url} target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold text-xs">{o.tracking.url}</a>}
-                        <button onClick={() => setShipFor(o)} className="block mt-1.5 text-xs text-zinc-500 underline cursor-pointer">Edit tracking</button>
+                        <p className="font-semibold text-violet-700 flex items-center gap-1.5"><Truck size={14} /> Tracking</p>
+                        <p className="text-zinc-600 mt-0.5 whitespace-pre-wrap break-words">{o.tracking.message}</p>
+                        <button onClick={() => setShipFor(o)} className="block mt-1.5 text-xs text-zinc-500 underline cursor-pointer">Edit message</button>
                       </div>
                     )}
 
@@ -260,15 +261,7 @@ export function AdminOrders() {
                       <div>
                         <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">Payment</p>
                         {o.advancePaid > 0 && (
-                          <p className="text-xs text-zinc-600 mb-2">Advance <b>{fmt(o.advancePaid)}</b> paid · balance <b>{fmt(o.total - o.advancePaid)}</b> on delivery</p>
-                        )}
-                        {/* Direct-UPI: show the customer-submitted reference to verify against the bank statement */}
-                        {o.paymentMethod === 'upi' && o.upiRef && (
-                          <div className="mb-2.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs">
-                            <p className="text-blue-700 font-semibold">UPI reference submitted</p>
-                            <p className="text-zinc-700 mt-0.5">Ref: <span className="font-mono font-bold">{o.upiRef}</span> · Amount: <b>₹{new Intl.NumberFormat('en-IN').format(o.total || 0)}</b></p>
-                            <p className="text-zinc-500 mt-0.5">Match this against your bank statement (note = {o.orderNo}), then Mark paid.</p>
-                          </div>
+                          <p className="text-xs text-zinc-600 mb-2">Advance <b>{fmt(o.advancePaid)}</b> paid online · balance <b>{fmt(o.total - o.advancePaid)}</b> due on delivery</p>
                         )}
                         <div className="flex items-center gap-2 flex-wrap">
                           <Dropdown value={o.paymentMethod || 'cod'} onChange={(v) => patchOrder(o._id, { paymentMethod: v })} align="left" options={PAY_METHODS} />
@@ -306,10 +299,9 @@ export function AdminOrders() {
   )
 }
 
-// Mark an order Shipped with tracking details the customer will see.
+// Mark an order Shipped with a single tracking message the customer will see —
+// paste the delivery partner's note (tracking id + link) straight in.
 function ShipModal({ order, onClose, onShipped }) {
-  const [courier, setCourier] = useState(order.tracking?.courier || '')
-  const [url, setUrl] = useState(order.tracking?.url || '')
   const [message, setMessage] = useState(order.tracking?.message || '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -318,7 +310,7 @@ function ShipModal({ order, onClose, onShipped }) {
   const submit = async () => {
     setSaving(true); setErr('')
     try {
-      const patch = { tracking: { courier: courier.trim(), url: url.trim(), message: message.trim() } }
+      const patch = { tracking: { message: message.trim() } }
       if (!alreadyShipped) patch.status = 'shipped'
       const updated = await api.patch(`/orders/${order._id}`, patch, { auth: true })
       onShipped(updated)
@@ -328,14 +320,10 @@ function ShipModal({ order, onClose, onShipped }) {
   return (
     <Modal open onClose={onClose} title={alreadyShipped ? 'Edit tracking' : `Ship ${order.orderNo}`} footer={<>
       <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      <Btn onClick={submit} disabled={saving}><Truck size={15} /> {saving ? 'Saving…' : (alreadyShipped ? 'Save tracking' : 'Mark Shipped')}</Btn>
+      <Btn onClick={submit} disabled={saving}><Truck size={15} /> {saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped')}</Btn>
     </>}>
-      <p className="text-sm text-zinc-500 -mt-1 mb-1">These details show on the customer's order tracker. All optional.</p>
-      <div className="grid sm:grid-cols-2 gap-3">
-        <Field field={{ label: 'Courier / partner', placeholder: 'e.g. Delhivery, India Post' }} value={courier} onChange={setCourier} />
-        <Field field={{ label: 'Tracking link', placeholder: 'https://…' }} value={url} onChange={setUrl} />
-      </div>
-      <Field field={{ label: 'Message to customer', type: 'textarea', placeholder: 'e.g. Shipped today — expected delivery in 3–4 days.' }} value={message} onChange={setMessage} />
+      <p className="text-sm text-zinc-500 -mt-1 mb-1">Paste the delivery partner's tracking message (id + link). It's shown on the customer's order tracker exactly as typed.</p>
+      <Field field={{ label: 'Tracking message', type: 'textarea', placeholder: 'e.g. Shipped via Delhivery. Tracking: 1234567890 — https://delhivery.com/track/1234567890' }} value={message} onChange={setMessage} />
       {err && <p className="text-sm text-red-600">{err}</p>}
     </Modal>
   )

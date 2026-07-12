@@ -13,14 +13,10 @@ export async function applyOrderStock(order, sign) {
 }
 
 // Should this order currently be holding stock? Reserve once an order is
-// committed (confirmed / shipped / delivered) — EXCEPT an unpaid manual-UPI
-// order, which reserves only after the customer submits payment (so abandoned
-// UPI orders that auto-delete never leak stock). Cancelled releases.
+// committed (confirmed / shipped / delivered); cancelled releases.
 export function shouldReserveStock(order) {
   if (order.status === 'cancelled') return false;
-  if (!['confirmed', 'shipped', 'delivered'].includes(order.status)) return false; // legacy 'pending'
-  if (order.paymentMethod === 'upi' && order.paymentStatus === 'unpaid') return false;
-  return true;
+  return ['confirmed', 'shipped', 'delivered'].includes(order.status); // legacy 'pending' excluded
 }
 
 // Bring `stockApplied` in line with shouldReserveStock. Mutates the order
