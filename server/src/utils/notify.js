@@ -11,8 +11,27 @@ const esc = (s) =>
 
 const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
-// Send an HTML message to every configured chat id. Returns { ok, error }.
-export async function sendTelegram(settings, text) {
+// Low-level Telegram Bot API call. Best-effort; returns the parsed body or null.
+export async function tgApi(token, method, payload) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    return await res.json().catch(() => null);
+  } catch (e) {
+    return { ok: false, description: e.message || 'network error' };
+  }
+}
+
+// Send an HTML message to every configured chat id, with an optional inline
+// keyboard (replyMarkup). Returns { ok, error }.
+export async function sendTelegram(settings, text, { replyMarkup } = {}) {
   const tg = settings?.notifications?.telegram || {};
   if (!tg.enabled || !tg.botToken || !tg.chatId) return { ok: false, error: 'not configured' };
 
@@ -21,25 +40,43 @@ export async function sendTelegram(settings, text) {
   let anyOk = false;
 
   for (const chatId of chatIds) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
-      const res = await fetch(`https://api.telegram.org/bot${tg.botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }),
-        signal: ctrl.signal,
-      });
-      clearTimeout(t);
-      const json = await res.json().catch(() => null);
-      if (json?.ok) anyOk = true;
-      else lastError = json?.description || `HTTP ${res.status}`;
-    } catch (e) {
-      lastError = e.message || 'network error';
-    }
+    const json = await tgApi(tg.botToken, 'sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+    if (json?.ok) anyOk = true;
+    else lastError = json?.description || 'send failed';
   }
   if (!anyOk && lastError) console.error('[telegram] send failed:', lastError);
   return { ok: anyOk, error: anyOk ? null : lastError };
+}
+
+// Inline keyboard shown under the "payment submitted" alert so the owner can
+// confirm/cancel from Telegram. callback_data is compact: "pay:<id>".
+export function verifyKeyboard(orderId) {
+  return {
+    inline_keyboard: [[
+      { text: '✅ Mark paid', callback_data: `pay:${orderId}` },
+      { text: '✖ Cancel order', callback_data: `cancel:${orderId}` },
+    ]],
+  };
+}
+
+// Register/refresh the bot webhook so button taps reach us. `secret` is echoed
+// back by Telegram in the X-Telegram-Bot-Api-Secret-Token header for verification.
+export async function setTelegramWebhook(token, url, secret) {
+  return tgApi(token, 'setWebhook', {
+    url,
+    secret_token: secret,
+    allowed_updates: ['callback_query'],
+  });
+}
+
+export async function deleteTelegramWebhook(token) {
+  return tgApi(token, 'deleteWebhook', {});
 }
 
 const PAYMENT_LABEL = {

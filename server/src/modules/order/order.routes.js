@@ -8,7 +8,7 @@ import { resolveCoupon } from '../coupon/coupon.service.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
-import { sendTelegram, orderMessage, paymentSubmittedMessage } from '../../utils/notify.js';
+import { sendTelegram, orderMessage, paymentSubmittedMessage, verifyKeyboard } from '../../utils/notify.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -66,6 +66,15 @@ router.post(
     }
 
     const total = Math.max(0, subtotal + shipping + codFee - discount);
+
+    // Abandoned direct-UPI orders self-destruct after the configured window
+    // (TTL index on expiresAt). Only UPI — COD/WhatsApp orders are legitimate
+    // unpaid orders and must never auto-expire.
+    const expiryMin = Number(settings.payments?.upiExpiryMinutes) || 0;
+    const expiresAt = paymentMethod === 'upi' && expiryMin > 0
+      ? new Date(Date.now() + expiryMin * 60000)
+      : null;
+
     const order = await Order.create({
       orderNo: await nextOrderNo(),
       customerId: req.customer?.id || null,
@@ -81,6 +90,7 @@ router.post(
       channel: req.body.channel || 'web',
       paymentMethod,
       paymentStatus: 'unpaid', // COD / WhatsApp orders are collected later
+      expiresAt,
       notes: req.body.notes || '',
     });
 
@@ -113,10 +123,12 @@ router.patch(
     order.paymentStatus = 'submitted';
     order.upiRef = (req.body.upiRef || '').trim();
     order.paymentSubmittedAt = new Date();
+    order.expiresAt = null; // submitted — no longer an abandoned order
     await order.save();
 
-    // Alert the owner that a UPI payment needs verification.
-    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order))).catch(() => {});
+    // Alert the owner that a UPI payment needs verification, with inline
+    // Mark-paid / Cancel buttons.
+    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order), { replyMarkup: verifyKeyboard(order._id) })).catch(() => {});
 
     res.json({ success: true, data: { orderNo: order.orderNo, total: order.total, paymentStatus: order.paymentStatus } });
   })
@@ -193,6 +205,7 @@ router.patch(
     if (req.body.status !== undefined) order.status = req.body.status;
     if (req.body.notes !== undefined) order.notes = req.body.notes;
     if (req.body.paymentMethod !== undefined) order.paymentMethod = req.body.paymentMethod;
+    order.expiresAt = null; // admin touched it — keep it, never auto-expire
 
     const delivered = order.status === 'delivered';
     if (delivered && !order.stockApplied) {

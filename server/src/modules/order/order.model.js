@@ -53,6 +53,11 @@ const orderSchema = new mongoose.Schema(
     upiRef: { type: String, default: '' },          // UTR / UPI reference no. from the customer
     paymentSubmittedAt: { type: Date, default: null },
     paymentVerifiedAt: { type: Date, default: null },
+    // Auto-cleanup: abandoned direct-UPI orders (created, never paid/submitted)
+    // carry a future expiry; the TTL index below deletes them once it passes.
+    // Cleared (set null) the moment the order is paid, submitted, or edited by
+    // admin — so only truly abandoned unpaid UPI orders ever expire.
+    expiresAt: { type: Date, default: null },
     notes: { type: String, default: '' },
   },
   { timestamps: true }
@@ -64,6 +69,10 @@ orderSchema.index(
   { razorpayPaymentId: 1 },
   { unique: true, partialFilterExpression: { razorpayPaymentId: { $type: 'string', $gt: '' } } }
 );
+
+// TTL: delete a document once `expiresAt` is in the past. Docs with a null
+// `expiresAt` (the vast majority) are ignored by the TTL monitor.
+orderSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const Order = mongoose.model('Order', orderSchema);
 export default Order;

@@ -260,6 +260,13 @@ export function AdminSettings() {
             <Field field={{ label: 'Payee name', placeholder: 'Shubra Jewels', help: 'Shown in the customer’s UPI app' }} value={s.payments?.upi?.payeeName || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, payeeName: v } } }))} />
           </div>
           <p className="text-xs text-zinc-400">Tip: use a UPI ID you can monitor. The order number rides along in the payment note so you can match it easily.</p>
+          <div className="pt-1">
+            <Field
+              field={{ label: 'Auto-remove unpaid UPI orders after (minutes)', type: 'number', placeholder: '0', help: 'Abandoned UPI orders that are never paid are permanently deleted after this many minutes. 0 = keep forever. Paid or screenshot-submitted orders are never touched. Suggested: 1440 (24h).' }}
+              value={s.payments?.upiExpiryMinutes ?? 0}
+              onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upiExpiryMinutes: Number(v) || 0 } }))}
+            />
+          </div>
         </div>
       </Section>
       )}
@@ -291,6 +298,9 @@ export function AdminSettings() {
             )}
           </div>
           <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>
+          <div className="rounded-xl p-3.5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, #16a34a 8%, transparent)', color: 'var(--ink)' }}>
+            <b>UPI verify buttons:</b> when a customer submits a UPI payment, the alert comes with <b>✅ Mark paid</b> and <b>✖ Cancel order</b> buttons — tap right inside Telegram to update the order, no need to open the admin panel.
+          </div>
         </div>
       </Section>
       )}

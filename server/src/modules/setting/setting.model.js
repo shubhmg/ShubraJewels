@@ -134,6 +134,10 @@ const settingSchema = new mongoose.Schema(
       },
       // Reward prepaid: waive shipping when the customer pays now (UPI/online).
       prepaidFreeShipping: { type: Boolean, default: false },
+      // Auto-remove abandoned direct-UPI orders that are never paid, after this
+      // many minutes. 0 = keep forever (delete manually). Only affects UPI
+      // orders still 'unpaid' + 'pending'; paid/submitted orders are safe.
+      upiExpiryMinutes: { type: Number, default: 0 },
     },
 
     // Order notifications. SECRET — the Telegram bot token must never be sent to
@@ -144,6 +148,9 @@ const settingSchema = new mongoose.Schema(
         enabled: { type: Boolean, default: false },
         botToken: { type: String, default: '' }, // from @BotFather
         chatId: { type: String, default: '' },   // your chat/group id (comma-separate for several)
+        // Auto-generated secret echoed by Telegram in the webhook header so we
+        // can verify inbound button-tap (callback_query) requests are genuine.
+        webhookSecret: { type: String, default: '' },
       },
     },
 
