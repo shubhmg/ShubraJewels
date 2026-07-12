@@ -11,8 +11,7 @@ import { resolveContent } from '../../lib/siteContent.js'
 const TABS = [
   { id: 'brand', label: 'Brand' },
   { id: 'contact', label: 'Contact & Social' },
-  { id: 'shipping', label: 'Shipping' },
-  { id: 'payments', label: 'Payments' },
+  { id: 'payments', label: 'Payments & Shipping' },
   { id: 'story', label: 'Our Story' },
   { id: 'content', label: 'Text & Content' },
   { id: 'policies', label: 'Legal Pages' },
@@ -192,46 +191,56 @@ export function AdminSettings() {
       </Section>
       )}
 
-      {tab === 'shipping' && (
-      <Section title="Shipping" subtitle="Base charge applies everywhere, unless a city is overridden below or the order qualifies for free shipping.">
-        <ShippingEditor value={s.shipping} onChange={(v) => set('shipping', v)} />
-      </Section>
-      )}
-
       {tab === 'payments' && (
-      <Section title="Payment Methods" subtitle="Which checkout options customers see.">
-        <div className="space-y-1">
-          <Field field={{ label: 'Pay online (Razorpay — UPI, cards, netbanking)', type: 'toggle' }} value={s.payments?.razorpay !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, razorpay: v } }))} />
-          <Field field={{ label: 'Pay on delivery (COD)', type: 'toggle' }} value={s.payments?.cod !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, cod: v } }))} />
-          <p className="text-xs text-zinc-400 pt-1">WhatsApp ordering is always available.</p>
+      <Section title="Payments & Shipping">
+        {/* How a customer's total is built — the mental model for everything below */}
+        <div className="rounded-xl p-4 mb-6 text-sm" style={{ background: 'color-mix(in srgb, var(--gold, #C9A84C) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--gold, #C9A84C) 35%, transparent)' }}>
+          <p className="font-semibold text-zinc-800">How a customer's total is calculated</p>
+          <p className="mt-1.5 font-mono text-[13px] text-zinc-700">Items − Discount + Shipping + COD fee</p>
+          <ul className="mt-2 space-y-1 text-[13px] text-zinc-600 list-disc pl-5">
+            <li><b>Shipping</b> = the base rule in §2 (per-city, or free above a value).</li>
+            <li>Paying now (UPI/online) can <b>waive shipping</b> if you enable that reward in §3.</li>
+            <li><b>COD</b> pays the base shipping <b>plus</b> the COD fee, and can require a small advance on WhatsApp.</li>
+          </ul>
         </div>
-      </Section>
-      )}
 
-      {tab === 'payments' && (
-      <Section title="COD & Prepaid Incentives" subtitle="Discourage fake COD and reward paying now. All optional.">
-        <div className="space-y-4">
-          <Field field={{ label: 'COD fee (₹)', type: 'number', help: 'Extra charge added to Cash-on-Delivery orders. 0 = no fee.' }} value={s.payments?.codFee || 0} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codFee: v === '' ? 0 : Number(v) } }))} />
-          <Field field={{ label: 'Free shipping when paying now (UPI/online)', type: 'toggle', help: 'Waives shipping for prepaid orders to nudge customers away from COD.' }} value={!!s.payments?.prepaidFreeShipping} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, prepaidFreeShipping: v } }))} />
+        {/* 1 — methods */}
+        <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mb-2">1 · Payment methods customers can choose</p>
+        <div className="space-y-1 mb-7">
+          <Field field={{ label: 'Pay online (Razorpay — UPI, cards, netbanking)', type: 'toggle' }} value={s.payments?.razorpay !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, razorpay: v } }))} />
+          <Field field={{ label: 'Cash on Delivery (COD)', type: 'toggle' }} value={s.payments?.cod !== false} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, cod: v } }))} />
+          <p className="text-xs text-zinc-400 pt-1">WhatsApp ordering is always available. Direct UPI is set up in §4 below.</p>
+        </div>
+
+        {/* 2 — base shipping */}
+        <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mb-2">2 · Shipping charges</p>
+        <p className="text-xs text-zinc-500 mb-3">The base delivery fee every order pays — unless it qualifies for free shipping (a rule here, or the prepaid reward in §3).</p>
+        <div className="mb-7"><ShippingEditor value={s.shipping} onChange={(v) => set('shipping', v)} /></div>
+
+        {/* 3 — COD fee + prepaid incentives */}
+        <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mb-2">3 · COD fee & prepaid incentives</p>
+        <p className="text-xs text-zinc-500 mb-3">Layered on top of shipping to cut fake COD orders and reward paying now. All optional — leave at 0 / off to ignore.</p>
+        <div className="space-y-4 mb-7">
+          <Field field={{ label: 'COD fee (₹)', type: 'number', help: 'Added ONLY to Cash-on-Delivery orders, on top of the base shipping above. 0 = no fee.' }} value={s.payments?.codFee || 0} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codFee: v === '' ? 0 : Number(v) } }))} />
+          <Field field={{ label: 'Free shipping when paying now (UPI / online)', type: 'toggle', help: 'When on, prepaid orders pay ₹0 shipping (COD still pays the base shipping). Makes prepaying cheaper than COD.' }} value={!!s.payments?.prepaidFreeShipping} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, prepaidFreeShipping: v } }))} />
           <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
-            <Field field={{ label: 'Require an advance on COD (via WhatsApp)', type: 'toggle', help: 'Ask the customer to pay a small % advance to confirm a COD order — cuts fake orders / RTO.' }} value={!!s.payments?.codAdvance?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, enabled: v } } }))} />
+            <Field field={{ label: 'Require an advance on COD (via WhatsApp)', type: 'toggle', help: 'Ask the customer to pay a small % of the total upfront on WhatsApp to confirm a COD order — cuts fake orders / returns. This is NOT an extra charge; it is part of the total, paid early.' }} value={!!s.payments?.codAdvance?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, enabled: v } } }))} />
             {s.payments?.codAdvance?.enabled && (
-              <Field field={{ label: 'Advance percent (%)', type: 'number', help: '% of the order total the customer pays upfront on WhatsApp.' }} value={s.payments?.codAdvance?.percent ?? 5} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, percent: v === '' ? 0 : Number(v) } } }))} />
+              <Field field={{ label: 'Advance percent (%)', type: 'number', help: '% of the order total paid upfront on WhatsApp. The rest is collected on delivery.' }} value={s.payments?.codAdvance?.percent ?? 5} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, percent: v === '' ? 0 : Number(v) } } }))} />
             )}
           </div>
         </div>
-      </Section>
-      )}
 
-      {tab === 'payments' && (
-      <Section title="Direct UPI (QR)" subtitle="No gateway needed. Customer scans your QR / pays to your UPI ID, then submits the reference number. You verify it against your bank statement and mark the order paid.">
+        {/* 4 — direct UPI */}
+        <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mb-2">4 · Direct UPI (QR) — no gateway needed</p>
+        <p className="text-xs text-zinc-500 mb-3">Customer scans your QR / pays to your UPI ID, then submits the reference. You match it against your bank statement and mark the order paid in Orders.</p>
         <div className="space-y-3">
           <Field field={{ label: 'Enable direct UPI payments', type: 'toggle' }} value={!!s.payments?.upi?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, enabled: v } } }))} />
           <div className="grid sm:grid-cols-2 gap-4">
             <Field field={{ label: 'Your UPI ID (VPA)', placeholder: 'name@okaxis', help: 'Where customers send money' }} value={s.payments?.upi?.vpa || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, vpa: v.trim() } } }))} />
             <Field field={{ label: 'Payee name', placeholder: 'Shubra Jewels', help: 'Shown in the customer’s UPI app' }} value={s.payments?.upi?.payeeName || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, payeeName: v } } }))} />
           </div>
-          <p className="text-xs text-zinc-400">Tip: use a UPI ID you can monitor (e.g. a dedicated one). The order number rides along in the payment note so you can match it easily.</p>
+          <p className="text-xs text-zinc-400">Tip: use a UPI ID you can monitor. The order number rides along in the payment note so you can match it easily.</p>
         </div>
       </Section>
       )}
