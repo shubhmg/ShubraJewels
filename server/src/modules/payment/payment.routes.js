@@ -16,6 +16,7 @@ import { resolveItems } from '../../utils/resolveItems.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
+import { reconcileOrderStock } from '../order/orderStock.js';
 
 const router = express.Router();
 const objectId = Joi.string().hex().length(24);
@@ -101,6 +102,10 @@ async function finalizeIntent(intent, paymentId) {
     if (e.code === 11000) return Order.findOne({ razorpayPaymentId: paymentId });
     throw e;
   }
+
+  // Reserve inventory for the confirmed, paid order.
+  await reconcileOrderStock(order);
+  await order.save();
 
   if (intent.couponId) await Coupon.updateOne({ _id: intent.couponId }, { $inc: { usedCount: 1 } });
   intent.status = 'completed';
@@ -192,6 +197,144 @@ router.post(
     if (!intent) throw ApiError.badRequest('Payment session not found — please contact us if money was deducted');
 
     const order = await finalizeIntent(intent, razorpay_payment_id);
+    res.status(201).json({ success: true, data: order });
+  })
+);
+
+/* ── COD advance (partial prepayment via Razorpay to confirm a COD order) ── */
+
+// Create the COD order from a completed advance intent, exactly once.
+async function finalizeCodAdvance(intent, paymentId) {
+  if (intent.status === 'completed' && intent.orderId) {
+    const existing = await Order.findById(intent.orderId);
+    if (existing) return existing;
+  }
+  const dup = await Order.findOne({ advanceRazorpayPaymentId: paymentId });
+  if (dup) return dup;
+
+  const order = await Order.create({
+    orderNo: await nextOrderNo(),
+    customerId: intent.customerId || null,
+    items: intent.items,
+    customer: intent.customer,
+    address: intent.address || {},
+    subtotal: intent.subtotal,
+    shipping: intent.shipping,
+    codFee: intent.codFee,
+    discount: intent.discount,
+    couponCode: intent.couponCode,
+    total: intent.total,
+    channel: 'web',
+    notes: intent.notes || '',
+    paymentMethod: 'cod',
+    paymentStatus: 'unpaid', // balance collected on delivery
+    status: 'confirmed',
+    advancePaid: intent.advance,
+    advanceRazorpayPaymentId: paymentId,
+  });
+
+  await reconcileOrderStock(order);
+  await order.save();
+
+  if (intent.couponId) await Coupon.updateOne({ _id: intent.couponId }, { $inc: { usedCount: 1 } });
+  intent.status = 'completed';
+  intent.orderId = order._id;
+  await intent.save();
+
+  getSettings().then((s) => sendTelegram(s, orderMessage(order), { photos: orderPhotos(order) })).catch(() => {});
+  return order;
+}
+
+// STEP 1 — create a Razorpay order for JUST the advance % of a COD order.
+router.post(
+  '/cod-advance/create-order',
+  optionalCustomer,
+  validate({
+    body: Joi.object({
+      items: itemsSchema,
+      customer: customerSchema.required(),
+      address: addressSchema.default({}),
+      couponCode: Joi.string().allow('').max(40).default(''),
+      notes: Joi.string().allow('').max(1000).default(''),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    if (!rzp) throw ApiError.badRequest('Online payments are not configured');
+    const settings = await getSettings();
+    const adv = settings.payments?.codAdvance;
+    if (!adv?.enabled) throw ApiError.badRequest('COD advance is not enabled');
+    const percent = Math.min(100, Math.max(1, Number(adv.percent) || 5));
+
+    // Price as a COD order (includes the COD fee).
+    const priced = await resolveItems(req.body.items);
+    const { shipping, codFee } = computeCharges(settings, req.body.address || {}, 'cod', priced.subtotal);
+    let discount = 0;
+    let coupon = null;
+    if (req.body.couponCode) {
+      const r = await resolveCoupon(req.body.couponCode, priced.subtotal);
+      if (r.error) throw ApiError.badRequest(r.error);
+      discount = r.discount;
+      coupon = r.coupon;
+    }
+    const total = Math.max(0, priced.subtotal + shipping + codFee - discount);
+    const advance = Math.max(1, Math.round(total * percent / 100));
+    const amount = advance * 100;
+    if (amount < 100) throw ApiError.badRequest('Advance must be at least ₹1');
+
+    let order;
+    try {
+      order = await rzp.orders.create({ amount, currency: 'INR', receipt: `adv_${Date.now()}` });
+    } catch (e) {
+      throw ApiError.internal(`Payment gateway error: ${e?.error?.description || e.message}`);
+    }
+
+    await PaymentIntent.create({
+      kind: 'cod_advance',
+      advance,
+      codFee,
+      razorpayOrderId: order.id,
+      items: priced.items,
+      customer: req.body.customer,
+      address: req.body.address || {},
+      customerId: req.customer?.id || null,
+      subtotal: priced.subtotal,
+      shipping,
+      discount,
+      couponCode: coupon?.code || '',
+      couponId: coupon?._id || null,
+      total,
+      notes: req.body.notes || '',
+    });
+
+    res.json({ success: true, data: { orderId: order.id, amount: order.amount, currency: order.currency, keyId: env.razorpay.keyId, advance, total } });
+  })
+);
+
+// STEP 2 — verify the advance payment, then create the COD order.
+router.post(
+  '/cod-advance/verify',
+  optionalCustomer,
+  validate({
+    body: Joi.object({
+      razorpay_order_id: Joi.string().required(),
+      razorpay_payment_id: Joi.string().required(),
+      razorpay_signature: Joi.string().required(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    if (!rzp) throw ApiError.badRequest('Online payments are not configured');
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const expected = crypto
+      .createHmac('sha256', env.razorpay.keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+    if (!safeEqualHex(expected, razorpay_signature)) throw ApiError.badRequest('Payment signature verification failed');
+
+    const intent = await PaymentIntent.findOne({ razorpayOrderId: razorpay_order_id });
+    if (!intent || intent.kind !== 'cod_advance') throw ApiError.badRequest('Payment session not found — please contact us if money was deducted');
+
+    const order = await finalizeCodAdvance(intent, razorpay_payment_id);
     res.status(201).json({ success: true, data: order });
   })
 );

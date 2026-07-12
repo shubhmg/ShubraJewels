@@ -6,7 +6,6 @@ import { useWishlistStore } from '../../store/wishlistStore.js'
 import { Badge } from '../../components/ui/Badge.jsx'
 import { StarRating } from '../../components/ui/StarRating.jsx'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
-import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { useProduct, useProducts } from '../../hooks/useApi.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
 import { resolveContent } from '../../lib/siteContent.js'
@@ -203,7 +202,6 @@ export function ProductDetail() {
                 <Heart size={18} className={wishlisted ? 'fill-rose-500 text-rose-500' : 'text-stone-400'} />
               </button>
             </div>
-            <WhatsAppButton product={product} className="w-full" />
 
             {/* Trust bar */}
             <div className="grid grid-cols-2 gap-2">

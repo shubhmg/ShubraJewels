@@ -6,9 +6,13 @@ import mongoose from 'mongoose';
 const paymentIntentSchema = new mongoose.Schema(
   {
     razorpayOrderId: { type: String, required: true, unique: true },
+    // 'full' = pay-online-in-full; 'cod_advance' = partial prepay to confirm a COD order.
+    kind: { type: String, enum: ['full', 'cod_advance'], default: 'full' },
+    advance: { type: Number, default: 0 }, // amount charged now (cod_advance)
+    codFee: { type: Number, default: 0 },
     items: [{ productId: mongoose.Schema.Types.ObjectId, name: String, image: String, price: Number, qty: Number }],
     customer: { name: String, phone: String, email: String },
-    address: { line1: String, line2: String, city: String, state: String, pincode: String },
+    address: { line1: String, line2: String, landmark: String, city: String, state: String, pincode: String },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
     subtotal: Number,
     shipping: Number,

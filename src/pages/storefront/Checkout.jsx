@@ -4,7 +4,6 @@ import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, A
 import { buildUpiUri, upiQrDataUrl } from '../../lib/upi.js'
 import { useCartStore } from '../../store/cartStore.js'
 import { useCustomerStore } from '../../store/customerStore.js'
-import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { AuthModal } from '../../components/auth/AuthModal.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { api } from '../../lib/api.js'
@@ -120,12 +119,12 @@ export function Checkout() {
   // takes over — the customer always sees just one "Pay online" option.
   const onlineMode = upiEnabled ? 'upi' : (razorpayEnabled ? 'razorpay' : null)
 
-  // Available payment methods, in display order (prepaid first).
+  // Available payment methods, in display order (prepaid first). Website-only —
+  // no WhatsApp ordering.
   const methods = useMemo(() => {
     const m = []
     if (onlineMode) m.push('online')
     if (codEnabled) m.push('cod')
-    m.push('whatsapp')
     return m
   }, [onlineMode, codEnabled])
 
@@ -294,16 +293,14 @@ export function Checkout() {
     try { await addAddress({ ...addr, name: contact.name.trim(), phone: contact.phone.replace(/\D/g, '') }) } catch { /* non-blocking */ }
   }
 
-  // COD order. If a COD advance is configured, the success screen prompts the
-  // customer to pay it via WhatsApp to confirm.
+  // Plain COD order (no online advance).
   const placeCodOrder = async () => {
     if (!gate()) return null
     setPlacing(true)
     try {
       const order = await api.post('/orders', { ...buildPayload('web'), paymentMethod: 'cod' }, { custAuth: true })
       await persistAddress()
-      const adv = advanceActive ? { percent: advancePercent, amount: Math.max(1, Math.round((order.total || 0) * advancePercent / 100)) } : null
-      setPlaced({ ...order, _advance: adv })
+      setPlaced(order)
       clearCart()
       return order
     } catch (e) {
@@ -404,17 +401,46 @@ export function Checkout() {
     try { await navigator.clipboard.writeText(upiCfg.vpa); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* ignore */ }
   }
 
-  const orderViaWhatsApp = () => {
-    if (items.length === 0) return
+  // COD with advance — collect the advance % via Razorpay, then the backend
+  // creates the confirmed COD order (balance due on delivery).
+  const payCodAdvance = async () => {
     if (!gate()) return
-    const lines = items.map((i) => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n')
-    const parts = [settings.whatsappMessage || 'Hello! I would like to order:', '', lines, '', `Subtotal: ${fmt(subtotal)}`]
-    if (coupon) parts.push(`Coupon ${coupon.code}: −${fmt(discount)}`)
-    parts.push(`Shipping${effAddr.city ? ` (${effAddr.city})` : ''}: ${shipping === 0 ? 'Free' : fmt(shipping)}`)
-    parts.push(`Total: ${fmt(total)}`, '', `Name: ${contact.name.trim()}`, `Phone: ${contact.phone.replace(/\D/g, '')}`, `Address: ${summarizeAddr(effAddr)}`)
-    persistAddress()
-    const link = whatsappLink(settings, parts.join('\n'))
-    if (link) window.open(link, '_blank')
+    setPlacing(true)
+    try {
+      const ro = await api.post('/payments/cod-advance/create-order', buildPayload('web'), { custAuth: true })
+      const ok = await loadRazorpay()
+      if (!ok) throw new Error('Could not load payment gateway')
+
+      const rzp = new window.Razorpay({
+        key: ro.keyId,
+        order_id: ro.orderId,
+        amount: ro.amount,
+        currency: ro.currency,
+        name: settings.brandName,
+        description: `COD advance (${advancePercent}%)`,
+        prefill: { name: contact.name, email: contact.email, contact: contact.phone },
+        theme: { color: settings.theme?.maroon || '#7B1E2B' },
+        modal: { ondismiss: () => setPlacing(false) },
+        handler: async (resp) => {
+          try {
+            const order = await api.post('/payments/cod-advance/verify', {
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            }, { custAuth: true })
+            await persistAddress()
+            setPlaced(order); clearCart()
+          } catch (e) {
+            setError(e.message || 'Payment verification failed. If money was deducted, contact us.')
+          } finally { setPlacing(false) }
+        },
+      })
+      rzp.on('payment.failed', (r) => { setError(r?.error?.description || 'Payment failed. Please try again.'); setPlacing(false) })
+      rzp.open()
+    } catch (e) {
+      setError(e.message || 'Could not start payment.')
+      setPlacing(false)
+    }
   }
 
   const removeSavedAddress = async (id) => {
@@ -428,16 +454,20 @@ export function Checkout() {
     } catch { /* ignore */ }
   }
 
+  // Collect the COD advance online only when Razorpay is the live gateway
+  // (not during the UPI stopgap). Otherwise COD is placed plainly.
+  const codAdvanceOnline = advanceActive && onlineMode === 'razorpay'
+
   // Single primary CTA — runs the flow for the selected payment method. The
   // "online" tile dispatches to whichever backend flow the admin has enabled.
   const primary = () => {
     if (choice === 'online') return onlineMode === 'upi' ? payUpi() : payOnline()
-    if (choice === 'whatsapp') return orderViaWhatsApp()
+    if (codAdvanceOnline) return payCodAdvance()
     return placeCodOrder()
   }
   const primaryLabel = placing ? 'Processing…'
     : choice === 'online' ? `Pay Online · ${fmt(total)}`
-    : choice === 'whatsapp' ? 'Order on WhatsApp'
+    : codAdvanceOnline ? `Pay ${fmt(advanceAmount)} advance · COD`
     : `Place Order · ${fmt(total)}`
 
   /* ── Success ── */
@@ -453,27 +483,22 @@ export function Checkout() {
           <h1 className="font-display text-3xl mt-2 mb-2" style={{ color: 'var(--ink)' }}>{isUpi ? 'Payment Submitted!' : 'Order Placed!'}</h1>
           <p className="text-stone-500">
             {isUpi
-              ? <>We've received your payment reference for order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span>. We'll verify it and confirm your order shortly.</>
-              : <>Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> has been received. We'll reach out on WhatsApp to confirm.</>}
+              ? <>We've received your payment for order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span>. We'll verify it and confirm your order shortly.</>
+              : <>Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> is confirmed. Track it anytime in <Link to="/account" className="font-semibold underline" style={{ color: 'var(--maroon)' }}>your account</Link>.</>}
           </p>
           <p className="text-sm mt-2" style={{ color: 'var(--maroon)' }}>Total: {fmt(placed.total)}</p>
 
-          {/* Optional COD advance — confirm the order by paying a small advance on WhatsApp */}
-          {placed._advance && (
+          {/* COD advance paid online — show what's left to pay on delivery */}
+          {placed.advancePaid > 0 && (
             <div className="mt-6 rounded-2xl p-4 text-left" style={{ background: 'color-mix(in srgb, var(--gold) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--gold) 40%, transparent)' }}>
-              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>One quick step to confirm your COD order</p>
-              <p className="text-sm text-stone-600 mt-1">Please pay a <span className="font-semibold">{placed._advance.percent}% advance ({fmt(placed._advance.amount)})</span> on WhatsApp. The rest ({fmt(placed.total - placed._advance.amount)}) is collected on delivery.</p>
-              <WhatsAppButton
-                className="w-full mt-3"
-                label={`Pay ${fmt(placed._advance.amount)} advance on WhatsApp`}
-                message={`Hi! I'd like to pay the ${placed._advance.percent}% advance (${fmt(placed._advance.amount)}) to confirm my COD order ${placed.orderNo} (total ${fmt(placed.total)}).`}
-              />
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Advance received — order confirmed ✓</p>
+              <p className="text-sm text-stone-600 mt-1">You paid <span className="font-semibold">{fmt(placed.advancePaid)}</span> now. The balance <span className="font-semibold">{fmt(placed.total - placed.advancePaid)}</span> is collected on delivery.</p>
             </div>
           )}
 
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <Link to="/products" className="btn-maroon">Continue Shopping</Link>
-            {!placed._advance && <WhatsAppButton message={`Hi! About my order ${placed.orderNo}…`} label="Message us" />}
+            <Link to="/account" className="btn-outline-gold">View my orders</Link>
           </div>
         </div>
       </div>
@@ -711,8 +736,7 @@ export function Checkout() {
                   const active = choice === m
                   const meta = {
                     online: { icon: QrCode, title: 'Pay online', sub: 'UPI, cards, netbanking & wallets — instant', right: (settings.payments?.prepaidFreeShipping ? 'Free shipping' : null), rec: true },
-                    cod: { icon: Smartphone, title: 'Cash on Delivery', sub: advCfg.enabled && Number(advCfg.percent) > 0 ? `Pay ${advCfg.percent}% advance on WhatsApp to confirm` : 'Pay when it arrives', right: (Number(settings.payments?.codFee) > 0 ? `+${fmt(Number(settings.payments.codFee))}` : null) },
-                    whatsapp: { icon: Smartphone, title: 'Order on WhatsApp', sub: 'Chat with us to confirm & pay', right: null },
+                    cod: { icon: Smartphone, title: 'Cash on Delivery', sub: codAdvanceOnline ? `Pay ${advancePercent}% (${fmt(advanceAmount)}) advance now to confirm` : 'Pay when it arrives', right: (Number(settings.payments?.codFee) > 0 ? `+${fmt(Number(settings.payments.codFee))}` : null) },
                   }[m]
                   const Icon = meta.icon
                   return (

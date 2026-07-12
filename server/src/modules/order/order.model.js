@@ -36,10 +36,19 @@ const orderSchema = new mongoose.Schema(
     couponCode: { type: String, default: '' },
     total: { type: Number, default: 0 },
     channel: { type: String, enum: ['web', 'whatsapp'], default: 'web' },
+    // Orders start CONFIRMED (payment/advance done at checkout, inventory
+    // reserved). 'pending' is kept only for back-compat with old orders.
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'],
-      default: 'pending',
+      default: 'confirmed',
+    },
+    // Shipment tracking — filled by the owner when marking the order Shipped.
+    tracking: {
+      courier: { type: String, default: '' },
+      url: { type: String, default: '' },
+      message: { type: String, default: '' },
+      shippedAt: { type: Date, default: null },
     },
     // true once this order's items have been deducted from stock (on delivery).
     stockApplied: { type: Boolean, default: false },
@@ -50,6 +59,9 @@ const orderSchema = new mongoose.Schema(
     paymentStatus: { type: String, enum: ['unpaid', 'submitted', 'paid'], default: 'unpaid' },
     razorpayOrderId: { type: String, default: '' },
     razorpayPaymentId: { type: String, default: '' },
+    // COD advance (partial prepayment via Razorpay to confirm a COD order).
+    advancePaid: { type: Number, default: 0 },
+    advanceRazorpayPaymentId: { type: String, default: '' },
     // Direct-UPI manual flow
     upiRef: { type: String, default: '' },          // UTR / UPI reference no. from the customer
     paymentSubmittedAt: { type: Date, default: null },

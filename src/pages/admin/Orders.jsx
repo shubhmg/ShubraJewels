@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
@@ -10,15 +10,53 @@ const fmtN = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 const PAY_METHODS = [
   { value: 'cod', label: 'Cash on delivery' }, { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' }, { value: 'bank', label: 'Bank transfer' },
-  { value: 'whatsapp', label: 'WhatsApp' }, { value: 'razorpay', label: 'Razorpay (online)' },
+  { value: 'razorpay', label: 'Razorpay (online)' },
 ]
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
-const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+// 'pending' kept for legacy orders only; new orders start Confirmed.
+const STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled']
 const STATUS_COLOR = {
-  pending: 'bg-amber-50 text-amber-600', confirmed: 'bg-blue-50 text-blue-600',
+  pending: 'bg-blue-50 text-blue-600', confirmed: 'bg-blue-50 text-blue-600',
   shipped: 'bg-violet-50 text-violet-600', delivered: 'bg-emerald-50 text-emerald-600',
   cancelled: 'bg-red-50 text-red-600',
+}
+// Left-edge colour spine per status — instant visual scan.
+const STATUS_SPINE = {
+  pending: '#3b82f6', confirmed: '#3b82f6', shipped: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444',
+}
+
+// The single next-step action for an order (drives the primary button).
+function nextAction(status) {
+  if (status === 'pending' || status === 'confirmed') return { label: 'Mark Shipped', to: 'shipped', ship: true, icon: Truck }
+  if (status === 'shipped') return { label: 'Mark Delivered', to: 'delivered', icon: PackageCheck }
+  return null
+}
+
+// Compact horizontal stepper for the order detail.
+const STAGES = [{ key: 'confirmed', label: 'Confirmed' }, { key: 'shipped', label: 'Shipped' }, { key: 'delivered', label: 'Delivered' }]
+function Stepper({ status }) {
+  if (status === 'cancelled') return <span className="text-xs font-bold text-red-600">✖ Cancelled</span>
+  const idx = Math.max(0, STAGES.findIndex((s) => s.key === status))
+  return (
+    <div className="flex items-center">
+      {STAGES.map((s, i) => {
+        const done = i <= idx
+        const isLast = i === STAGES.length - 1
+        return (
+          <div key={s.key} className="flex items-center" style={{ flex: isLast ? '0 0 auto' : 1 }}>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full grid place-items-center shrink-0" style={{ background: done ? 'var(--maroon)' : '#e7e5e4', color: '#fff' }}>
+                {done ? <Check size={12} /> : <span className="w-1 h-1 rounded-full bg-stone-400" />}
+              </div>
+              <span className="text-[11px] font-semibold" style={{ color: done ? 'var(--ink)' : '#a8a29e' }}>{s.label}</span>
+            </div>
+            {!isLast && <div className="h-0.5 flex-1 mx-2 rounded-full" style={{ background: i < idx ? 'var(--maroon)' : '#e7e5e4' }} />}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // Payment badge — Paid, UPI-submitted (needs verifying), else COD / WhatsApp.
@@ -41,6 +79,7 @@ export function AdminOrders() {
   const [search, setSearch] = useState('')
   const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
+  const [shipFor, setShipFor] = useState(null) // order being marked shipped (tracking form)
 
   const [wiping, setWiping] = useState(false)
 
@@ -85,6 +124,14 @@ export function AdminOrders() {
   }
   const setStatus = (id, status) => patchOrder(id, { status })
 
+  // Run an order's next step. "Mark Shipped" opens the tracking form first.
+  const advance = (o) => {
+    const a = nextAction(o.status)
+    if (!a) return
+    if (a.ship) setShipFor(o)
+    else setStatus(o._id, a.to)
+  }
+
   const countFor = (s) => (s === 'all' ? (counts.all || 0) : (counts[s] || 0))
   const pages = Math.max(1, Math.ceil(total / PAGE_LIMIT))
 
@@ -99,6 +146,7 @@ export function AdminOrders() {
         <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
       </AdminHeader>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
+      {shipFor && <ShipModal order={shipFor} onClose={() => setShipFor(null)} onShipped={(u) => { setOrders((os) => os.map((o) => (o._id === u._id ? u : o))); setShipFor(null) }} />}
 
       {/* Search */}
       <div className="relative mb-4 max-w-sm">
@@ -139,28 +187,52 @@ export function AdminOrders() {
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
             const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
             return (
-              <div key={o._id} className="admin-row overflow-hidden">
+              <div key={o._id} className="admin-row overflow-hidden" style={{ borderLeft: `4px solid ${STATUS_SPINE[o.status] || '#3b82f6'}` }}>
                 <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setOpen(isOpen ? null : o._id)}>
-                  <div className="w-11 h-11 rounded-full grid place-items-center text-sm font-bold text-white shrink-0" style={{ background: 'var(--maroon)' }}>{initial}</div>
+                  <div className="w-11 h-11 rounded-full grid place-items-center text-sm font-bold text-white shrink-0 hidden sm:grid" style={{ background: 'var(--maroon)' }}>{initial}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-zinc-900">{o.orderNo}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${STATUS_COLOR[o.status]}`}>{o.status}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${STATUS_COLOR[o.status]}`}>{o.status === 'pending' ? 'confirmed' : o.status}</span>
                       {(() => { const b = payBadge(o); return <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${b.cls}`}>{b.label}</span> })()}
                     </div>
                     <p className="text-sm text-zinc-700 truncate mt-0.5">{o.customer?.name}</p>
-                    <p className="text-xs text-zinc-400">{date} · {o.items?.length} item(s) · {o.channel}</p>
+                    <p className="text-xs text-zinc-400">{date} · {o.items?.length} item(s)</p>
                   </div>
-                  <div className="flex flex-col items-end shrink-0">
+                  <div className="flex flex-col items-end shrink-0 gap-2">
                     <p className="font-bold text-lg leading-none" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</p>
-                    <span className="text-[11px] text-zinc-400 mt-1.5 flex items-center gap-0.5">
-                      {isOpen ? 'Hide' : 'Details'}{isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                    </span>
+                    {(() => {
+                      const a = nextAction(o.status)
+                      return a ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); advance(o) }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white cursor-pointer transition hover:brightness-110"
+                          style={{ background: 'var(--maroon)' }}
+                        >
+                          <a.icon size={13} /> {a.label}
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-zinc-400 flex items-center gap-0.5">{isOpen ? 'Hide' : 'Details'}{isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
+                      )
+                    })()}
                   </div>
                 </div>
 
                 {isOpen && (
                   <div className="border-t border-zinc-100 bg-zinc-50/60 p-4 space-y-4">
+                    {/* Progress */}
+                    <div className="bg-white rounded-xl p-3 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
+
+                    {/* Tracking summary when shipped */}
+                    {(o.status === 'shipped' || o.status === 'delivered') && (o.tracking?.message || o.tracking?.url || o.tracking?.courier) && (
+                      <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #8b5cf6 8%, transparent)' }}>
+                        <p className="font-semibold text-violet-700 flex items-center gap-1.5"><Truck size={14} /> {o.tracking?.courier || 'Shipment'}</p>
+                        {o.tracking?.message && <p className="text-zinc-600 mt-0.5">{o.tracking.message}</p>}
+                        {o.tracking?.url && <a href={o.tracking.url} target="_blank" rel="noopener noreferrer" className="text-violet-600 font-semibold text-xs">{o.tracking.url}</a>}
+                        <button onClick={() => setShipFor(o)} className="block mt-1.5 text-xs text-zinc-500 underline cursor-pointer">Edit tracking</button>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       {o.items.map((it, i) => (
                         <div key={i} className="flex items-center gap-3 text-sm">
@@ -186,11 +258,10 @@ export function AdminOrders() {
                         {o.notes && <p className="text-zinc-500 mt-2 italic">“{o.notes}”</p>}
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">Update status</p>
-                        <Dropdown value={o.status} onChange={(v) => setStatus(o._id, v)} align="left" options={STATUSES.map((s) => ({ value: s, label: s }))} />
-                        <p className="text-[11px] text-zinc-400 mt-2">Marking <b>Delivered</b> deducts stock and marks the order paid.</p>
-
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold mt-4">Payment</p>
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">Payment</p>
+                        {o.advancePaid > 0 && (
+                          <p className="text-xs text-zinc-600 mb-2">Advance <b>{fmt(o.advancePaid)}</b> paid · balance <b>{fmt(o.total - o.advancePaid)}</b> on delivery</p>
+                        )}
                         {/* Direct-UPI: show the customer-submitted reference to verify against the bank statement */}
                         {o.paymentMethod === 'upi' && o.upiRef && (
                           <div className="mb-2.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs">
@@ -208,6 +279,10 @@ export function AdminOrders() {
                             {o.paymentStatus === 'paid' ? <><Check size={13} className="inline -mt-0.5" /> Paid</> : 'Mark paid'}
                           </button>
                         </div>
+
+                        {/* Edge-case status override */}
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold mt-4">Change stage</p>
+                        <Dropdown value={o.status === 'pending' ? 'confirmed' : o.status} onChange={(v) => setStatus(o._id, v)} align="left" options={STATUSES.map((s) => ({ value: s, label: s }))} />
                       </div>
                     </div>
                   </div>
@@ -231,14 +306,49 @@ export function AdminOrders() {
   )
 }
 
-// Manually log an order (e.g. from WhatsApp) with real line items + payment.
+// Mark an order Shipped with tracking details the customer will see.
+function ShipModal({ order, onClose, onShipped }) {
+  const [courier, setCourier] = useState(order.tracking?.courier || '')
+  const [url, setUrl] = useState(order.tracking?.url || '')
+  const [message, setMessage] = useState(order.tracking?.message || '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const alreadyShipped = order.status === 'shipped' || order.status === 'delivered'
+
+  const submit = async () => {
+    setSaving(true); setErr('')
+    try {
+      const patch = { tracking: { courier: courier.trim(), url: url.trim(), message: message.trim() } }
+      if (!alreadyShipped) patch.status = 'shipped'
+      const updated = await api.patch(`/orders/${order._id}`, patch, { auth: true })
+      onShipped(updated)
+    } catch (e) { setErr(e.message || 'Could not save'); setSaving(false) }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={alreadyShipped ? 'Edit tracking' : `Ship ${order.orderNo}`} footer={<>
+      <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+      <Btn onClick={submit} disabled={saving}><Truck size={15} /> {saving ? 'Saving…' : (alreadyShipped ? 'Save tracking' : 'Mark Shipped')}</Btn>
+    </>}>
+      <p className="text-sm text-zinc-500 -mt-1 mb-1">These details show on the customer's order tracker. All optional.</p>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <Field field={{ label: 'Courier / partner', placeholder: 'e.g. Delhivery, India Post' }} value={courier} onChange={setCourier} />
+        <Field field={{ label: 'Tracking link', placeholder: 'https://…' }} value={url} onChange={setUrl} />
+      </div>
+      <Field field={{ label: 'Message to customer', type: 'textarea', placeholder: 'e.g. Shipped today — expected delivery in 3–4 days.' }} value={message} onChange={setMessage} />
+      {err && <p className="text-sm text-red-600">{err}</p>}
+    </Modal>
+  )
+}
+
+// Manually log an order with real line items + payment.
 function NewOrderModal({ onClose, onCreated }) {
   const [products, setProducts] = useState([])
   const [lines, setLines] = useState([])
   const [cust, setCust] = useState({ name: '', phone: '', email: '' })
   const [addr, setAddr] = useState({ line1: '', city: '', pincode: '' })
-  const [status, setStatus] = useState('pending')
-  const [method, setMethod] = useState('whatsapp')
+  const [status, setStatus] = useState('confirmed')
+  const [method, setMethod] = useState('cod')
   const [paid, setPaid] = useState(false)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)

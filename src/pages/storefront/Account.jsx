@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, LogOut, Package, Star, X } from 'lucide-react'
+import { Loader2, LogOut, Package, Star, X, Check, Truck, ExternalLink } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { useCustomerStore } from '../../store/customerStore.js'
 import { AuthModal } from '../../components/auth/AuthModal.jsx'
@@ -8,9 +8,46 @@ import { Motif } from '../../components/decor/Decor.jsx'
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 const STATUS_COLOR = {
-  pending: 'bg-amber-100 text-amber-700', confirmed: 'bg-blue-100 text-blue-700',
+  pending: 'bg-blue-100 text-blue-700', confirmed: 'bg-blue-100 text-blue-700',
   shipped: 'bg-violet-100 text-violet-700', delivered: 'bg-emerald-100 text-emerald-700',
   cancelled: 'bg-red-100 text-red-700',
+}
+
+// Modern order progress stepper: Confirmed → Shipped → Delivered.
+const STAGES = [
+  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'shipped', label: 'Shipped' },
+  { key: 'delivered', label: 'Delivered' },
+]
+function OrderProgress({ status }) {
+  if (status === 'cancelled') {
+    return (
+      <div className="mt-3 rounded-xl px-3 py-2 text-sm font-semibold text-center" style={{ background: 'color-mix(in srgb, #ef4444 12%, transparent)', color: '#b91c1c' }}>
+        This order was cancelled
+      </div>
+    )
+  }
+  // 'pending' (legacy) reads as Confirmed.
+  const idx = Math.max(0, STAGES.findIndex((s) => s.key === status))
+  return (
+    <div className="mt-4 flex items-center">
+      {STAGES.map((s, i) => {
+        const done = i <= idx
+        const isLast = i === STAGES.length - 1
+        return (
+          <div key={s.key} className="flex items-center" style={{ flex: isLast ? '0 0 auto' : 1 }}>
+            <div className="flex flex-col items-center gap-1" style={{ width: 34 }}>
+              <div className="w-7 h-7 rounded-full grid place-items-center shrink-0 transition-colors" style={{ background: done ? 'var(--maroon)' : 'color-mix(in srgb, var(--ink) 8%, transparent)', color: done ? '#fff' : 'var(--muted, #a8a29e)' }}>
+                {done ? <Check size={15} /> : <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />}
+              </div>
+              <span className="text-[10px] font-semibold whitespace-nowrap" style={{ color: done ? 'var(--ink)' : '#a8a29e' }}>{s.label}</span>
+            </div>
+            {!isLast && <div className="h-0.5 flex-1 mx-1 -mt-4 rounded-full" style={{ background: i < idx ? 'var(--maroon)' : 'color-mix(in srgb, var(--ink) 10%, transparent)' }} />}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export function Account() {
@@ -94,10 +131,30 @@ export function Account() {
                       <p className="text-xs text-stone-400">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {o.items?.length} item(s)</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide ${STATUS_COLOR[o.status]}`}>{o.status}</span>
+                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide ${STATUS_COLOR[o.status] || STATUS_COLOR.confirmed}`}>{o.status === 'pending' ? 'confirmed' : o.status}</span>
                       <span className="font-bold" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</span>
                     </div>
                   </div>
+
+                  {/* Progress + tracking */}
+                  <OrderProgress status={o.status} />
+                  {(o.status === 'shipped' || o.status === 'delivered') && (o.tracking?.message || o.tracking?.url || o.tracking?.courier) && (
+                    <div className="mt-3 rounded-xl p-3" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)' }}>
+                      <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--ink)' }}>
+                        <Truck size={15} style={{ color: 'var(--maroon)' }} /> Shipment {o.tracking?.courier ? `· ${o.tracking.courier}` : ''}
+                      </p>
+                      {o.tracking?.message && <p className="text-[13px] text-stone-600 mt-1">{o.tracking.message}</p>}
+                      {o.tracking?.url && (
+                        <a href={o.tracking.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-sm font-semibold" style={{ color: 'var(--maroon)' }}>
+                          Track shipment <ExternalLink size={13} />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
+                    <p className="mt-3 text-xs text-stone-500">Advance {fmt(o.advancePaid)} paid · {fmt(o.total - o.advancePaid)} due on delivery</p>
+                  )}
+
                   <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
                     {o.items.map((it, i) => {
                       const rev = it.productId && reviewOf(it.productId)

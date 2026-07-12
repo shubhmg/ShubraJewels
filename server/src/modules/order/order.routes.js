@@ -1,7 +1,6 @@
 import express from 'express';
 import Joi from 'joi';
 import Order from './order.model.js';
-import Product from '../product/product.model.js';
 import Coupon from '../coupon/coupon.model.js';
 import { getSettings } from '../setting/setting.model.js';
 import { resolveCoupon } from '../coupon/coupon.service.js';
@@ -9,6 +8,7 @@ import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, paymentSubmittedMessage, verifyKeyboard, orderPhotos } from '../../utils/notify.js';
+import { reconcileOrderStock } from './orderStock.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -97,6 +97,11 @@ router.post(
 
     if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
 
+    // Reserve inventory now (order is created Confirmed). Unpaid manual-UPI
+    // orders reserve later, on payment submit — see reconcileOrderStock.
+    await reconcileOrderStock(order);
+    await order.save();
+
     // Ping the owner on Telegram (best-effort — never blocks the response).
     // UPI orders carry Mark-paid / Cancel buttons so payment can be confirmed
     // straight from the alert, even before the customer submits a screenshot.
@@ -130,6 +135,7 @@ router.patch(
     order.upiRef = (req.body.upiRef || '').trim();
     order.paymentSubmittedAt = new Date();
     order.expiresAt = null; // submitted — no longer an abandoned order
+    await reconcileOrderStock(order); // reserve stock now that payment is claimed
     await order.save();
 
     // Alert the owner that a UPI payment needs verification, with inline
@@ -178,20 +184,8 @@ router.get(
   })
 );
 
-// Adjust product stock by a signed multiplier (+1 restock, -1 deduct); clamps at 0.
-async function applyOrderStock(order, sign) {
-  for (const it of order.items) {
-    if (!it.productId) continue;
-    const p = await Product.findById(it.productId);
-    if (!p) continue;
-    p.stockQty = Math.max(0, (p.stockQty || 0) + sign * it.qty);
-    p.inStock = p.stockQty > 0;
-    await p.save();
-  }
-}
-
-// ADMIN — update status / notes. Stock is deducted when an order becomes
-// 'delivered', and added back if it later leaves 'delivered' (or is cancelled).
+// ADMIN — update status / notes / tracking. Stock is reserved when an order is
+// confirmed and released if it's cancelled (see reconcileOrderStock).
 router.patch(
   '/:id',
   requireAdmin,
@@ -202,6 +196,11 @@ router.patch(
       paymentStatus: Joi.string().valid('unpaid', 'submitted', 'paid'),
       paymentMethod: Joi.string().valid('none', 'razorpay', 'cod', 'whatsapp', 'cash', 'upi', 'bank'),
       notes: Joi.string().allow('').max(1000),
+      tracking: Joi.object({
+        courier: Joi.string().allow('').max(80),
+        url: Joi.string().allow('').max(500),
+        message: Joi.string().allow('').max(500),
+      }),
     }).min(1),
   }),
   asyncHandler(async (req, res) => {
@@ -213,19 +212,22 @@ router.patch(
     if (req.body.paymentMethod !== undefined) order.paymentMethod = req.body.paymentMethod;
     order.expiresAt = null; // admin touched it — keep it, never auto-expire
 
-    const delivered = order.status === 'delivered';
-    if (delivered && !order.stockApplied) {
-      await applyOrderStock(order, -1);
-      order.stockApplied = true;
-    } else if (!delivered && order.stockApplied) {
-      await applyOrderStock(order, +1);
-      order.stockApplied = false;
+    // Shipment tracking (courier / link / message), typically set with Shipped.
+    if (req.body.tracking && typeof req.body.tracking === 'object') {
+      const t = req.body.tracking;
+      if (t.courier !== undefined) order.tracking.courier = t.courier;
+      if (t.url !== undefined) order.tracking.url = t.url;
+      if (t.message !== undefined) order.tracking.message = t.message;
     }
+    if (order.status === 'shipped' && !order.tracking.shippedAt) order.tracking.shippedAt = new Date();
+
+    // Reserve / release inventory to match the new state.
+    await reconcileOrderStock(order);
 
     // Cash is collected on delivery — COD/WhatsApp orders become paid when delivered
     // (and revert to unpaid if moved back). Razorpay + UPI keep their own status.
     const collectOnDelivery = ['cod', 'whatsapp', 'cash', 'none'].includes(order.paymentMethod);
-    if (delivered) {
+    if (order.status === 'delivered') {
       if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
     } else if (collectOnDelivery) {
       order.paymentStatus = 'unpaid';
@@ -256,8 +258,8 @@ router.post(
         line1: Joi.string().allow('').max(200), line2: Joi.string().allow('').max(200), landmark: Joi.string().allow('').max(120),
         city: Joi.string().allow('').max(80), state: Joi.string().allow('').max(80), pincode: Joi.string().allow('').max(12),
       }).default({}),
-      status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled').default('pending'),
-      paymentMethod: Joi.string().valid('cod', 'whatsapp', 'cash', 'upi', 'bank').default('whatsapp'),
+      status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled').default('confirmed'),
+      paymentMethod: Joi.string().valid('cod', 'cash', 'upi', 'bank').default('cod'),
       paymentStatus: Joi.string().valid('unpaid', 'paid').default('unpaid'),
       notes: Joi.string().allow('').max(1000),
     }),
@@ -272,18 +274,15 @@ router.post(
       customer: req.body.customer,
       address: req.body.address || {},
       subtotal, shipping: 0, total: subtotal,
-      channel: 'whatsapp',
+      channel: 'web',
       status: req.body.status,
       paymentMethod: req.body.paymentMethod,
       paymentStatus: req.body.paymentStatus,
       notes: req.body.notes || '',
     });
-    // Deduct stock if logged as already delivered; delivered also implies paid.
-    if (order.status === 'delivered') {
-      await applyOrderStock(order, -1);
-      order.stockApplied = true;
-      if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
-    }
+    if (order.status === 'delivered' && order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
+    // Reserve stock to match the logged state (confirmed/shipped/delivered).
+    await reconcileOrderStock(order);
     await order.save();
     res.status(201).json({ success: true, data: order });
   })

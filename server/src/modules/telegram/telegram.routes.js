@@ -3,6 +3,7 @@ import asyncHandler from '../../utils/asyncHandler.js';
 import { getSettings } from '../setting/setting.model.js';
 import Order from '../order/order.model.js';
 import { tgApi } from '../../utils/notify.js';
+import { reconcileOrderStock } from '../order/orderStock.js';
 
 const router = express.Router();
 
@@ -60,12 +61,14 @@ router.post(
       order.paymentStatus = 'paid';
       order.expiresAt = null;
       if (!order.paymentVerifiedAt) order.paymentVerifiedAt = new Date();
+      await reconcileOrderStock(order); // reserve if this was an unpaid UPI order
       await order.save();
       note = '✅ Marked <b>PAID</b>';
       await answer('Marked paid ✅');
     } else if (action === 'cancel') {
       order.status = 'cancelled';
       order.expiresAt = null;
+      await reconcileOrderStock(order); // release reserved stock
       await order.save();
       note = '✖ Order <b>CANCELLED</b>';
       await answer('Order cancelled');
