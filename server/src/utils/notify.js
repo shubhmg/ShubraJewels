@@ -79,6 +79,12 @@ export async function deleteTelegramWebhook(token) {
   return tgApi(token, 'deleteWebhook', {});
 }
 
+// Diagnostics: what does Telegram think our webhook is? Surfaces the last
+// delivery error so button-tap failures are debuggable from the admin panel.
+export async function getWebhookInfo(token) {
+  return tgApi(token, 'getWebhookInfo', {});
+}
+
 const PAYMENT_LABEL = {
   none: 'Not set', razorpay: 'Online', cod: 'COD', whatsapp: 'WhatsApp', cash: 'Cash', upi: 'UPI', bank: 'Bank',
 };

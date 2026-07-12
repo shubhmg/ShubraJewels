@@ -90,8 +90,13 @@ export function AdminSettings() {
     setTgTest({ loading: true })
     try {
       await api.patch('/settings', { notifications: s.notifications }, { auth: true }) // save first so the test uses current values
-      await api.post('/settings/test-telegram', {}, { auth: true })
-      setTgTest({ ok: true, msg: 'Sent! Check your Telegram.' })
+      const data = await api.post('/settings/test-telegram', {}, { auth: true })
+      const w = data?.webhook || {}
+      let msg = 'Sent! Check your Telegram. '
+      if (w.registered && !w.lastError) msg += 'Buttons are active ✓'
+      else if (w.registered && w.lastError) msg += `Buttons registered but Telegram reports: "${w.lastError}"`
+      else msg += `Buttons NOT registered${w.registerError ? ` — ${w.registerError}` : ''}.`
+      setTgTest({ ok: true, warn: !w.registered || !!w.lastError, msg })
     } catch (e) {
       setTgTest({ ok: false, msg: e.message || 'Could not send.' })
     }
@@ -294,7 +299,7 @@ export function AdminSettings() {
               {tgTest?.loading ? 'Sending…' : 'Send test'}
             </Btn>
             {tgTest && !tgTest.loading && (
-              <span className="text-sm font-medium" style={{ color: tgTest.ok ? '#15803d' : '#b91c1c' }}>{tgTest.msg}</span>
+              <span className="text-sm font-medium" style={{ color: !tgTest.ok ? '#b91c1c' : tgTest.warn ? '#b45309' : '#15803d' }}>{tgTest.msg}</span>
             )}
           </div>
           <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>

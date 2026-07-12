@@ -4,7 +4,7 @@ import requireAdmin from '../../middleware/auth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 import env from '../../config/env.js';
 import { getSettings } from './setting.model.js';
-import { sendTelegram, setTelegramWebhook, deleteTelegramWebhook } from '../../utils/notify.js';
+import { sendTelegram, setTelegramWebhook, deleteTelegramWebhook, getWebhookInfo } from '../../utils/notify.js';
 
 const router = express.Router();
 
@@ -15,17 +15,17 @@ const publicBase = () => (env.publicUrl || 'https://shubrajewels.shop').replace(
 // Ensures a webhook secret exists. Best-effort; mutates + saves the doc.
 async function syncTelegramWebhook(doc) {
   const tg = doc.notifications?.telegram;
-  if (!tg) return;
+  if (!tg) return null;
   if (tg.enabled && tg.botToken) {
     if (!tg.webhookSecret) {
       tg.webhookSecret = crypto.randomBytes(16).toString('hex');
       doc.markModified('notifications');
       await doc.save();
     }
-    await setTelegramWebhook(tg.botToken, `${publicBase()}/api/telegram/webhook`, tg.webhookSecret);
-  } else if (tg.botToken) {
-    await deleteTelegramWebhook(tg.botToken);
+    return setTelegramWebhook(tg.botToken, `${publicBase()}/api/telegram/webhook`, tg.webhookSecret);
   }
+  if (tg.botToken) return deleteTelegramWebhook(tg.botToken);
+  return null;
 }
 
 // Public: current settings. SECRETS (notifications.telegram — the bot token)
@@ -101,10 +101,22 @@ router.post(
   requireAdmin,
   asyncHandler(async (_req, res) => {
     const doc = await getSettings();
-    await syncTelegramWebhook(doc).catch(() => {}); // ensure buttons work too
+    const reg = await syncTelegramWebhook(doc).catch((e) => ({ ok: false, description: e.message }));
     const r = await sendTelegram(doc, '✅ Test alert from Shubra Jewels — order notifications are working. Payment-verify buttons are active.');
-    if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Could not send. Check the token and chat id.' });
-    res.json({ success: true, data: { sent: true } });
+
+    // Report the webhook state so button failures are diagnosable in the UI.
+    const info = await getWebhookInfo(doc.notifications?.telegram?.botToken).catch(() => null);
+    const w = info?.result || {};
+    const webhook = {
+      registered: !!w.url,
+      url: w.url || '',
+      lastError: w.last_error_message || '',
+      pending: w.pending_update_count || 0,
+      registerError: reg && reg.ok === false ? reg.description : '',
+    };
+
+    if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Could not send. Check the token and chat id.', data: { webhook } });
+    res.json({ success: true, data: { sent: true, webhook } });
   })
 );
 
