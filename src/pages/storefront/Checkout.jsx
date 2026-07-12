@@ -42,7 +42,7 @@ function summarizeAddr(a) {
 function calcCharges(settings, addr, subtotal, choice) {
   const base = calcShipping(settings, addr, subtotal)
   const pay = settings.payments || {}
-  const prepaid = choice === 'upi' || choice === 'razorpay'
+  const prepaid = choice === 'online' || choice === 'upi' || choice === 'razorpay'
   const shipping = (prepaid && pay.prepaidFreeShipping) ? 0 : base
   const codFee = choice === 'cod' ? Math.max(0, Number(pay.codFee) || 0) : 0
   return { shipping, codFee }
@@ -115,15 +115,19 @@ export function Checkout() {
   const codEnabled = settings.payments?.cod !== false
   const razorpayEnabled = settings.payments?.razorpay !== false
 
+  // Which flow backs the single "Pay online" tile. The direct-UPI stopgap wins
+  // while it's on; once the gateway is live the admin turns UPI off and Razorpay
+  // takes over — the customer always sees just one "Pay online" option.
+  const onlineMode = upiEnabled ? 'upi' : (razorpayEnabled ? 'razorpay' : null)
+
   // Available payment methods, in display order (prepaid first).
   const methods = useMemo(() => {
     const m = []
-    if (upiEnabled) m.push('upi')
-    if (razorpayEnabled) m.push('razorpay')
+    if (onlineMode) m.push('online')
     if (codEnabled) m.push('cod')
     m.push('whatsapp')
     return m
-  }, [upiEnabled, razorpayEnabled, codEnabled])
+  }, [onlineMode, codEnabled])
 
   const [paymentChoice, setPaymentChoice] = useState(null)
   useEffect(() => { if (!paymentChoice && methods.length) setPaymentChoice(methods[0]) }, [methods]) // eslint-disable-line
@@ -420,16 +424,15 @@ export function Checkout() {
     } catch { /* ignore */ }
   }
 
-  // Single primary CTA — runs the flow for the selected payment method.
+  // Single primary CTA — runs the flow for the selected payment method. The
+  // "online" tile dispatches to whichever backend flow the admin has enabled.
   const primary = () => {
-    if (choice === 'upi') return payUpi()
-    if (choice === 'razorpay') return payOnline()
+    if (choice === 'online') return onlineMode === 'upi' ? payUpi() : payOnline()
     if (choice === 'whatsapp') return orderViaWhatsApp()
     return placeCodOrder()
   }
   const primaryLabel = placing ? 'Processing…'
-    : choice === 'upi' ? `Pay via UPI · ${fmt(total)}`
-    : choice === 'razorpay' ? `Pay Online · ${fmt(total)}`
+    : choice === 'online' ? `Pay Online · ${fmt(total)}`
     : choice === 'whatsapp' ? 'Order on WhatsApp'
     : `Place Order · ${fmt(total)}`
 
@@ -701,8 +704,7 @@ export function Checkout() {
                 {methods.map((m) => {
                   const active = choice === m
                   const meta = {
-                    upi: { icon: QrCode, title: 'Pay now · UPI', sub: 'Scan a QR & pay instantly — fastest', right: (settings.payments?.prepaidFreeShipping ? 'Free shipping' : null), rec: true },
-                    razorpay: { icon: QrCode, title: 'Pay online', sub: 'UPI, cards, netbanking, wallets', right: (settings.payments?.prepaidFreeShipping ? 'Free shipping' : null), rec: !upiEnabled },
+                    online: { icon: QrCode, title: 'Pay online', sub: 'UPI, cards, netbanking & wallets — instant', right: (settings.payments?.prepaidFreeShipping ? 'Free shipping' : null), rec: true },
                     cod: { icon: Smartphone, title: 'Cash on Delivery', sub: advCfg.enabled && Number(advCfg.percent) > 0 ? `Pay ${advCfg.percent}% advance on WhatsApp to confirm` : 'Pay when it arrives', right: (Number(settings.payments?.codFee) > 0 ? `+${fmt(Number(settings.payments.codFee))}` : null) },
                     whatsapp: { icon: Smartphone, title: 'Order on WhatsApp', sub: 'Chat with us to confirm & pay', right: null },
                   }[m]
@@ -736,7 +738,7 @@ export function Checkout() {
               )}
 
               <button onClick={primary} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60 flex items-center justify-center gap-2">
-                {choice === 'upi' && <QrCode size={18} />}{primaryLabel}
+                {choice === 'online' && <QrCode size={18} />}{primaryLabel}
               </button>
               <p className="text-xs text-stone-400 text-center">100% secure · your details are encrypted.</p>
             </div>
