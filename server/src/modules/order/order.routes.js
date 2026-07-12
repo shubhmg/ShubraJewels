@@ -8,6 +8,7 @@ import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
+import { sendOrderConfirmation } from '../../utils/mailer.js';
 import { reconcileOrderStock } from './orderStock.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
@@ -32,7 +33,7 @@ router.post(
       customer: Joi.object({
         name: Joi.string().max(120).required(),
         phone: Joi.string().max(20).required(),
-        email: Joi.string().email().allow('').default(''),
+        email: Joi.string().email().required(),
       }).required(),
       address: Joi.object({
         line1: Joi.string().allow('').max(200),
@@ -94,6 +95,9 @@ router.post(
 
     // Ping the owner on Telegram (best-effort — never blocks the response).
     sendTelegram(settings, orderMessage(order), { photos: orderPhotos(order) }).catch(() => {});
+
+    // Send order confirmation email to the customer (best-effort).
+    sendOrderConfirmation(order.toObject(), settings).catch(() => {});
 
     res.status(201).json({ success: true, data: order });
   })

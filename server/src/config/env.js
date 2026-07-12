@@ -33,6 +33,14 @@ const env = {
   // Comma-separated allowed origins in production (falls back to reflecting any
   // origin only if unset — set this to the real domain(s) in prod).
   corsOrigin: process.env.CORS_ORIGIN || '',
+
+  // Brevo (Sendinblue) SMTP — used for order confirmation emails.
+  brevoSmtpHost: process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com',
+  brevoSmtpPort: process.env.BREVO_SMTP_PORT || '587',
+  brevoSmtpUser: process.env.BREVO_SMTP_USER || '',
+  brevoSmtpPass: process.env.BREVO_SMTP_PASS || '',
+  emailFrom: process.env.EMAIL_FROM || '',
+  emailFromName: process.env.EMAIL_FROM_NAME || 'Shubra Jewels',
 };
 
 export default env;

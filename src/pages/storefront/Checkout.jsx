@@ -153,7 +153,8 @@ export function Checkout() {
     const e = {}
     if (contact.name.trim().length < 2) e.name = 'Enter your full name'
     if (!/^[6-9]\d{9}$/.test(contact.phone.replace(/\D/g, ''))) e.phone = 'Enter a valid 10-digit mobile number'
-    if (contact.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim())) e.email = 'Enter a valid email address'
+    if (!contact.email.trim()) e.email = 'Email address is required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim())) e.email = 'Enter a valid email address'
     if (!effAddr.line1.trim()) e.line1 = 'Enter your street address'
     if (!effAddr.state.trim()) e.state = 'Select your state'
     if (!effAddr.city.trim()) e.city = 'Enter your city'
@@ -483,7 +484,15 @@ export function Checkout() {
                 <Field label="Full Name" required value={contact.name} onChange={(v) => setC('name', v)} onBlur={() => markTouched('name')} placeholder="Priya Sharma" error={showErr('name')} />
                 <Field label="Mobile Number" required type="tel" inputMode="numeric" maxLength={10} value={contact.phone} onChange={(v) => setC('phone', v.replace(/\D/g, ''))} onBlur={() => markTouched('phone')} placeholder="10-digit mobile" error={showErr('phone')} prefix="+91" />
               </div>
-              <Field label="Email (optional)" type="email" value={contact.email} onChange={(v) => setC('email', v)} onBlur={() => markTouched('email')} placeholder="you@example.com" error={showErr('email')} />
+              {signedIn ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-sm" style={{ borderColor: 'var(--gold)', background: 'color-mix(in srgb, var(--gold) 8%, transparent)', color: 'var(--ink)' }}>
+                  <span style={{ color: 'var(--gold)' }}>✉</span>
+                  <span className="font-medium">{contact.email}</span>
+                  <span className="ml-auto text-xs opacity-60">from your account</span>
+                </div>
+              ) : (
+                <Field label="Email" required type="email" value={contact.email} onChange={(v) => setC('email', v)} onBlur={() => markTouched('email')} placeholder="you@example.com" error={showErr('email')} />
+              )}
             </div>
 
             {/* Address */}

@@ -79,6 +79,8 @@ Setting (singleton: slogan, taglines, whatsappNumber, freeShippingCity, socials 
 - **Custom dropdown:** `components/ui/Dropdown.jsx` (styled select replacement) used for the Products sort (replaced the native `<select>`).
 - **Admin orders:** status filter tabs (all/pending/confirmed/shipped/delivered/cancelled with counts) on `pages/admin/Orders.jsx`.
 
+- **Order confirmation email:** `utils/mailer.js` — nodemailer + Brevo SMTP. Sends a royal branded HTML email to the customer's email on order placement (best-effort, like Telegram). Config: `BREVO_SMTP_HOST/PORT/USER/PASS` + `EMAIL_FROM` + `EMAIL_FROM_NAME` in `server/.env`. Falls back silently if no email provided or SMTP not configured.
+
 ## Remaining (not code — go-live)
 - Set real WhatsApp number + brand/contact/socials in `/admin/settings` (`instagramUrl` powers the footer handle and gallery wall label).
 - Replace seed placeholder images/videos with real uploads (admin drag-drop).
