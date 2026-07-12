@@ -15,6 +15,7 @@ import { resolveCoupon } from '../coupon/coupon.service.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { nextOrderNo } from '../../utils/sequence.js';
+import { sendTelegram, orderMessage } from '../../utils/notify.js';
 
 const router = express.Router();
 const objectId = Joi.string().hex().length(24);
@@ -105,6 +106,10 @@ async function finalizeIntent(intent, paymentId) {
   intent.status = 'completed';
   intent.orderId = order._id;
   await intent.save();
+
+  // Notify the owner of the new (paid) online order — best-effort.
+  getSettings().then((s) => sendTelegram(s, orderMessage(order))).catch(() => {});
+
   return order;
 }
 

@@ -136,6 +136,17 @@ const settingSchema = new mongoose.Schema(
       prepaidFreeShipping: { type: Boolean, default: false },
     },
 
+    // Order notifications. SECRET — the Telegram bot token must never be sent to
+    // the public storefront; the /settings GET strips `notifications` and the
+    // admin panel reads it via GET /settings/admin.
+    notifications: {
+      telegram: {
+        enabled: { type: Boolean, default: false },
+        botToken: { type: String, default: '' }, // from @BotFather
+        chatId: { type: String, default: '' },   // your chat/group id (comma-separate for several)
+      },
+    },
+
     // Fully admin-editable homepage layout (hero + ordered sections)
     homepage: {
       hero: {

@@ -8,6 +8,7 @@ import { resolveCoupon } from '../coupon/coupon.service.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
+import { sendTelegram, orderMessage, paymentSubmittedMessage } from '../../utils/notify.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -85,6 +86,9 @@ router.post(
 
     if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
 
+    // Ping the owner on Telegram (best-effort — never blocks the response).
+    sendTelegram(settings, orderMessage(order)).catch(() => {});
+
     res.status(201).json({ success: true, data: order });
   })
 );
@@ -110,6 +114,10 @@ router.patch(
     order.upiRef = (req.body.upiRef || '').trim();
     order.paymentSubmittedAt = new Date();
     await order.save();
+
+    // Alert the owner that a UPI payment needs verification.
+    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order))).catch(() => {});
+
     res.json({ success: true, data: { orderNo: order.orderNo, total: order.total, paymentStatus: order.paymentStatus } });
   })
 );

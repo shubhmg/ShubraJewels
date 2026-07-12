@@ -12,6 +12,7 @@ const TABS = [
   { id: 'brand', label: 'Brand' },
   { id: 'contact', label: 'Contact & Social' },
   { id: 'payments', label: 'Payments & Shipping' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'story', label: 'Our Story' },
   { id: 'content', label: 'Text & Content' },
   { id: 'policies', label: 'Legal Pages' },
@@ -78,8 +79,23 @@ export function AdminSettings() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [tab, setTab] = useState('brand')
+  const [tgTest, setTgTest] = useState(null) // { ok, msg } after a test send
 
-  useEffect(() => { api.get('/settings').then(setS) }, [])
+  // Admin endpoint returns secrets (Telegram token) that the public GET strips.
+  useEffect(() => { api.get('/settings/admin', { auth: true }).then(setS) }, [])
+
+  const setTg = (k, v) => setS((p) => ({ ...p, notifications: { ...p.notifications, telegram: { ...p.notifications?.telegram, [k]: v } } }))
+
+  const testTelegram = async () => {
+    setTgTest({ loading: true })
+    try {
+      await api.patch('/settings', { notifications: s.notifications }, { auth: true }) // save first so the test uses current values
+      await api.post('/settings/test-telegram', {}, { auth: true })
+      setTgTest({ ok: true, msg: 'Sent! Check your Telegram.' })
+    } catch (e) {
+      setTgTest({ ok: false, msg: e.message || 'Could not send.' })
+    }
+  }
 
   const set = (k, v) => setS((p) => ({ ...p, [k]: v }))
   const setTheme = (k, v) => setS((p) => ({ ...p, theme: { ...p.theme, [k]: v } }))
@@ -244,6 +260,37 @@ export function AdminSettings() {
             <Field field={{ label: 'Payee name', placeholder: 'Shubra Jewels', help: 'Shown in the customer’s UPI app' }} value={s.payments?.upi?.payeeName || ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, payeeName: v } } }))} />
           </div>
           <p className="text-xs text-zinc-400">Tip: use a UPI ID you can monitor. The order number rides along in the payment note so you can match it easily.</p>
+        </div>
+      </Section>
+      )}
+
+      {tab === 'notifications' && (
+      <Section title="Order Notifications" subtitle="Get an instant Telegram alert on your phone the moment an order comes in — and when a UPI payment needs verifying.">
+        <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
+          <p className="font-semibold mb-1.5">One-time setup (2 minutes):</p>
+          <ol className="list-decimal ml-5 space-y-1 text-zinc-600">
+            <li>In Telegram, open <b>@BotFather</b> → send <code>/newbot</code> → follow prompts. It gives you a <b>bot token</b> (like <code>1234:AbC…</code>). Paste it below.</li>
+            <li>Open your new bot, tap <b>Start</b>, and send it any message.</li>
+            <li>Open <b>@userinfobot</b> (or @RawDataBot) — it replies with your <b>chat id</b> (a number). Paste it below.</li>
+            <li>Turn on the toggle, hit <b>Send test</b>. You should get a message.</li>
+          </ol>
+          <p className="text-xs text-zinc-500 mt-2">For a shared group, add the bot to the group and use the group’s chat id (starts with <code>-</code>). Multiple ids? Separate with commas.</p>
+        </div>
+
+        <div className="space-y-4">
+          <Field field={{ label: 'Enable Telegram order alerts', type: 'toggle' }} value={!!s.notifications?.telegram?.enabled} onChange={(v) => setTg('enabled', v)} />
+          <Field field={{ label: 'Bot token', placeholder: '1234567890:AbCdEf…', help: 'From @BotFather. Kept private — never shown on the website.' }} value={s.notifications?.telegram?.botToken || ''} onChange={(v) => setTg('botToken', v.trim())} />
+          <Field field={{ label: 'Chat ID', placeholder: 'e.g. 812345678', help: 'Your Telegram numeric id (or a group id starting with -). Comma-separate for several.' }} value={s.notifications?.telegram?.chatId || ''} onChange={(v) => setTg('chatId', v.trim())} />
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <Btn variant="outline" onClick={testTelegram} disabled={tgTest?.loading || !s.notifications?.telegram?.botToken || !s.notifications?.telegram?.chatId}>
+              {tgTest?.loading ? 'Sending…' : 'Send test'}
+            </Btn>
+            {tgTest && !tgTest.loading && (
+              <span className="text-sm font-medium" style={{ color: tgTest.ok ? '#15803d' : '#b91c1c' }}>{tgTest.msg}</span>
+            )}
+          </div>
+          <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>
         </div>
       </Section>
       )}
