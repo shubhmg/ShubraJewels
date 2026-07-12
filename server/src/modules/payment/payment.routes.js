@@ -13,7 +13,7 @@ import PaymentIntent from './paymentIntent.model.js';
 import { getSettings } from '../setting/setting.model.js';
 import { resolveCoupon } from '../coupon/coupon.service.js';
 import { resolveItems } from '../../utils/resolveItems.js';
-import { computeShipping } from '../../utils/pricing.js';
+import { computeCharges } from '../../utils/pricing.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 
 const router = express.Router();
@@ -49,7 +49,8 @@ const addressSchema = Joi.object({
 async function priceOrder({ items, address, couponCode }) {
   const priced = await resolveItems(items);
   const settings = await getSettings();
-  const shipping = computeShipping(settings, address || {}, priced.subtotal);
+  // Razorpay is prepaid — gets free shipping when that reward is enabled.
+  const { shipping } = computeCharges(settings, address || {}, 'razorpay', priced.subtotal);
   let discount = 0;
   let coupon = null;
   if (couponCode) {

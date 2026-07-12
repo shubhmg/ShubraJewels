@@ -5,7 +5,7 @@ import Product from '../product/product.model.js';
 import Coupon from '../coupon/coupon.model.js';
 import { getSettings } from '../setting/setting.model.js';
 import { resolveCoupon } from '../coupon/coupon.service.js';
-import { computeShipping } from '../../utils/pricing.js';
+import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 import validate from '../../middleware/validate.js';
@@ -49,7 +49,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const { items, subtotal } = await resolveItems(req.body.items);
     const settings = await getSettings();
-    const shipping = computeShipping(settings, req.body.address || {}, subtotal);
+    const paymentMethod = req.body.paymentMethod || (req.body.channel === 'whatsapp' ? 'whatsapp' : 'cod');
+    const { shipping, codFee } = computeCharges(settings, req.body.address || {}, paymentMethod, subtotal);
 
     // Re-validate the coupon server-side (never trust a client-sent discount).
     let discount = 0;
@@ -63,7 +64,7 @@ router.post(
       appliedCoupon = r.coupon;
     }
 
-    const total = Math.max(0, subtotal + shipping - discount);
+    const total = Math.max(0, subtotal + shipping + codFee - discount);
     const order = await Order.create({
       orderNo: await nextOrderNo(),
       customerId: req.customer?.id || null,
@@ -72,11 +73,12 @@ router.post(
       address: req.body.address || {},
       subtotal,
       shipping,
+      codFee,
       discount,
       couponCode,
       total,
       channel: req.body.channel || 'web',
-      paymentMethod: req.body.paymentMethod || (req.body.channel === 'whatsapp' ? 'whatsapp' : 'cod'),
+      paymentMethod,
       paymentStatus: 'unpaid', // COD / WhatsApp orders are collected later
       notes: req.body.notes || '',
     });

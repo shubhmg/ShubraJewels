@@ -16,3 +16,15 @@ export function computeShipping(settings, addr, subtotal) {
   if (match) return Math.max(0, Number(match.charge) || 0);
   return Math.max(0, Number(s.defaultCharge) || 0);
 }
+
+// Shipping + COD fee for an order, given the payment method. Prepaid methods
+// (razorpay/upi) get free shipping when `prepaidFreeShipping` is on; COD adds
+// the flat `codFee`. Returns { shipping, codFee }.
+export function computeCharges(settings, address, paymentMethod, subtotal) {
+  const pay = (settings && settings.payments) || {};
+  const base = computeShipping(settings, address, subtotal);
+  const prepaid = paymentMethod === 'razorpay' || paymentMethod === 'upi';
+  const shipping = (prepaid && pay.prepaidFreeShipping) ? 0 : base;
+  const codFee = paymentMethod === 'cod' ? Math.max(0, Number(pay.codFee) || 0) : 0;
+  return { shipping, codFee };
+}

@@ -38,6 +38,16 @@ function summarizeAddr(a) {
   return [a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(', ')
 }
 
+// Shipping + COD fee for the selected payment method — mirrors server computeCharges.
+function calcCharges(settings, addr, subtotal, choice) {
+  const base = calcShipping(settings, addr, subtotal)
+  const pay = settings.payments || {}
+  const prepaid = choice === 'upi' || choice === 'razorpay'
+  const shipping = (prepaid && pay.prepaidFreeShipping) ? 0 : base
+  const codFee = choice === 'cod' ? Math.max(0, Number(pay.codFee) || 0) : 0
+  return { shipping, codFee }
+}
+
 // Single-city union territories — every PIN in them should resolve to one
 // canonical city, regardless of which sub-district/division India Post returns
 // (so Delhi PINs don't flip between "Delhi" and "New Delhi").
@@ -103,6 +113,22 @@ export function Checkout() {
   const signedIn = isAuthed()
   const upiCfg = settings.payments?.upi || {}
   const upiEnabled = !!(upiCfg.enabled && upiCfg.vpa)
+  const codEnabled = settings.payments?.cod !== false
+  const razorpayEnabled = settings.payments?.razorpay !== false
+
+  // Available payment methods, in display order (prepaid first).
+  const methods = useMemo(() => {
+    const m = []
+    if (upiEnabled) m.push('upi')
+    if (razorpayEnabled) m.push('razorpay')
+    if (codEnabled) m.push('cod')
+    m.push('whatsapp')
+    return m
+  }, [upiEnabled, razorpayEnabled, codEnabled])
+
+  const [paymentChoice, setPaymentChoice] = useState(null)
+  useEffect(() => { if (!paymentChoice && methods.length) setPaymentChoice(methods[0]) }, [methods]) // eslint-disable-line
+  const choice = paymentChoice || methods[0]
 
   // Saved addresses (address book). Fall back to the legacy single address.
   const savedAddresses = useMemo(() => {
@@ -122,9 +148,15 @@ export function Checkout() {
     ? { line1: chosen.line1 || '', line2: chosen.line2 || '', city: chosen.city || '', state: chosen.state || '', pincode: chosen.pincode || '' }
     : addr
 
-  const shipping = calcShipping(settings, effAddr, subtotal)
+  const { shipping, codFee } = calcCharges(settings, effAddr, subtotal, choice)
   const discount = coupon?.discount || 0
-  const total = Math.max(0, subtotal + shipping - discount)
+  const total = Math.max(0, subtotal + shipping + codFee - discount)
+
+  // Optional COD advance (paid via WhatsApp to confirm the order)
+  const advCfg = settings.payments?.codAdvance || {}
+  const advanceActive = choice === 'cod' && !!advCfg.enabled && Number(advCfg.percent) > 0
+  const advancePercent = Number(advCfg.percent) || 0
+  const advanceAmount = advanceActive ? Math.max(1, Math.round(total * advancePercent / 100)) : 0
 
   // ── Validation ──────────────────────────────────────────────────────────────
   const errors = useMemo(() => {
@@ -255,13 +287,17 @@ export function Checkout() {
     try { await addAddress({ ...addr, name: contact.name.trim(), phone: contact.phone.replace(/\D/g, '') }) } catch { /* non-blocking */ }
   }
 
-  const placeOrder = async (channel) => {
+  // COD order. If a COD advance is configured, the success screen prompts the
+  // customer to pay it via WhatsApp to confirm.
+  const placeCodOrder = async () => {
     if (!gate()) return null
     setPlacing(true)
     try {
-      const order = await api.post('/orders', buildPayload(channel), { custAuth: true })
+      const order = await api.post('/orders', { ...buildPayload('web'), paymentMethod: 'cod' }, { custAuth: true })
       await persistAddress()
-      setPlaced(order); clearCart()
+      const adv = advanceActive ? { percent: advancePercent, amount: Math.max(1, Math.round((order.total || 0) * advancePercent / 100)) } : null
+      setPlaced({ ...order, _advance: adv })
+      clearCart()
       return order
     } catch (e) {
       setError(e.message || 'Could not place order. Please try again.')
@@ -365,6 +401,19 @@ export function Checkout() {
     } catch { /* ignore */ }
   }
 
+  // Single primary CTA — runs the flow for the selected payment method.
+  const primary = () => {
+    if (choice === 'upi') return payUpi()
+    if (choice === 'razorpay') return payOnline()
+    if (choice === 'whatsapp') return orderViaWhatsApp()
+    return placeCodOrder()
+  }
+  const primaryLabel = placing ? 'Processing…'
+    : choice === 'upi' ? `Pay via UPI · ${fmt(total)}`
+    : choice === 'razorpay' ? `Pay Online · ${fmt(total)}`
+    : choice === 'whatsapp' ? 'Order on WhatsApp'
+    : `Place Order · ${fmt(total)}`
+
   /* ── Success ── */
   if (placed) {
     const isUpi = placed._upi
@@ -382,9 +431,23 @@ export function Checkout() {
               : <>Your order <span className="font-semibold" style={{ color: 'var(--maroon)' }}>{placed.orderNo}</span> has been received. We'll reach out on WhatsApp to confirm.</>}
           </p>
           <p className="text-sm mt-2" style={{ color: 'var(--maroon)' }}>Total: {fmt(placed.total)}</p>
+
+          {/* Optional COD advance — confirm the order by paying a small advance on WhatsApp */}
+          {placed._advance && (
+            <div className="mt-6 rounded-2xl p-4 text-left" style={{ background: 'color-mix(in srgb, var(--gold) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--gold) 40%, transparent)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>One quick step to confirm your COD order</p>
+              <p className="text-sm text-stone-600 mt-1">Please pay a <span className="font-semibold">{placed._advance.percent}% advance ({fmt(placed._advance.amount)})</span> on WhatsApp. The rest ({fmt(placed.total - placed._advance.amount)}) is collected on delivery.</p>
+              <WhatsAppButton
+                className="w-full mt-3"
+                label={`Pay ${fmt(placed._advance.amount)} advance on WhatsApp`}
+                message={`Hi! I'd like to pay the ${placed._advance.percent}% advance (${fmt(placed._advance.amount)}) to confirm my COD order ${placed.orderNo} (total ${fmt(placed.total)}).`}
+              />
+            </div>
+          )}
+
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <Link to="/products" className="btn-maroon">Continue Shopping</Link>
-            <WhatsAppButton message={`Hi! About my order ${placed.orderNo}…`} label="Message us" />
+            {!placed._advance && <WhatsAppButton message={`Hi! About my order ${placed.orderNo}…`} label="Message us" />}
           </div>
         </div>
       </div>
@@ -597,37 +660,56 @@ export function Checkout() {
               )}
             </div>
 
-            {/* Notes + actions */}
-            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-card space-y-4">
+            {/* Notes */}
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-card">
               <Field label="Order notes (optional)" value={notes} onChange={setNotes} placeholder="Anything we should know?" />
+            </div>
+
+            {/* Payment — single clear selector */}
+            <div className="bg-white rounded-2xl p-4 md:p-6 shadow-card space-y-3">
+              <h2 className="font-display text-xl" style={{ color: 'var(--ink)' }}>Payment</h2>
+              <div className="space-y-2.5">
+                {methods.map((m) => {
+                  const active = choice === m
+                  const meta = {
+                    upi: { icon: QrCode, title: 'Pay now · UPI', sub: 'Scan a QR & pay instantly — fastest', right: (settings.payments?.prepaidFreeShipping ? 'Free shipping' : null), rec: true },
+                    razorpay: { icon: QrCode, title: 'Pay online', sub: 'UPI, cards, netbanking, wallets', right: (settings.payments?.prepaidFreeShipping ? 'Free shipping' : null), rec: !upiEnabled },
+                    cod: { icon: Smartphone, title: 'Cash on Delivery', sub: advCfg.enabled && Number(advCfg.percent) > 0 ? `Pay ${advCfg.percent}% advance on WhatsApp to confirm` : 'Pay when it arrives', right: (Number(settings.payments?.codFee) > 0 ? `+${fmt(Number(settings.payments.codFee))}` : null) },
+                    whatsapp: { icon: Smartphone, title: 'Order on WhatsApp', sub: 'Chat with us to confirm & pay', right: null },
+                  }[m]
+                  const Icon = meta.icon
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setPaymentChoice(m)}
+                      className="w-full text-left rounded-xl border p-3.5 flex items-center gap-3 transition cursor-pointer"
+                      style={{ borderColor: active ? 'var(--maroon)' : 'color-mix(in srgb, var(--gold) 35%, transparent)', background: active ? 'color-mix(in srgb, var(--maroon) 6%, transparent)' : 'white' }}
+                    >
+                      <span className="w-4 h-4 rounded-full border-2 grid place-items-center shrink-0" style={{ borderColor: active ? 'var(--maroon)' : '#d6d3d1' }}>
+                        {active && <span className="w-2 h-2 rounded-full" style={{ background: 'var(--maroon)' }} />}
+                      </span>
+                      <Icon size={18} style={{ color: active ? 'var(--maroon)' : '#a8a29e' }} className="shrink-0" />
+                      <span className="flex-1 min-w-0">
+                        <span className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{meta.title}</span>
+                          {meta.rec && <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>Recommended</span>}
+                        </span>
+                        <span className="block text-xs text-stone-500 mt-0.5">{meta.sub}</span>
+                      </span>
+                      {meta.right && <span className="text-xs font-bold shrink-0" style={{ color: meta.right === 'Free shipping' ? 'var(--maroon)' : 'var(--ink)' }}>{meta.right}</span>}
+                    </button>
+                  )
+                })}
+              </div>
 
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2.5 flex items-center gap-2"><AlertCircle size={16} className="shrink-0" />{error}</p>
               )}
 
-              {upiEnabled && (
-                <button onClick={payUpi} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60 flex items-center justify-center gap-2">
-                  <QrCode size={18} /> {placing ? 'Processing…' : `Pay via UPI · ${fmt(total)}`}
-                </button>
-              )}
-              {settings.payments?.razorpay !== false && (
-                <button onClick={payOnline} disabled={placing} className={`w-full !py-3.5 text-base disabled:opacity-60 ${upiEnabled ? 'btn-outline-gold' : 'btn-gold'}`}>
-                  {placing ? 'Processing…' : `Pay Online · ${fmt(total)}`}
-                </button>
-              )}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button onClick={orderViaWhatsApp} disabled={placing} className="btn-whatsapp flex-1 disabled:opacity-60">
-                  Order on WhatsApp
-                </button>
-                {settings.payments?.cod !== false && (
-                  <button onClick={() => placeOrder('web')} disabled={placing} className="btn-outline-gold flex-1 disabled:opacity-60">
-                    Pay on delivery
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-stone-400 text-center">
-                {settings.payments?.razorpay !== false ? 'Secure payments by Razorpay (UPI, cards, netbanking) · ' : ''}order over WhatsApp{settings.payments?.cod !== false ? ' / pay on delivery' : ''}.
-              </p>
+              <button onClick={primary} disabled={placing} className="btn-gold w-full !py-3.5 text-base disabled:opacity-60 flex items-center justify-center gap-2">
+                {choice === 'upi' && <QrCode size={18} />}{primaryLabel}
+              </button>
+              <p className="text-xs text-stone-400 text-center">100% secure · your details are encrypted.</p>
             </div>
           </div>
 
@@ -678,8 +760,16 @@ export function Checkout() {
               <span>Shipping{effAddr.city ? '' : ' (enter address)'}</span>
               <span className={shipping === 0 ? 'text-emerald-600 font-semibold' : ''}>{shipping === 0 ? 'Free' : fmt(shipping)}</span>
             </div>
+            {codFee > 0 && (
+              <div className="flex justify-between text-sm text-stone-500"><span>COD fee</span><span>{fmt(codFee)}</span></div>
+            )}
             <div className="h-px" style={{ background: 'color-mix(in srgb, var(--gold) 30%, transparent)' }} />
             <div className="flex justify-between font-semibold text-lg" style={{ color: 'var(--maroon)' }}><span>Total</span><span>{fmt(total)}</span></div>
+            {advanceActive && (
+              <p className="text-xs mt-1 rounded-lg px-3 py-2" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)', color: 'var(--maroon-dark)' }}>
+                Pay {advancePercent}% advance ({fmt(advanceAmount)}) on WhatsApp to confirm · {fmt(total - advanceAmount)} on delivery.
+              </p>
+            )}
           </aside>
         </div>
       </div>

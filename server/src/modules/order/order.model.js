@@ -30,6 +30,7 @@ const orderSchema = new mongoose.Schema(
     },
     subtotal: { type: Number, default: 0 },
     shipping: { type: Number, default: 0 },
+    codFee: { type: Number, default: 0 }, // extra fee charged on COD orders
     discount: { type: Number, default: 0 },
     couponCode: { type: String, default: '' },
     total: { type: Number, default: 0 },

@@ -126,6 +126,14 @@ const settingSchema = new mongoose.Schema(
         vpa: { type: String, default: '' },        // e.g. shubra@okaxis
         payeeName: { type: String, default: '' },  // shown in the UPI app
       },
+      // COD economics — discourage casual/fake COD.
+      codFee: { type: Number, default: 0 },        // extra charge added to COD orders
+      codAdvance: {                                 // optional partial prepayment to confirm
+        enabled: { type: Boolean, default: false },
+        percent: { type: Number, default: 5 },     // % of order value, paid via WhatsApp
+      },
+      // Reward prepaid: waive shipping when the customer pays now (UPI/online).
+      prepaidFreeShipping: { type: Boolean, default: false },
     },
 
     // Fully admin-editable homepage layout (hero + ordered sections)

@@ -209,6 +209,21 @@ export function AdminSettings() {
       )}
 
       {tab === 'payments' && (
+      <Section title="COD & Prepaid Incentives" subtitle="Discourage fake COD and reward paying now. All optional.">
+        <div className="space-y-4">
+          <Field field={{ label: 'COD fee (₹)', type: 'number', help: 'Extra charge added to Cash-on-Delivery orders. 0 = no fee.' }} value={s.payments?.codFee || 0} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codFee: v === '' ? 0 : Number(v) } }))} />
+          <Field field={{ label: 'Free shipping when paying now (UPI/online)', type: 'toggle', help: 'Waives shipping for prepaid orders to nudge customers away from COD.' }} value={!!s.payments?.prepaidFreeShipping} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, prepaidFreeShipping: v } }))} />
+          <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
+            <Field field={{ label: 'Require an advance on COD (via WhatsApp)', type: 'toggle', help: 'Ask the customer to pay a small % advance to confirm a COD order — cuts fake orders / RTO.' }} value={!!s.payments?.codAdvance?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, enabled: v } } }))} />
+            {s.payments?.codAdvance?.enabled && (
+              <Field field={{ label: 'Advance percent (%)', type: 'number', help: '% of the order total the customer pays upfront on WhatsApp.' }} value={s.payments?.codAdvance?.percent ?? 5} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, percent: v === '' ? 0 : Number(v) } } }))} />
+            )}
+          </div>
+        </div>
+      </Section>
+      )}
+
+      {tab === 'payments' && (
       <Section title="Direct UPI (QR)" subtitle="No gateway needed. Customer scans your QR / pays to your UPI ID, then submits the reference number. You verify it against your bank statement and mark the order paid.">
         <div className="space-y-3">
           <Field field={{ label: 'Enable direct UPI payments', type: 'toggle' }} value={!!s.payments?.upi?.enabled} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, upi: { ...p.payments?.upi, enabled: v } } }))} />
