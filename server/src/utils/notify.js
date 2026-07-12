@@ -24,6 +24,22 @@ export function orderPhoto(order) {
   return withImg ? absUrl(withImg.image) : '';
 }
 
+// Unique product images in the order (absolute URLs), capped at Telegram's
+// 10-per-album limit.
+export function orderPhotos(order) {
+  const seen = new Set();
+  const urls = [];
+  for (const it of order?.items || []) {
+    if (!it.image) continue;
+    const u = absUrl(it.image);
+    if (seen.has(u)) continue;
+    seen.add(u);
+    urls.push(u);
+    if (urls.length >= 10) break;
+  }
+  return urls;
+}
+
 // Low-level Telegram Bot API call. Best-effort; returns the parsed body or null.
 export async function tgApi(token, method, payload) {
   try {
@@ -43,32 +59,42 @@ export async function tgApi(token, method, payload) {
 }
 
 // Send an HTML message to every configured chat id, with an optional inline
-// keyboard (replyMarkup) and optional header photo. When `photo` is set we use
-// sendPhoto (caption = text); Telegram caps captions at 1024 chars, so a photo
-// send falls back to a plain text message if that would overflow. Returns
-// { ok, error }.
-export async function sendTelegram(settings, text, { replyMarkup, photo } = {}) {
+// keyboard (replyMarkup) and optional product images.
+//   - `photos` (2+): a compact thumbnail-grid album is sent first, then the
+//     text + buttons as a follow-up message (albums can't carry buttons).
+//   - `photos` (1) or `photo`: a single photo with the text as its caption.
+//   - none: a plain text message.
+// The text message is always attempted independently, so a bad image URL can
+// never swallow the order. Returns { ok, error }.
+export async function sendTelegram(settings, text, { replyMarkup, photo, photos } = {}) {
   const tg = settings?.notifications?.telegram || {};
   if (!tg.enabled || !tg.botToken || !tg.chatId) return { ok: false, error: 'not configured' };
 
   const chatIds = String(tg.chatId).split(',').map((s) => s.trim()).filter(Boolean);
-  const usePhoto = photo && text.length <= 1024;
+  const imgs = (photos && photos.length ? photos : (photo ? [photo] : [])).slice(0, 10);
+  const token = tg.botToken;
   let lastError = null;
   let anyOk = false;
 
-  for (const chatId of chatIds) {
-    const payload = usePhoto
-      ? { chat_id: chatId, photo, caption: text, parse_mode: 'HTML' }
-      : { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
-    if (replyMarkup) payload.reply_markup = replyMarkup;
+  const sendText = (chatId) => tgApi(token, 'sendMessage', {
+    chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true,
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+  });
 
-    let json = await tgApi(tg.botToken, usePhoto ? 'sendPhoto' : 'sendMessage', payload);
-    // If the image URL was unreachable, still deliver the order as text.
-    if (!json?.ok && usePhoto) {
-      json = await tgApi(tg.botToken, 'sendMessage', {
-        chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true,
+  for (const chatId of chatIds) {
+    let json;
+    if (imgs.length >= 2) {
+      // Album (compact grid) first — best-effort — then the text + buttons.
+      await tgApi(token, 'sendMediaGroup', { chat_id: chatId, media: imgs.map((url) => ({ type: 'photo', media: url })) });
+      json = await sendText(chatId);
+    } else if (imgs.length === 1 && text.length <= 1024) {
+      json = await tgApi(token, 'sendPhoto', {
+        chat_id: chatId, photo: imgs[0], caption: text, parse_mode: 'HTML',
         ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       });
+      if (!json?.ok) json = await sendText(chatId); // image unreachable → text fallback
+    } else {
+      json = await sendText(chatId);
     }
     if (json?.ok) anyOk = true;
     else lastError = json?.description || 'send failed';

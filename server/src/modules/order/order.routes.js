@@ -8,7 +8,7 @@ import { resolveCoupon } from '../coupon/coupon.service.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
-import { sendTelegram, orderMessage, paymentSubmittedMessage, verifyKeyboard, orderPhoto } from '../../utils/notify.js';
+import { sendTelegram, orderMessage, paymentSubmittedMessage, verifyKeyboard, orderPhotos } from '../../utils/notify.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -101,7 +101,7 @@ router.post(
     // UPI orders carry Mark-paid / Cancel buttons so payment can be confirmed
     // straight from the alert, even before the customer submits a screenshot.
     sendTelegram(settings, orderMessage(order), {
-      photo: orderPhoto(order),
+      photos: orderPhotos(order),
       ...(order.paymentMethod === 'upi' ? { replyMarkup: verifyKeyboard(order._id) } : {}),
     }).catch(() => {});
 
@@ -134,7 +134,7 @@ router.patch(
 
     // Alert the owner that a UPI payment needs verification, with inline
     // Mark-paid / Cancel buttons.
-    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order), { photo: orderPhoto(order), replyMarkup: verifyKeyboard(order._id) })).catch(() => {});
+    getSettings().then((s) => sendTelegram(s, paymentSubmittedMessage(order), { photos: orderPhotos(order), replyMarkup: verifyKeyboard(order._id) })).catch(() => {});
 
     res.json({ success: true, data: { orderNo: order.orderNo, total: order.total, paymentStatus: order.paymentStatus } });
   })
