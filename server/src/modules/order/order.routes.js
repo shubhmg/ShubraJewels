@@ -97,7 +97,9 @@ router.post(
     if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
 
     // Ping the owner on Telegram (best-effort — never blocks the response).
-    sendTelegram(settings, orderMessage(order)).catch(() => {});
+    // UPI orders carry Mark-paid / Cancel buttons so payment can be confirmed
+    // straight from the alert, even before the customer submits a screenshot.
+    sendTelegram(settings, orderMessage(order), order.paymentMethod === 'upi' ? { replyMarkup: verifyKeyboard(order._id) } : undefined).catch(() => {});
 
     res.status(201).json({ success: true, data: order });
   })
