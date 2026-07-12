@@ -484,15 +484,7 @@ export function Checkout() {
                 <Field label="Full Name" required value={contact.name} onChange={(v) => setC('name', v)} onBlur={() => markTouched('name')} placeholder="Priya Sharma" error={showErr('name')} />
                 <Field label="Mobile Number" required type="tel" inputMode="numeric" maxLength={10} value={contact.phone} onChange={(v) => setC('phone', v.replace(/\D/g, ''))} onBlur={() => markTouched('phone')} placeholder="10-digit mobile" error={showErr('phone')} prefix="+91" />
               </div>
-              {signedIn ? (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-sm" style={{ borderColor: 'var(--gold)', background: 'color-mix(in srgb, var(--gold) 8%, transparent)', color: 'var(--ink)' }}>
-                  <span style={{ color: 'var(--gold)' }}>✉</span>
-                  <span className="font-medium">{contact.email}</span>
-                  <span className="ml-auto text-xs opacity-60">from your account</span>
-                </div>
-              ) : (
-                <Field label="Email" required type="email" value={contact.email} onChange={(v) => setC('email', v)} onBlur={() => markTouched('email')} placeholder="you@example.com" error={showErr('email')} />
-              )}
+              <Field label="Email" required type="email" value={contact.email} onChange={(v) => setC('email', v)} onBlur={() => markTouched('email')} placeholder="you@example.com" error={showErr('email')} />
             </div>
 
             {/* Address */}
