@@ -21,6 +21,12 @@
     --beige:       #F6ECD9;
     --cream:       #FBF6EC;
     --ink:         #2A1A16;
+
+    /* Noir Atelier — cinematic dark gallery canvas (storefront art direction). */
+    --noir-bg:    #0b0807;
+    --noir-panel: #14100e;
+    --noir-text:  #ece7df;
+    --noir-muted: rgba(236, 231, 223, 0.52);
   }
 
   html.dark {
@@ -264,6 +270,18 @@
   /* Warm gold light-bloom behind a hero/product. */
   .glow-gold {
     box-shadow: 0 0 120px -30px color-mix(in srgb, var(--gold) 65%, transparent);
+  }
+
+  /* Noir Atelier hero shell. */
+  .noir-hero { color: var(--noir-text); }
+
+  /* Gallery exhibit number — oversized hairline serif index (01, 02…). */
+  .exhibit-no {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 300;
+    font-style: italic;
+    letter-spacing: -0.02em;
+    color: color-mix(in srgb, var(--gold) 55%, transparent);
   }
 
   /* Animated hairline underline for editorial links. */

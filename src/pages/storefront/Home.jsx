@@ -37,9 +37,10 @@ export function Home() {
   const offers = (banners || []).filter((b) => b.placement === 'offer')
   const spotlight = all.find((p) => p.story)
 
-  // Render one homepage block by its type + config.
+  // Render one homepage block by its type + config. Noir Atelier: every section
+  // renders on the dark gallery canvas (force dark, regardless of saved config).
   const renderBlock = (b) => {
-    const c = b.config || {}
+    const c = { ...(b.config || {}), dark: true }
     switch (b.type) {
       case 'banners': return offers.length > 0 ? <OfferStrip offers={offers} /> : null
       case 'categories': return categories?.length > 0 ? <CategoryGrid categories={categories} h={c} /> : null
@@ -58,7 +59,7 @@ export function Home() {
   const blocks = settings.homepage?.blocks || []
 
   return (
-    <div style={{ background: 'var(--cream)' }}>
+    <div style={{ background: 'var(--noir-bg)' }}>
       <Hero settings={settings} />
       <BrandTicker settings={settings} />
 
@@ -153,159 +154,124 @@ function TextBlock({ config }) {
 }
 
 /* ── Hero ─────────────────────────────────────────────────────────── */
-function HeroText({ hero, settings }) {
-  return (
-    <motion.div
-      className="container-wide relative z-10 pb-10 md:pb-14 pt-2 text-center"
-      initial="hidden"
-      animate="show"
-      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
-    >
-      <HeroLine>
-        <span className="eyebrow justify-center flex text-[var(--gold-light)]" style={{ color: 'var(--gold-light)' }}>Handcrafted in Rajasthan</span>
-      </HeroLine>
-      <HeroLine><p className="font-hindi text-xl md:text-3xl text-[var(--gold-light)] mt-3">{hero.slogan || settings.slogan}</p></HeroLine>
-      <HeroLine>
-        <h1 className="font-display text-white text-5xl md:text-7xl lg:text-[5.5rem] leading-[0.98] mt-2" style={{ fontWeight: 400, letterSpacing: '-0.03em' }}>
-          {hero.heading || settings.brandName}
-        </h1>
-      </HeroLine>
-      {hero.subheading && <HeroLine><p className="text-white/75 max-w-xl mx-auto mt-5 text-sm md:text-lg leading-relaxed">{hero.subheading}</p></HeroLine>}
-      <HeroLine>
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-7">
-          <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold !px-7 !py-3 !text-sm">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={16} /></Link></Magnetic>
-          <Magnetic><Link to="/collections" className="btn-outline-gold !px-6 !py-3 !text-sm !text-white" style={{ borderColor: 'rgba(255,255,255,0.35)' }}>The Collections</Link></Magnetic>
-        </div>
-      </HeroLine>
-    </motion.div>
-  )
-}
-
-const HERO_MOTIFS = (
-  <>
-    <EarringMotif size={150} className="absolute right-[7%] top-[9%] rotate-12" style={{ opacity: 0.1 }} />
-    <EarringMotif size={95} className="absolute left-[8%] top-[22%] -rotate-12" style={{ opacity: 0.08 }} />
-    <EarringMotif size={120} className="absolute left-[13%] bottom-[16%] rotate-6" style={{ opacity: 0.07 }} />
-    <EarringMotif size={72} className="absolute right-[15%] bottom-[24%] -rotate-6" style={{ opacity: 0.09 }} />
-  </>
-)
+/* ── Hero — Noir Atelier: a spotlit, cinematic gallery ─────────────── */
+const heroStagger = { hidden: {}, show: { transition: { staggerChildren: 0.14, delayChildren: 0.2 } } }
+const heroItem = { hidden: { opacity: 0, y: 26 }, show: { opacity: 1, y: 0, transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] } } }
 
 function Hero({ settings }) {
   const t = settings.theme || {}
   const hero = settings.homepage?.hero || {}
-  const bg = hero.background || 'jewel'
-  const url = hero.mediaUrl || ''
+  const ref = useRef(null)
 
-  // Image hero gets a bespoke layout: on mobile the image is full-width at its
-  // natural aspect (height auto, flush under the navbar — no dead space); on
-  // desktop it's the contain + blurred-fill band with feathered edges.
-  if (bg === 'image' && url) {
-    const edgeFade = 'linear-gradient(to right, transparent 0%, #000 13%, #000 87%, transparent 100%)'
-    const bottomMask = 'linear-gradient(to bottom, #000 0%, #000 40%, transparent 94%)'
-    const mobileBottom = 'linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%)'
-    return (
-      <section className="tex-grain relative flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
-        {HERO_MOTIFS}
+  // Mouse parallax on the spotlight + centerpiece (skipped for reduced motion).
+  useEffect(() => {
+    const el = ref.current
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let raf = 0
+    const onMove = (e) => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const r = el.getBoundingClientRect()
+        const x = (e.clientX - r.left) / r.width - 0.5
+        const y = (e.clientY - r.top) / r.height - 0.5
+        el.style.setProperty('--px', (x * 22).toFixed(1) + 'px')
+        el.style.setProperty('--py', (y * 22).toFixed(1) + 'px')
+      })
+    }
+    el.addEventListener('mousemove', onMove)
+    return () => { el.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf) }
+  }, [])
 
-        {/* Mobile: natural full-width image, height follows aspect ratio */}
-        <div className="md:hidden relative">
-          <img src={url} alt="" className="block w-full h-auto" style={{ WebkitMaskImage: mobileBottom, maskImage: mobileBottom }} />
-        </div>
-
-        {/* Desktop: full image over a blurred copy, all edges feathered */}
-        <div className="hidden md:block relative h-[58vh] lg:h-[62vh]">
-          <div className="absolute inset-0" style={{ WebkitMaskImage: bottomMask, maskImage: bottomMask }}>
-            <img src={url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <img src={url} alt="" className="max-h-full max-w-full w-auto h-auto" style={{ WebkitMaskImage: edgeFade, maskImage: edgeFade }} />
-            </div>
-          </div>
-        </div>
-
-        <HeroText hero={hero} settings={settings} />
-        <div className="absolute bottom-0 left-0 right-0"><MehendiDivider /></div>
-      </section>
-    )
-  }
-
-  // 3D jewel / video: full-bleed band with text below.
   return (
-    <section className="tex-grain relative min-h-[68vh] md:min-h-[80vh] flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
-      {HERO_MOTIFS}
-      <div className="relative flex-1 min-h-[30vh] md:min-h-[42vh]">
-        <HeroBackground hero={hero} t={t} />
+    <section
+      ref={ref}
+      className="noir-hero tex-grain relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-6 pt-16"
+      style={{ background: 'var(--noir-bg)' }}
+    >
+      {/* spotlit centerpiece (uploaded media / 3D jewel / ornament) */}
+      <HeroBackdrop hero={hero} t={t} />
+
+      {/* warm gold spotlight + gallery vignette */}
+      <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: 'radial-gradient(56% 44% at 50% 40%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 70%)', transform: 'translate(var(--px,0), var(--py,0))' }} />
+      <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: 'radial-gradient(125% 120% at 50% 38%, transparent 40%, rgba(0,0,0,0.82) 100%)' }} />
+
+      {/* vertical gallery labels */}
+      <span className="hidden md:flex writing-vertical absolute left-6 top-1/2 z-[2] -translate-y-1/2 text-[10px] uppercase tracking-[0.42em]" style={{ color: 'var(--noir-muted)' }}>Est. Rajasthan</span>
+      <span className="hidden md:flex writing-vertical font-hindi absolute right-6 top-1/2 z-[2] -translate-y-1/2 text-sm tracking-widest" style={{ color: 'var(--noir-muted)' }}>{settings.slogan}</span>
+
+      {/* type */}
+      <motion.div className="relative z-[2] flex flex-col items-center text-center" variants={heroStagger} initial="hidden" animate="show">
+        <motion.span variants={heroItem} className="eyebrow" style={{ color: 'var(--gold-light)' }}>The Atelier</motion.span>
+        <motion.h1
+          variants={heroItem}
+          className="font-display mt-5 text-white"
+          style={{ fontWeight: 300, fontSize: 'clamp(3.25rem, 12vw, 8rem)', lineHeight: 0.92, letterSpacing: '-0.035em' }}
+        >
+          {hero.heading || settings.brandName}
+        </motion.h1>
+        <motion.p variants={heroItem} className="font-hindi mt-5 text-lg md:text-2xl" style={{ color: 'var(--gold-light)' }}>{hero.slogan || settings.slogan}</motion.p>
+        {hero.subheading && <motion.p variants={heroItem} className="mt-5 max-w-md text-sm md:text-base leading-relaxed" style={{ color: 'var(--noir-muted)' }}>{hero.subheading}</motion.p>}
+        <motion.div variants={heroItem} className="mt-9 flex flex-wrap items-center justify-center gap-8">
+          <Link to={hero.ctaLink || '/products'} className="link-underline text-xs font-semibold uppercase tracking-[0.28em]" style={{ color: 'var(--noir-text)' }}>
+            {hero.ctaLabel || 'Shop the collection'}
+          </Link>
+          <Link to="/collections" className="link-underline text-xs font-semibold uppercase tracking-[0.28em]" style={{ color: 'var(--gold-light)' }}>
+            The Collections
+          </Link>
+        </motion.div>
+      </motion.div>
+
+      {/* scroll cue */}
+      <div className="absolute bottom-7 left-1/2 z-[2] flex -translate-x-1/2 flex-col items-center gap-2">
+        <span className="text-[10px] uppercase tracking-[0.35em]" style={{ color: 'var(--noir-muted)' }}>Scroll</span>
+        <span className="h-10 w-px animate-pulse" style={{ background: 'linear-gradient(var(--gold), transparent)' }} />
       </div>
-      <HeroText hero={hero} settings={settings} />
-      <div className="absolute bottom-0 left-0 right-0"><MehendiDivider /></div>
     </section>
   )
 }
 
-// Hero background switch: 3D jewel (default), an uploaded image, or a video.
-function HeroBackground({ hero, t }) {
+// Spotlit centerpiece behind the type: uploaded image/video shown as a ghosted,
+// softly-masked artifact; the 3D jewel; or an ornamental mandala fallback.
+function HeroBackdrop({ hero, t }) {
   const bg = hero.background || 'jewel'
   const url = hero.mediaUrl || ''
   const videoRef = useRef(null)
-
-  // Pause the hero video when scrolled off-screen.
   useEffect(() => {
     if (bg !== 'video') return
     const el = videoRef.current
     if (!el) return
-    const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) el.play().catch(() => {}); else el.pause() },
-      { threshold: 0.1 }
-    )
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) el.play().catch(() => {}); else el.pause() }, { threshold: 0.1 })
     io.observe(el)
     return () => io.disconnect()
   }, [bg, url])
 
-  // Fades the media's bottom edge into the maroon text block below (continuity).
-  const bottomFade = <div className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent, var(--maroon-dark) 96%)' }} />
+  const softMask = { WebkitMaskImage: 'radial-gradient(closest-side, #000 50%, transparent 86%)', maskImage: 'radial-gradient(closest-side, #000 50%, transparent 86%)' }
+  const counter = { transform: 'translate(calc(var(--px,0) * -1), calc(var(--py,0) * -1))' }
 
-  if (bg === 'image' && url) {
-    // Show the WHOLE image (never cropped) over a blurred copy of itself that
-    // fills the leftover space. The sharp image is sized to its own content and
-    // its left/right edges are feathered with a mask, so it melts into the
-    // blurred backdrop instead of ending in a hard vertical seam.
-    const edgeFade = 'linear-gradient(to right, transparent 0%, #000 13%, #000 87%, transparent 100%)'
-    // Fade the ENTIRE band (image + blur + vignette) to nothing over a long,
-    // gentle ramp so it dissolves into the maroon card below with no seam. The
-    // vignette lives inside this wrapper so its tint fades out too (otherwise it
-    // tints the band right up to the boundary and shows a tonal step).
-    const bottomMask = 'linear-gradient(to bottom, #000 0%, #000 40%, transparent 94%)'
+  if ((bg === 'image' || bg === 'video') && url) {
     return (
-      <div className="absolute inset-0" style={{ WebkitMaskImage: bottomMask, maskImage: bottomMask }}>
-        <img src={url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <img
-            src={url}
-            alt=""
-            className="max-h-full max-w-full w-auto h-auto"
-            style={{ WebkitMaskImage: edgeFade, maskImage: edgeFade }}
-          />
+      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center" style={counter}>
+        <div className="relative h-[62vh] w-[92%] max-w-[660px]" style={{ ...softMask, opacity: 0.5 }}>
+          {bg === 'video'
+            ? <video ref={videoRef} src={url} autoPlay muted loop playsInline className="h-full w-full object-contain" />
+            : <img src={url} alt="" className="h-full w-full object-contain" />}
         </div>
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
       </div>
     )
   }
-  if (bg === 'video' && url) {
+  if (bg === 'jewel') {
     return (
-      <>
-        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover object-center" src={url} autoPlay muted loop playsInline />
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 45%, transparent, rgba(90,18,28,0.35) 80%)' }} />
-        {bottomFade}
-      </>
+      <div className="pointer-events-none absolute inset-0 z-0" style={counter}>
+        <Suspense fallback={null}>
+          <HeroJewel gold={t.gold || '#C9A84C'} goldLight={t.goldLight || '#E3C97A'} className="absolute inset-0 opacity-80" />
+        </Suspense>
+      </div>
     )
   }
-  // Default: 3D jewel
   return (
-    <>
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 50% 55% at 50% 45%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 70%)' }} />
-      <Suspense fallback={null}>
-        <HeroJewel gold={t.gold || '#C9A84C'} goldLight={t.goldLight || '#E3C97A'} className="absolute inset-0" />
-      </Suspense>
-    </>
+    <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.13]" style={counter}>
+      <Mandala size={520} />
+    </div>
   )
 }
 
