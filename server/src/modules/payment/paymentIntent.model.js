@@ -23,6 +23,11 @@ const paymentIntentSchema = new mongoose.Schema(
     notes: { type: String, default: '' },
     status: { type: String, enum: ['created', 'completed'], default: 'created' },
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+    // Stock is reserved when the intent is opened (before payment) so we never
+    // charge for an unavailable item. The hold is transferred to the order on
+    // finalize, or released if the intent expires / payment is abandoned.
+    stockApplied: { type: Boolean, default: false },
+    holdExpiresAt: { type: Date, default: null },
     // Auto-expire abandoned intents after 24h.
     createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 },
   },

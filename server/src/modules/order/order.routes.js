@@ -8,8 +8,8 @@ import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
-import { sendOrderConfirmation } from '../../utils/mailer.js';
-import { reconcileOrderStock } from './orderStock.js';
+import { sendOrderConfirmation, sendOrderShipped } from '../../utils/mailer.js';
+import { reconcileOrderStock, checkAvailability, reserveProducts, releaseProducts } from './orderStock.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -69,7 +69,12 @@ router.post(
 
     const total = Math.max(0, subtotal + shipping + codFee - discount);
 
-    const order = await Order.create({
+    // Atomically reserve stock FIRST. If a concurrent order took the last unit
+    // this throws a 409 (with the shortfall) before we consume an order number
+    // or persist anything — no phantom order, no oversell.
+    await reserveProducts(items);
+
+    const order = new Order({
       orderNo: await nextOrderNo(),
       customerId: req.customer?.id || null,
       items,
@@ -85,13 +90,17 @@ router.post(
       paymentMethod,
       paymentStatus: 'unpaid', // COD collected on delivery
       notes: req.body.notes || '',
+      stockApplied: true, // reserved just above
     });
 
-    if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
+    try {
+      await order.save();
+    } catch (e) {
+      await releaseProducts(items); // couldn't persist — give the stock back
+      throw e;
+    }
 
-    // Reserve inventory now (order is created Confirmed).
-    await reconcileOrderStock(order);
-    await order.save();
+    if (appliedCoupon) await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } });
 
     // Ping the owner on Telegram (best-effort — never blocks the response).
     sendTelegram(settings, orderMessage(order), { photos: orderPhotos(order) }).catch(() => {});
@@ -102,6 +111,22 @@ router.post(
       .catch((e) => console.error('[mailer] unexpected error:', e.message));
 
     res.status(201).json({ success: true, data: order });
+  })
+);
+
+// PUBLIC — pre-flight availability probe. The checkout calls this the moment
+// before opening the payment methods, so a customer whose item sold out while
+// they filled the form is told immediately (never mid-payment). Read-only.
+router.post(
+  '/check-stock',
+  validate({
+    body: Joi.object({
+      items: Joi.array().items(Joi.object({ productId: objectId.required(), qty: Joi.number().min(1).required() })).min(1).required(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const result = await checkAvailability(req.body.items);
+    res.json({ success: true, data: result });
   })
 );
 
@@ -164,6 +189,7 @@ router.patch(
     const order = await Order.findById(req.params.id);
     if (!order) throw ApiError.notFound('Order not found');
 
+    const wasShipped = order.status === 'shipped';
     if (req.body.status !== undefined) order.status = req.body.status;
     if (req.body.notes !== undefined) order.notes = req.body.notes;
     if (req.body.paymentMethod !== undefined) order.paymentMethod = req.body.paymentMethod;
@@ -192,6 +218,16 @@ router.patch(
     if (order.paymentStatus === 'paid' && !order.paymentVerifiedAt) order.paymentVerifiedAt = new Date();
 
     await order.save();
+
+    // Email the customer their shipment update the moment the order becomes
+    // shipped (best-effort — never blocks the response).
+    if (!wasShipped && order.status === 'shipped') {
+      getSettings()
+        .then((s) => sendOrderShipped(order.toObject(), s))
+        .then((r) => { if (!r.ok) console.error('[mailer] shipped email failed:', r.error); })
+        .catch((e) => console.error('[mailer] unexpected error:', e.message));
+    }
+
     res.json({ success: true, data: order });
   })
 );

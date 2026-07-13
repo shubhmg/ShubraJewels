@@ -32,6 +32,15 @@ function getTransport() {
 
 const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
+const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Render an admin-typed shipment note as safe HTML: escape, keep line breaks,
+// and make any pasted tracking link clickable.
+function shipmentHtml(msg, linkColor) {
+  const withBreaks = escapeHtml(msg).replace(/\n/g, '<br>');
+  return withBreaks.replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" style="color:${linkColor};font-weight:700;text-decoration:underline;">$1</a>`);
+}
+
 function formatAddress(addr = {}) {
   const parts = [
     [addr.line1, addr.line2].filter(Boolean).join(', '),
@@ -45,7 +54,8 @@ function formatAddress(addr = {}) {
 // HTML email template — matches the ShubraJewels website exactly
 // ---------------------------------------------------------------------------
 
-function buildOrderConfirmationHtml(order, settings = {}) {
+function buildOrderEmailHtml(order, settings = {}, variant = 'confirmed') {
+  const isShipped  = variant === 'shipped';
   const storeName  = settings.brandName || 'Shubra Jewels';
   const storeEmail = env.emailFrom || env.brevoSmtpUser;
   const t          = settings.theme || {};
@@ -102,12 +112,20 @@ function buildOrderConfirmationHtml(order, settings = {}) {
 
   const payLabel = { cod: 'Cash on Delivery', razorpay: 'Online Payment', upi: 'UPI', cash: 'Cash', bank: 'Bank Transfer', whatsapp: 'WhatsApp' };
 
+  const firstName = order.customer?.name?.split(' ')[0] || 'dear customer';
+  const shipMsg = (order.tracking?.message || '').trim();
+  const shipBody = shipMsg
+    ? shipmentHtml(shipMsg, maroon)
+    : 'Your order has been carefully packed and is on its way to you. 📦';
+
+  const titleText  = isShipped ? `Your order is on its way — ${order.orderNo}` : `Order Confirmed — ${order.orderNo}`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Order Confirmed — ${order.orderNo}</title>
+  <title>${titleText}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Mukta:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -153,21 +171,37 @@ function buildOrderConfirmationHtml(order, settings = {}) {
     </td>
   </tr>
 
-  <!-- ══ CONFIRMED BANNER ══ -->
+  <!-- ══ STATUS BANNER ══ -->
   <tr>
     <td style="background:${goldPale};padding:24px 32px 20px;text-align:center;">
-      <span style="display:inline-block;background:${gold};color:#fff;font-size:11px;font-weight:700;
+      <span style="display:inline-block;background:${isShipped ? maroon : gold};color:#fff;font-size:11px;font-weight:700;
                    letter-spacing:2px;text-transform:uppercase;border-radius:30px;padding:5px 20px;
-                   font-family:'Plus Jakarta Sans',Arial,sans-serif;">✓ &nbsp;Order Confirmed</span>
+                   font-family:'Plus Jakarta Sans',Arial,sans-serif;">${isShipped ? '📦 &nbsp;Shipped' : '✓ &nbsp;Order Confirmed'}</span>
       <h2 style="margin:14px 0 6px;font-size:22px;font-weight:800;color:${maroon};
                  font-family:'Plus Jakarta Sans',Arial,sans-serif;">
-        Thank you, ${order.customer?.name?.split(' ')[0] || 'dear customer'}! ✨
+        ${isShipped ? `It's on its way, ${firstName}! 🚚` : `Thank you, ${firstName}! ✨`}
       </h2>
       <p style="margin:0;font-size:14px;color:#8a7060;font-family:Arial,sans-serif;line-height:1.6;">
-        Your order <strong style="color:${maroon};font-family:'Plus Jakarta Sans',Arial,sans-serif;">${order.orderNo}</strong> has been placed and we're getting it ready.
+        ${isShipped
+          ? `Great news — your order <strong style="color:${maroon};font-family:'Plus Jakarta Sans',Arial,sans-serif;">${order.orderNo}</strong> has shipped.`
+          : `Your order <strong style="color:${maroon};font-family:'Plus Jakarta Sans',Arial,sans-serif;">${order.orderNo}</strong> has been placed and we're getting it ready.`}
       </p>
     </td>
   </tr>
+
+  ${isShipped ? `
+  <!-- ══ SHIPMENT UPDATE (primary focus) ══ -->
+  <tr>
+    <td class="inner-pad" style="padding:26px 32px 4px;">
+      <div style="background:${cream};border:1.5px solid ${gold};border-radius:16px;padding:22px 24px;">
+        <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+                  color:${gold};font-family:'Plus Jakarta Sans',Arial,sans-serif;">🚚 &nbsp;Shipment Update</p>
+        <p style="margin:0;font-size:15px;color:${ink};line-height:1.75;font-family:Arial,sans-serif;">
+          ${shipBody}
+        </p>
+      </div>
+    </td>
+  </tr>` : ''}
 
   <!-- ══ ITEMS ══ -->
   <tr>
@@ -251,10 +285,11 @@ function buildOrderConfirmationHtml(order, settings = {}) {
       <div style="background:${cream};border-radius:14px;padding:22px 24px;text-align:center;
                   border:1px solid ${goldPale};">
         <p style="margin:0 0 8px;font-size:15px;font-weight:700;color:${maroon};
-                  font-family:'Plus Jakarta Sans',Arial,sans-serif;">What happens next?</p>
+                  font-family:'Plus Jakarta Sans',Arial,sans-serif;">${isShipped ? 'Almost there!' : 'What happens next?'}</p>
         <p style="margin:0;font-size:13px;color:#8a7060;font-family:Arial,sans-serif;line-height:1.8;">
-          Our artisans will carefully pack your jhumkas with love.<br>
-          You'll receive a shipping update soon. 📦
+          ${isShipped
+            ? `Your jhumkas are en route to you.<br>Have a question? Just reply to this email. 💛`
+            : `Our artisans will carefully pack your jhumkas with love.<br>You'll receive a shipping update soon. 📦`}
         </p>
       </div>
     </td>
@@ -317,12 +352,43 @@ export async function sendOrderConfirmation(order, settings = {}) {
       from: `"${fromName}" <${fromAddr}>`,
       to: order.customer.email,
       subject: `✨ Order Confirmed | ${storeName}`,
-      html: buildOrderConfirmationHtml(order, settings),
+      html: buildOrderEmailHtml(order, settings, 'confirmed'),
     });
     console.log(`[mailer] confirmation sent to ${order.customer.email} for ${order.orderNo}`);
     return { ok: true };
   } catch (err) {
     console.error('[mailer] send failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Send an order-shipped email to the customer. Same layout as the confirmation,
+ * with the shipment/tracking message as the primary focus.
+ * Best-effort — never throws. Returns { ok, error }.
+ */
+export async function sendOrderShipped(order, settings = {}) {
+  console.log('[mailer] shipped email for', order?.orderNo, '| email:', order?.customer?.email);
+  if (!order.customer?.email) return { ok: false, error: 'no customer email' };
+
+  const transport = getTransport();
+  if (!transport) return { ok: false, error: 'SMTP not configured' };
+
+  const storeName = settings.brandName || 'Shubra Jewels';
+  const fromName = env.emailFromName || storeName;
+  const fromAddr = env.emailFrom || env.brevoSmtpUser;
+
+  try {
+    await transport.sendMail({
+      from: `"${fromName}" <${fromAddr}>`,
+      to: order.customer.email,
+      subject: `📦 Your order has shipped | ${storeName}`,
+      html: buildOrderEmailHtml(order, settings, 'shipped'),
+    });
+    console.log(`[mailer] shipped email sent to ${order.customer.email} for ${order.orderNo}`);
+    return { ok: true };
+  } catch (err) {
+    console.error('[mailer] shipped send failed:', err.message);
     return { ok: false, error: err.message };
   }
 }

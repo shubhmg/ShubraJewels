@@ -4,6 +4,7 @@ import { ChevronRight, Check, ShoppingBag, User, Tag, X, MapPin, Plus, Trash2, A
 import { useCartStore } from '../../store/cartStore.js'
 import { useCustomerStore } from '../../store/customerStore.js'
 import { AuthModal } from '../../components/auth/AuthModal.jsx'
+import { StockConflictModal } from '../../components/cart/StockConflictModal.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { api } from '../../lib/api.js'
 import { loadRazorpay } from '../../lib/razorpay.js'
@@ -76,6 +77,8 @@ function deriveCityFromPin(po, stateKey) {
 export function Checkout() {
   const settings = useSettings()
   const { items, clearCart } = useCartStore()
+  const applyAvailability = useCartStore((s) => s.applyAvailability)
+  const [stockIssues, setStockIssues] = useState(null)
   const { customer, isAuthed, fetchMe, addAddress, deleteAddress } = useCustomerStore()
 
   const [contact, setContact] = useState({ name: '', phone: '', email: '' })
@@ -272,6 +275,27 @@ export function Checkout() {
     return true
   }
 
+  // Apply a server shortfall report to the bag + surface the dialog. Returns the
+  // issues so callers can decide to halt.
+  const handleStockIssues = (issues) => {
+    if (!issues?.length) return false
+    applyAvailability(issues)
+    setStockIssues(issues)
+    setError(null)
+    return true
+  }
+
+  // Hard availability check the instant before opening the payment methods, so a
+  // customer whose item sold out mid-checkout is told now — never mid-payment.
+  // A check failure never blocks: the server still atomically guards every order.
+  const preflight = async () => {
+    try {
+      const r = await api.post('/orders/check-stock', { items: buildPayload('web').items })
+      if (!r.ok) { handleStockIssues(r.issues); return false }
+      return true
+    } catch { return true }
+  }
+
   // Persist a newly-typed address to the account (fire-and-forget).
   const persistAddress = async () => {
     if (!signedIn || usingSaved || !saveAddr) return
@@ -289,7 +313,8 @@ export function Checkout() {
       clearCart()
       return order
     } catch (e) {
-      setError(e.message || 'Could not place order. Please try again.')
+      if (e.status === 409 && e.details?.issues) handleStockIssues(e.details.issues)
+      else setError(e.message || 'Could not place order. Please try again.')
       return null
     } finally { setPlacing(false) }
   }
@@ -302,6 +327,9 @@ export function Checkout() {
       const ok = await loadRazorpay()
       if (!ok) throw new Error('Could not load payment gateway')
 
+      // Free the reserved stock if the customer walks away from the payment.
+      const releaseHold = () => api.post('/payments/release-hold', { razorpay_order_id: ro.orderId }).catch(() => {})
+
       const rzp = new window.Razorpay({
         key: ro.keyId,
         order_id: ro.orderId,
@@ -311,7 +339,7 @@ export function Checkout() {
         description: 'Jhumka order',
         prefill: { name: contact.name, email: contact.email, contact: contact.phone },
         theme: { color: settings.theme?.maroon || '#7B1E2B' },
-        modal: { ondismiss: () => setPlacing(false) },
+        modal: { ondismiss: () => { releaseHold(); setPlacing(false) } },
         handler: async (resp) => {
           try {
             const order = await api.post('/payments/verify', {
@@ -327,10 +355,11 @@ export function Checkout() {
           } finally { setPlacing(false) }
         },
       })
-      rzp.on('payment.failed', (r) => { setError(r?.error?.description || 'Payment failed. Please try again.'); setPlacing(false) })
+      rzp.on('payment.failed', (r) => { releaseHold(); setError(r?.error?.description || 'Payment failed. Please try again.'); setPlacing(false) })
       rzp.open()
     } catch (e) {
-      setError(e.message || 'Could not start payment.')
+      if (e.status === 409 && e.details?.issues) handleStockIssues(e.details.issues)
+      else setError(e.message || 'Could not start payment.')
       setPlacing(false)
     }
   }
@@ -345,6 +374,8 @@ export function Checkout() {
       const ok = await loadRazorpay()
       if (!ok) throw new Error('Could not load payment gateway')
 
+      const releaseHold = () => api.post('/payments/release-hold', { razorpay_order_id: ro.orderId }).catch(() => {})
+
       const rzp = new window.Razorpay({
         key: ro.keyId,
         order_id: ro.orderId,
@@ -354,7 +385,7 @@ export function Checkout() {
         description: `COD advance (${advancePercent}%)`,
         prefill: { name: contact.name, email: contact.email, contact: contact.phone },
         theme: { color: settings.theme?.maroon || '#7B1E2B' },
-        modal: { ondismiss: () => setPlacing(false) },
+        modal: { ondismiss: () => { releaseHold(); setPlacing(false) } },
         handler: async (resp) => {
           try {
             const order = await api.post('/payments/cod-advance/verify', {
@@ -369,10 +400,11 @@ export function Checkout() {
           } finally { setPlacing(false) }
         },
       })
-      rzp.on('payment.failed', (r) => { setError(r?.error?.description || 'Payment failed. Please try again.'); setPlacing(false) })
+      rzp.on('payment.failed', (r) => { releaseHold(); setError(r?.error?.description || 'Payment failed. Please try again.'); setPlacing(false) })
       rzp.open()
     } catch (e) {
-      setError(e.message || 'Could not start payment.')
+      if (e.status === 409 && e.details?.issues) handleStockIssues(e.details.issues)
+      else setError(e.message || 'Could not start payment.')
       setPlacing(false)
     }
   }
@@ -393,7 +425,12 @@ export function Checkout() {
   const codAdvanceOnline = advanceActive && razorpayEnabled
 
   // Single primary CTA — runs the flow for the selected payment method.
-  const primary = () => {
+  const primary = async () => {
+    if (!gate()) return
+    setPlacing(true)
+    const ok = await preflight() // hard stock check before any payment UI opens
+    setPlacing(false)
+    if (!ok) return
     if (choice === 'online') return payOnline()
     if (codAdvanceOnline) return payCodAdvance()
     return placeCodOrder()
@@ -444,6 +481,8 @@ export function Checkout() {
           <h2 className="font-display text-2xl mb-4" style={{ color: 'var(--ink)' }}>Your bag is empty</h2>
           <Link to="/products" className="btn-maroon">Browse Jhumkas</Link>
         </div>
+        {/* Explain the sell-out even after it emptied the bag. */}
+        <StockConflictModal issues={stockIssues} onClose={() => setStockIssues(null)} />
       </div>
     )
   }
@@ -669,6 +708,7 @@ export function Checkout() {
         </div>
       </div>
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <StockConflictModal issues={stockIssues} onClose={() => setStockIssues(null)} />
     </div>
   )
 }

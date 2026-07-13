@@ -16,10 +16,32 @@ import { resolveItems } from '../../utils/resolveItems.js';
 import { computeCharges } from '../../utils/pricing.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
-import { reconcileOrderStock } from '../order/orderStock.js';
+import { reconcileOrderStock, reserveProducts, releaseProducts } from '../order/orderStock.js';
 
 const router = express.Router();
 const objectId = Joi.string().hex().length(24);
+
+// How long a Razorpay checkout may hold reserved stock before it's swept back.
+const HOLD_MINUTES = 30;
+
+// Cron-free self-healing: release stock held by intents that were opened but
+// never completed and have since expired. Runs opportunistically whenever a new
+// checkout is opened, so abandoned reservations can't lock inventory for long.
+async function sweepExpiredHolds() {
+  const stale = await PaymentIntent.find({ status: 'created', stockApplied: true, holdExpiresAt: { $lt: new Date() } });
+  for (const it of stale) {
+    try { await releaseProducts(it.items); it.stockApplied = false; await it.save(); } catch { /* best-effort */ }
+  }
+}
+
+// Reserve stock for a freshly-priced intent and record the hold. Throws
+// ApiError.conflict on a shortfall (before any Razorpay order is created, so the
+// customer is never charged for an unavailable item).
+async function holdStock(intentDoc, items) {
+  await reserveProducts(items);
+  intentDoc.stockApplied = true;
+  intentDoc.holdExpiresAt = new Date(Date.now() + HOLD_MINUTES * 60 * 1000);
+}
 
 const rzp = env.razorpay.keyId && env.razorpay.keySecret
   ? new Razorpay({ key_id: env.razorpay.keyId, key_secret: env.razorpay.keySecret })
@@ -103,8 +125,15 @@ async function finalizeIntent(intent, paymentId) {
     throw e;
   }
 
-  // Reserve inventory for the confirmed, paid order.
-  await reconcileOrderStock(order);
+  // Stock was already reserved when the checkout opened — transfer that hold to
+  // the order (so a later cancel releases it). Fall back to reserving now only
+  // for legacy intents opened before holds existed.
+  if (intent.stockApplied) {
+    order.stockApplied = true;
+    intent.stockApplied = false; // hold consumed by the order
+  } else {
+    await reconcileOrderStock(order);
+  }
   await order.save();
 
   if (intent.couponId) await Coupon.updateOne({ _id: intent.couponId }, { $inc: { usedCount: 1 } });
@@ -135,19 +164,15 @@ router.post(
   }),
   asyncHandler(async (req, res) => {
     if (!rzp) throw ApiError.badRequest('Online payments are not configured');
+    await sweepExpiredHolds();
     const priced = await priceOrder({ items: req.body.items, address: req.body.address || {}, couponCode: req.body.couponCode });
     const amount = Math.round(priced.total * 100);
     if (amount < 100) throw ApiError.badRequest('Amount must be at least ₹1');
 
-    let order;
-    try {
-      order = await rzp.orders.create({ amount, currency: 'INR', receipt: `rcpt_${Date.now()}` });
-    } catch (e) {
-      throw ApiError.internal(`Payment gateway error: ${e?.error?.description || e.message}`);
-    }
-
-    await PaymentIntent.create({
-      razorpayOrderId: order.id,
+    // Hold stock now (throws 409 with the shortfall if unavailable) — before any
+    // Razorpay order exists, so a customer can never pay for a sold-out item.
+    const intent = new PaymentIntent({
+      razorpayOrderId: `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       items: priced.items,
       customer: req.body.customer,
       address: req.body.address || {},
@@ -160,6 +185,23 @@ router.post(
       total: priced.total,
       notes: req.body.notes || '',
     });
+    await holdStock(intent, priced.items); // reserves; throws 409 on shortfall
+
+    let order;
+    try {
+      order = await rzp.orders.create({ amount, currency: 'INR', receipt: `rcpt_${Date.now()}` });
+    } catch (e) {
+      await releaseProducts(priced.items); // gateway failed — free the hold
+      throw ApiError.internal(`Payment gateway error: ${e?.error?.description || e.message}`);
+    }
+
+    intent.razorpayOrderId = order.id;
+    try {
+      await intent.save();
+    } catch (e) {
+      await releaseProducts(priced.items); // couldn't persist the intent — free the hold
+      throw e;
+    }
 
     res.json({ success: true, data: { orderId: order.id, amount: order.amount, currency: order.currency, keyId: env.razorpay.keyId } });
   })
@@ -233,7 +275,12 @@ async function finalizeCodAdvance(intent, paymentId) {
     advanceRazorpayPaymentId: paymentId,
   });
 
-  await reconcileOrderStock(order);
+  if (intent.stockApplied) {
+    order.stockApplied = true;
+    intent.stockApplied = false;
+  } else {
+    await reconcileOrderStock(order);
+  }
   await order.save();
 
   if (intent.couponId) await Coupon.updateOne({ _id: intent.couponId }, { $inc: { usedCount: 1 } });
@@ -260,6 +307,7 @@ router.post(
   }),
   asyncHandler(async (req, res) => {
     if (!rzp) throw ApiError.badRequest('Online payments are not configured');
+    await sweepExpiredHolds();
     const settings = await getSettings();
     const adv = settings.payments?.codAdvance;
     if (!adv?.enabled) throw ApiError.badRequest('COD advance is not enabled');
@@ -281,18 +329,12 @@ router.post(
     const amount = advance * 100;
     if (amount < 100) throw ApiError.badRequest('Advance must be at least ₹1');
 
-    let order;
-    try {
-      order = await rzp.orders.create({ amount, currency: 'INR', receipt: `adv_${Date.now()}` });
-    } catch (e) {
-      throw ApiError.internal(`Payment gateway error: ${e?.error?.description || e.message}`);
-    }
-
-    await PaymentIntent.create({
+    // Hold stock before the gateway order exists (throws 409 on shortfall).
+    const intent = new PaymentIntent({
       kind: 'cod_advance',
       advance,
       codFee,
-      razorpayOrderId: order.id,
+      razorpayOrderId: `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       items: priced.items,
       customer: req.body.customer,
       address: req.body.address || {},
@@ -305,6 +347,23 @@ router.post(
       total,
       notes: req.body.notes || '',
     });
+    await holdStock(intent, priced.items);
+
+    let order;
+    try {
+      order = await rzp.orders.create({ amount, currency: 'INR', receipt: `adv_${Date.now()}` });
+    } catch (e) {
+      await releaseProducts(priced.items);
+      throw ApiError.internal(`Payment gateway error: ${e?.error?.description || e.message}`);
+    }
+
+    intent.razorpayOrderId = order.id;
+    try {
+      await intent.save();
+    } catch (e) {
+      await releaseProducts(priced.items);
+      throw e;
+    }
 
     res.json({ success: true, data: { orderId: order.id, amount: order.amount, currency: order.currency, keyId: env.razorpay.keyId, advance, total } });
   })
@@ -336,6 +395,23 @@ router.post(
 
     const order = await finalizeCodAdvance(intent, razorpay_payment_id);
     res.status(201).json({ success: true, data: order });
+  })
+);
+
+// PUBLIC — release a stock hold when the customer dismisses/abandons the
+// Razorpay modal, so the last unit isn't locked until the sweep. Best-effort and
+// idempotent: only frees an intent that is still open and still holding stock.
+router.post(
+  '/release-hold',
+  validate({ body: Joi.object({ razorpay_order_id: Joi.string().required() }) }),
+  asyncHandler(async (req, res) => {
+    const intent = await PaymentIntent.findOne({ razorpayOrderId: req.body.razorpay_order_id });
+    if (intent && intent.status === 'created' && intent.stockApplied) {
+      await releaseProducts(intent.items);
+      intent.stockApplied = false;
+      await intent.save();
+    }
+    res.json({ success: true });
   })
 );
 

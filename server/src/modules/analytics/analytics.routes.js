@@ -4,7 +4,7 @@ import Visit from './visit.model.js';
 import Order from '../order/order.model.js';
 import Product from '../product/product.model.js';
 import PaymentIntent from '../payment/paymentIntent.model.js';
-import { applyOrderStock } from '../order/orderStock.js';
+import { releaseProducts } from '../order/orderStock.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
@@ -85,7 +85,7 @@ router.post(
   asyncHandler(async (_req, res) => {
     // Give back stock held by any live order before deleting.
     const held = await Order.find({ stockApplied: true });
-    for (const o of held) await applyOrderStock(o, +1);
+    for (const o of held) await releaseProducts(o.items);
 
     const [v, o, pi] = await Promise.all([
       Visit.deleteMany({}),

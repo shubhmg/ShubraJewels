@@ -36,6 +36,20 @@ export const useCartStore = create(persist(
         : s.items.map(i => i.key === key ? { ...i, qty: Math.min(qty, clampCap(i.stockQty)) } : i)
     })),
 
+    // Reconcile the bag against a server availability report:
+    // issues = [{ productId, available, ... }]. Sold-out lines (available ≤ 0)
+    // are dropped; short lines are clamped to what's left. Returns nothing.
+    applyAvailability: (issues) => set(s => {
+      const byId = new Map((issues || []).map(i => [String(i.productId), i]))
+      const items = s.items.flatMap(it => {
+        const iss = byId.get(String(it.id ?? it._id))
+        if (!iss) return [it]
+        if (!(iss.available > 0)) return []
+        return [{ ...it, stockQty: iss.available, qty: Math.min(it.qty, iss.available) }]
+      })
+      return { items }
+    }),
+
     clearCart: () => set({ items: [] }),
   }),
   {
