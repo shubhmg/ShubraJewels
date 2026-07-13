@@ -13,7 +13,8 @@ export function Contact() {
   const [form, setForm] = useState({ name: '', message: '' })
 
   const composed = `Hello ${settings.brandName}! ${form.name ? `I'm ${form.name}. ` : ''}${form.message || ''}`
-  const wa = whatsappLink(settings, composed)
+  // Only offer WhatsApp when a number is set AND the admin has enabled it.
+  const wa = settings.showWhatsappContact !== false ? whatsappLink(settings, composed) : null
 
   const igUrl = instagramUrl(settings)
   const igHandle = instagramHandle(settings)
@@ -34,7 +35,8 @@ export function Contact() {
       </div>
 
       <section className="section">
-        <div className="container-tight grid md:grid-cols-2 gap-12">
+        <div className={`container-tight grid gap-12 ${wa ? 'md:grid-cols-2' : 'max-w-lg mx-auto'}`}>
+          {wa && (
           <div>
             <h2 className="font-display text-2xl mb-1" style={{ color: 'var(--ink)' }}>{c.waHeading}</h2>
             <p className="text-sm text-stone-500 mb-6">{c.waSubtext}</p>
@@ -54,13 +56,10 @@ export function Contact() {
                 className="w-full px-4 py-3 rounded-xl border bg-white text-sm focus:outline-none resize-none"
                 style={{ borderColor: 'color-mix(in srgb, var(--gold) 35%, transparent)' }}
               />
-              {wa ? (
-                <WhatsAppButton message={composed} label="Send on WhatsApp" className="w-full" />
-              ) : (
-                <p className="text-xs text-stone-400">WhatsApp number not set yet — add it in the admin panel.</p>
-              )}
+              <WhatsAppButton message={composed} label="Send on WhatsApp" className="w-full" />
             </div>
           </div>
+          )}
 
           <div className="space-y-5">
             {settings.phone && <ContactRow icon={Phone} label="Phone" value={settings.phone} href={`tel:${settings.phone}`} />}

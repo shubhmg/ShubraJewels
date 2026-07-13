@@ -58,6 +58,7 @@ const settingSchema = new mongoose.Schema(
     // Ordering / contact
     whatsappNumber: { type: String, default: '' }, // e.g. 919812345678 (country code, no +)
     whatsappMessage: { type: String, default: 'Hello! I would like to order:' },
+    showWhatsappContact: { type: Boolean, default: true }, // show the WhatsApp form on the Contact page
     phone: { type: String, default: '' },
     email: { type: String, default: '' },
     freeShippingCity: { type: String, default: 'Delhi' },

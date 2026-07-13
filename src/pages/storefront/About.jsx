@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Sparkles, HandHeart, Truck, ShieldCheck, Gem, Award, Heart, Leaf, Crown, Star, Flower, BadgeCheck } from 'lucide-react'
 import { Mandala, Motif, MehendiDivider, TempleFrame } from '../../components/decor/Decor.jsx'
-import { WhatsAppButton } from '../../components/ui/WhatsAppButton.jsx'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
 import { resolveAbout } from '../../lib/aboutContent.js'
 import { resolveContent } from '../../lib/siteContent.js'
@@ -42,7 +41,6 @@ export function About() {
           </div>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link to="/products" className="btn-maroon">Shop the Collection</Link>
-            <WhatsAppButton label="Chat with us" />
           </div>
         </div>
       </section>

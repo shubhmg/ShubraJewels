@@ -200,6 +200,9 @@ export function AdminSettings() {
           <Field field={{ label: 'Shipping note', help: 'Short line shown on product pages / footer' }} value={s.shippingNote} onChange={(v) => set('shippingNote', v)} />
           <Field field={{ label: 'Announcement strip' }} value={s.announcement} onChange={(v) => set('announcement', v)} />
         </div>
+        <div className="mt-2">
+          <Field field={{ label: 'Show "Message us on WhatsApp" on the Contact page', type: 'toggle', help: 'Off = the WhatsApp enquiry form is hidden on the Contact page (customers still see phone, email and socials).' }} value={s.showWhatsappContact !== false} onChange={(v) => set('showWhatsappContact', v)} />
+        </div>
       </Section>
       )}
 
