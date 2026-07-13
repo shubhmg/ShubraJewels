@@ -3,6 +3,7 @@ import requireAdmin from '../../middleware/auth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 import { seedContent, clearContent } from './seed.service.js';
 import { sendOrderConfirmation } from '../../utils/mailer.js';
+import { getSettings } from '../setting/setting.model.js';
 
 const router = express.Router();
 
@@ -54,7 +55,8 @@ router.post(
       paymentMethod: 'cod',
       notes: '',
     };
-    const result = await sendOrderConfirmation(mockOrder, {});
+    const settings = await getSettings();
+    const result = await sendOrderConfirmation(mockOrder, settings);
     res.json({ success: result.ok, data: result });
   })
 );
