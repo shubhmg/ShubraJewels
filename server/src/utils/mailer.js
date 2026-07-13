@@ -285,6 +285,8 @@ function buildOrderConfirmationHtml(order, settings = {}) {
 </td></tr>
 </table>
 
+`;
+}
 
 // ---------------------------------------------------------------------------
 // Public API
