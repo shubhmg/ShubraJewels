@@ -50,10 +50,6 @@ export function Navbar() {
 
   // Merged/transparent only on dark-top routes; every other route is solid.
   const solid = scrolled || mobileOpen || !darkTop
-  // The home page is a near-black Noir gallery — its solid navbar stays dark
-  // (light text) instead of flipping to a bright white bar.
-  const noir = location.pathname === '/'
-  const lightText = heroBg || (solid && noir)
 
   return (
     <>
@@ -61,11 +57,7 @@ export function Navbar() {
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
 
       <header className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 transform-gpu ${
-        solid
-          ? (noir
-              ? 'bg-[#0b0807]/90 backdrop-blur-md border-b border-white/10'
-              : 'bg-white/95 backdrop-blur-md shadow-sm border-b border-cream-200/80')
-          : 'bg-transparent'
+        solid ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-cream-200/80' : 'bg-transparent'
       }`}>
         <div className="container-wide">
           <div className="flex items-center justify-between gap-2 h-14 md:h-20">
@@ -79,7 +71,7 @@ export function Navbar() {
                 </div>
               )}
               {(settings.showBrandName !== false || !settings.logo) && (
-                <span className={`font-display text-xl sm:text-2xl md:text-[1.7rem] truncate transition-colors duration-300 ${lightText ? 'text-white' : ''}`} style={{ fontWeight: 500, letterSpacing: '-0.01em', ...(lightText ? {} : { color: 'var(--maroon)' }) }}>
+                <span className={`font-display text-lg sm:text-xl md:text-2xl tracking-wide truncate transition-colors duration-300 ${heroBg ? 'text-white' : ''}`} style={heroBg ? undefined : { color: 'var(--maroon)' }}>
                   {settings.brandName}
                 </span>
               )}
@@ -88,7 +80,7 @@ export function Navbar() {
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-8" aria-label="Main navigation">
               {NAV.map(({ to, label }) => (
-                <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${lightText ? 'text-white/85 hover:text-white' : 'text-stone-700 hover:text-dark-900'}`}>
+                <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''} ${heroBg ? 'text-white/90 hover:text-white' : 'text-stone-700 hover:text-dark-900'}`}>
                   {label}
                 </NavLink>
               ))}
@@ -96,21 +88,21 @@ export function Navbar() {
 
             {/* Actions */}
             <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-              <IconBtn heroBg={lightText} onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={18} /></IconBtn>
+              <IconBtn heroBg={heroBg} onClick={() => setSearchOpen(true)} aria-label="Search"><Search size={18} /></IconBtn>
               <Link to="/wishlist" className="hidden sm:block">
-                <IconBtn heroBg={lightText} as="div" aria-label={`Wishlist (${wishCount})`}>
+                <IconBtn heroBg={heroBg} as="div" aria-label={`Wishlist (${wishCount})`}>
                   <Heart size={18} />{wishCount > 0 && <Dot>{wishCount}</Dot>}
                 </IconBtn>
               </Link>
-              <IconBtn heroBg={lightText} onClick={openCart} aria-label={`Cart (${cartCount})`}>
+              <IconBtn heroBg={heroBg} onClick={openCart} aria-label={`Cart (${cartCount})`}>
                 <ShoppingBag size={18} />{cartCount > 0 && <Dot>{cartCount}</Dot>}
               </IconBtn>
-              <IconBtn heroBg={lightText} onClick={onAccount} aria-label="Account">
+              <IconBtn heroBg={heroBg} onClick={onAccount} aria-label="Account">
                 {isAuthed() ? (
                   <span className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-bold" style={{ background: 'var(--maroon)', color: 'var(--cream)' }}>{(customer?.name || customer?.email || 'U')[0]?.toUpperCase()}</span>
                 ) : <User size={18} />}
               </IconBtn>
-              <IconBtn heroBg={lightText} className="md:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
+              <IconBtn heroBg={heroBg} className="md:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
                 {mobileOpen ? <X size={20} /> : <Menu size={20} />}
               </IconBtn>
             </div>
@@ -119,17 +111,13 @@ export function Navbar() {
 
         {/* Mobile menu */}
         <div className={`md:hidden overflow-hidden transition-[max-height] duration-300 ${mobileOpen ? 'max-h-96' : 'max-h-0'}`}>
-          <div className={`px-4 py-3 space-y-1 border-t ${noir ? 'border-white/10' : 'border-cream-200'}`} style={{ background: noir ? '#0b0807' : '#fff' }}>
+          <div className="bg-white border-t border-cream-200 px-4 py-3 space-y-1">
             {NAV.map(({ to, label }) => (
-              <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => `block px-4 py-3 rounded-xl text-base font-medium transition-colors ${
-                isActive
-                  ? (noir ? 'text-[var(--gold-light)] bg-white/5' : 'bg-gold-500/10 text-gold-700')
-                  : (noir ? 'text-white/85 hover:bg-white/5' : 'text-stone-700 hover:bg-cream-100')
-              }`}>
+              <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => `block px-4 py-3 rounded-xl text-base font-medium transition-colors ${isActive ? 'bg-gold-500/10 text-gold-700' : 'text-stone-700 hover:bg-cream-100'}`}>
                 {label}
               </NavLink>
             ))}
-            <Link to="/wishlist" onClick={() => setMobileOpen(false)} className={`block px-4 py-3 rounded-xl text-base font-medium ${noir ? 'text-white/85 hover:bg-white/5' : 'text-stone-700 hover:bg-cream-100'}`}>Wishlist{wishCount > 0 ? ` (${wishCount})` : ''}</Link>
+            <Link to="/wishlist" onClick={() => setMobileOpen(false)} className="block px-4 py-3 rounded-xl text-base font-medium text-stone-700 hover:bg-cream-100">Wishlist{wishCount > 0 ? ` (${wishCount})` : ''}</Link>
           </div>
         </div>
       </header>
