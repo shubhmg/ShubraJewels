@@ -134,24 +134,10 @@ function buildOrderConfirmationHtml(order, settings = {}) {
   <!-- ══ HEADER ══ -->
   <tr>
     <td style="background:linear-gradient(150deg,${maroon} 0%,${maroonDk} 100%);padding:36px 32px 28px;text-align:center;">
-      <!-- logo / brand mark -->
-      <table cellpadding="0" cellspacing="0" style="margin:0 auto 16px;">
-        <tr><td style="text-align:center;vertical-align:middle;">
-          ${settings.logo
-            ? `<img src="${absImg(settings.logo)}" alt="${storeName}" height="64"
-                style="height:64px;width:auto;max-width:180px;display:block;margin:0 auto;" />`
-            : `<div style="width:72px;height:72px;border-radius:50%;
-                          background:rgba(201,168,76,0.15);
-                          border:2px solid rgba(201,168,76,0.45);
-                          font-size:26px;font-weight:800;color:${goldLight};
-                          font-family:'Plus Jakarta Sans',Arial,sans-serif;
-                          line-height:72px;text-align:center;">
-                 ${(storeName).split(' ').map(w=>w[0]).slice(0,2).join('')}
-               </div>`
-          }
-        </td></tr>
+      <!-- decorative gold rule above brand name -->
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto 20px;width:72px;">
+        <tr><td style="height:2px;background:linear-gradient(90deg,transparent,${gold},transparent);"></td></tr>
       </table>
-
       <!-- Brand name in Plus Jakarta Sans -->
       <h1 style="margin:0;font-size:28px;font-weight:800;color:#fff;letter-spacing:0.5px;
                  font-family:'Plus Jakarta Sans',Arial,sans-serif;">${storeName}</h1>
