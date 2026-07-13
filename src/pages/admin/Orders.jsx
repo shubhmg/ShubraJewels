@@ -74,7 +74,7 @@ export function AdminOrders() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(null)
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState('confirmed')
   const [search, setSearch] = useState('')
   const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
@@ -172,7 +172,7 @@ export function AdminOrders() {
 
       {/* Status filter tabs */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {['all', ...STATUSES].map((s) => {
+        {STATUSES.map((s) => {
           const active = filter === s
           return (
             <button

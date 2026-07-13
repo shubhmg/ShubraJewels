@@ -158,6 +158,99 @@ router.get(
   })
 );
 
+// ADMIN — sales report. Filters by date range (IST days), order status, and
+// payment method. Returns KPI summary, a daily revenue/orders trend (gap-filled
+// so the chart is continuous), top products, and payment/status breakdowns.
+const REPORT_STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled'];
+const REPORT_PAYMENTS = ['cod', 'razorpay', 'upi', 'cash', 'bank', 'whatsapp', 'none'];
+const TZ = 'Asia/Kolkata';
+
+router.get(
+  '/sales',
+  requireAdmin,
+  validate({
+    query: Joi.object({
+      from: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).allow('').default(''),
+      to: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).allow('').default(''),
+      status: Joi.string().valid(...REPORT_STATUSES, '').default(''),
+      paymentMethod: Joi.string().valid(...REPORT_PAYMENTS, '').default(''),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const now = new Date();
+    const toStr = req.query.to || dayStr(now);
+    const fromStr = req.query.from || dayStr(new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000));
+    // IST day boundaries → precise UTC instants (+05:30 offset baked into the ISO).
+    const start = new Date(`${fromStr}T00:00:00.000+05:30`);
+    const end = new Date(`${toStr}T23:59:59.999+05:30`);
+
+    const match = { createdAt: { $gte: start, $lte: end } };
+    // "Sales" excludes cancelled orders unless a specific status is requested.
+    if (req.query.status) match.status = req.query.status;
+    else match.status = { $ne: 'cancelled' };
+    if (req.query.paymentMethod) match.paymentMethod = req.query.paymentMethod;
+
+    const [agg = {}] = await Order.aggregate([
+      { $match: match },
+      {
+        $facet: {
+          summary: [{ $group: { _id: null, revenue: { $sum: '$total' }, subtotal: { $sum: '$subtotal' }, discount: { $sum: '$discount' }, shipping: { $sum: '$shipping' }, orders: { $sum: 1 } } }],
+          units: [{ $unwind: '$items' }, { $group: { _id: null, units: { $sum: '$items.qty' } } }],
+          series: [
+            { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: TZ } }, revenue: { $sum: '$total' }, orders: { $sum: 1 } } },
+            { $sort: { _id: 1 } },
+          ],
+          byPayment: [{ $group: { _id: '$paymentMethod', revenue: { $sum: '$total' }, orders: { $sum: 1 } } }, { $sort: { revenue: -1 } }],
+          byStatus: [{ $group: { _id: '$status', revenue: { $sum: '$total' }, orders: { $sum: 1 } } }],
+          top: [
+            { $unwind: '$items' },
+            { $group: { _id: '$items.productId', name: { $first: '$items.name' }, image: { $first: '$items.image' }, units: { $sum: '$items.qty' }, revenue: { $sum: { $multiply: ['$items.price', '$items.qty'] } } } },
+            { $sort: { revenue: -1 } },
+            { $limit: 12 },
+          ],
+        },
+      },
+    ]);
+
+    const s = agg.summary?.[0] || {};
+    const orders = s.orders || 0;
+    const revenue = s.revenue || 0;
+
+    // Gap-fill the daily series so the trend line is continuous. Cap at ~13
+    // months to keep the payload small for very wide ranges.
+    const seriesMap = new Map((agg.series || []).map((d) => [d._id, d]));
+    let series = [];
+    let capped = false;
+    for (let t = new Date(`${fromStr}T12:00:00+05:30`); dayStr(t) <= toStr; t = new Date(t.getTime() + 24 * 60 * 60 * 1000)) {
+      if (series.length > 400) { capped = true; break; }
+      const key = dayStr(t);
+      const found = seriesMap.get(key);
+      series.push({ day: key, revenue: found?.revenue || 0, orders: found?.orders || 0 });
+    }
+    if (capped) series = (agg.series || []).map((d) => ({ day: d._id, revenue: d.revenue, orders: d.orders }));
+
+    res.json({
+      success: true,
+      data: {
+        range: { from: fromStr, to: toStr },
+        summary: {
+          revenue,
+          subtotal: s.subtotal || 0,
+          discount: s.discount || 0,
+          shipping: s.shipping || 0,
+          orders,
+          units: agg.units?.[0]?.units || 0,
+          avgOrderValue: orders ? Math.round(revenue / orders) : 0,
+        },
+        series,
+        topProducts: (agg.top || []).map((t) => ({ productId: t._id, name: t.name || 'Deleted product', image: t.image || '', units: t.units, revenue: t.revenue })),
+        byPayment: (agg.byPayment || []).map((p) => ({ method: p._id || 'none', orders: p.orders, revenue: p.revenue })),
+        byStatus: (agg.byStatus || []).map((p) => ({ status: p._id, orders: p.orders, revenue: p.revenue })),
+      },
+    });
+  })
+);
+
 // ADMIN — per-product view stats (separate from page-view totals). Server-side
 // search + pagination so it scales to a large catalog.
 router.get(
