@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
+// Available-stock ceiling for a cart line. stockQty ≤ 0 (or missing) means the
+// product doesn't track a finite count, so no client cap — the server still
+// validates every order against live stock via resolveItems().
+const clampCap = (stockQty) => (stockQty > 0 ? stockQty : Infinity)
+
 export const useCartStore = create(persist(
   (set) => ({
     items: [],
@@ -12,11 +17,15 @@ export const useCartStore = create(persist(
 
     addItem: (product, size, qty = 1) => set(s => {
       const key = `${product.id}-${size}`
+      const cap = clampCap(product.stockQty)
       const existing = s.items.find(i => i.key === key)
       if (existing) {
-        return { items: s.items.map(i => i.key === key ? { ...i, qty: i.qty + qty } : i) }
+        // Re-adding: refresh the stock snapshot and clamp the combined qty.
+        return { items: s.items.map(i => i.key === key
+          ? { ...i, stockQty: product.stockQty, qty: Math.min(i.qty + qty, cap) }
+          : i) }
       }
-      return { items: [...s.items, { ...product, key, size, qty }] }
+      return { items: [...s.items, { ...product, key, size, qty: Math.min(qty, cap) }] }
     }),
 
     removeItem: (key) => set(s => ({ items: s.items.filter(i => i.key !== key) })),
@@ -24,7 +33,7 @@ export const useCartStore = create(persist(
     updateQty: (key, qty) => set(s => ({
       items: qty < 1
         ? s.items.filter(i => i.key !== key)
-        : s.items.map(i => i.key === key ? { ...i, qty } : i)
+        : s.items.map(i => i.key === key ? { ...i, qty: Math.min(qty, clampCap(i.stockQty)) } : i)
     })),
 
     clearCart: () => set({ items: [] }),

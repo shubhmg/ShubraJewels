@@ -139,6 +139,8 @@ export function CartDrawer() {
 }
 
 function CartItem({ item, onRemove, onQtyChange }) {
+  const hasCap = item.stockQty > 0
+  const atMax = hasCap && item.qty >= item.stockQty
   return (
     <div
       className="flex gap-3 sm:gap-5 p-3 sm:p-4 rounded-2xl animate-fade-in"
@@ -178,14 +180,21 @@ function CartItem({ item, onRemove, onQtyChange }) {
             </button>
             <span className="text-sm font-bold w-4 text-center" style={{ color: 'var(--ink)' }}>{item.qty}</span>
             <button
-              onClick={() => onQtyChange(item.key, item.qty + 1)}
-              className="w-7 h-7 sm:w-5 sm:h-5 flex items-center justify-center rounded-full transition-colors cursor-pointer"
+              onClick={() => !atMax && onQtyChange(item.key, item.qty + 1)}
+              disabled={atMax}
+              className="w-7 h-7 sm:w-5 sm:h-5 flex items-center justify-center rounded-full transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
               style={{ color: 'var(--maroon)' }}
               aria-label="Increase quantity"
             >
               <Plus size={11} />
             </button>
           </div>
+
+          {atMax && (
+            <p className="w-full text-[11px] font-medium order-last mt-1" style={{ color: 'var(--maroon)' }}>
+              Only {item.stockQty} in stock
+            </p>
+          )}
 
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
             <span className="font-bold text-sm sm:text-base whitespace-nowrap" style={{ color: 'var(--ink)' }}>
