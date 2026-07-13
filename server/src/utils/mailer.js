@@ -61,7 +61,13 @@ function buildOrderConfirmationHtml(order, settings = {}) {
   // Derived pale-gold for borders/rows (lighten the gold slightly)
   const goldPale  = '#F5EDD5';
 
-  const absImg = (p) => !p ? '' : /^https?:\/\//.test(p) ? p : `${(env.publicUrl || '').replace(/\/$/, '')}${p.startsWith('/') ? '' : '/'}${p}`;
+  const baseUrl = (() => {
+    const u = (env.publicUrl || '').replace(/\/$/, '');
+    if (!u) return '';
+    return /^https?:\/\//.test(u) ? u : `https://${u}`;
+  })();
+  const absImg = (p) => !p ? '' : /^https?:\/\//.test(p) ? p : `${baseUrl}${p.startsWith('/') ? '' : '/'}${p}`;
+
 
   // ── Item rows ────────────────────────────────────────────────────────────
   const itemRows = (order.items || []).map((it) => {
