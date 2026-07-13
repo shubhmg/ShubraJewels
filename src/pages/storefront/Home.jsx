@@ -60,10 +60,32 @@ export function Home() {
   return (
     <div style={{ background: 'var(--cream)' }}>
       <Hero settings={settings} />
+      <BrandTicker settings={settings} />
 
       {blocks.filter((b) => b.enabled).map((b) => <Fragment key={b.id}>{renderBlock(b)}</Fragment>)}
 
       <SloganBand settings={settings} />
+    </div>
+  )
+}
+
+/* ── Kinetic brand ticker ─────────────────────────────────────────── */
+function BrandTicker({ settings }) {
+  const words = [
+    settings.sloganEnglish || 'Every jhumka tells a story',
+    'Oxidised', 'Meenakari', 'Bridal', 'Handcrafted', 'Kashmiri', 'Jaipur',
+  ]
+  const run = [...words, ...words]
+  return (
+    <div className="overflow-hidden border-y py-3.5 select-none" style={{ background: 'var(--ink)', borderColor: 'color-mix(in srgb, var(--gold) 30%, transparent)' }}>
+      <div className="marquee items-center gap-8">
+        {run.map((w, i) => (
+          <span key={i} className="inline-flex items-center gap-8 whitespace-nowrap">
+            <span className="font-display text-sm md:text-base tracking-wide" style={{ color: i % 2 ? 'var(--gold-light)' : 'rgba(255,255,255,0.85)', fontWeight: 400 }}>{w}</span>
+            <span aria-hidden style={{ color: 'var(--gold)' }}>✦</span>
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -89,7 +111,7 @@ function ProductGridBlock({ all, config }) {
       <div className="container-wide">
         <Reveal><SectionHeading eyebrow={c.eyebrow} hindi={c.hindi} title={c.title} subtitle={c.subtitle} light={dark} /></Reveal>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-7" style={{ display: 'grid' }}>
-          {list.map((p) => <ProductCard key={p.id} product={p} />)}
+          {list.map((p) => <ProductCard key={p.id} product={p} dark={dark} />)}
         </div>
       </div>
     </section>
@@ -139,12 +161,20 @@ function HeroText({ hero, settings }) {
       animate="show"
       variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
     >
-      <HeroLine><p className="font-hindi text-xl md:text-3xl text-[var(--gold-light)]">{hero.slogan || settings.slogan}</p></HeroLine>
-      <HeroLine><h1 className="font-display text-white text-4xl md:text-6xl lg:text-7xl leading-[1.05] mt-1.5 tracking-tight">{hero.heading || settings.brandName}</h1></HeroLine>
-      {hero.subheading && <HeroLine><p className="text-white/80 max-w-xl mx-auto mt-3 text-sm md:text-lg">{hero.subheading}</p></HeroLine>}
       <HeroLine>
-        <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
-          <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold !px-6 !py-2.5 !text-sm">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={16} /></Link></Magnetic>
+        <span className="eyebrow justify-center flex text-[var(--gold-light)]" style={{ color: 'var(--gold-light)' }}>Handcrafted in Rajasthan</span>
+      </HeroLine>
+      <HeroLine><p className="font-hindi text-xl md:text-3xl text-[var(--gold-light)] mt-3">{hero.slogan || settings.slogan}</p></HeroLine>
+      <HeroLine>
+        <h1 className="font-display text-white text-5xl md:text-7xl lg:text-[5.5rem] leading-[0.98] mt-2" style={{ fontWeight: 400, letterSpacing: '-0.03em' }}>
+          {hero.heading || settings.brandName}
+        </h1>
+      </HeroLine>
+      {hero.subheading && <HeroLine><p className="text-white/75 max-w-xl mx-auto mt-5 text-sm md:text-lg leading-relaxed">{hero.subheading}</p></HeroLine>}
+      <HeroLine>
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-7">
+          <Magnetic><Link to={hero.ctaLink || '/products'} className="btn-gold !px-7 !py-3 !text-sm">{hero.ctaLabel || 'Shop Jhumkas'} <ArrowRight size={16} /></Link></Magnetic>
+          <Magnetic><Link to="/collections" className="btn-outline-gold !px-6 !py-3 !text-sm !text-white" style={{ borderColor: 'rgba(255,255,255,0.35)' }}>The Collections</Link></Magnetic>
         </div>
       </HeroLine>
     </motion.div>
@@ -174,7 +204,7 @@ function Hero({ settings }) {
     const bottomMask = 'linear-gradient(to bottom, #000 0%, #000 40%, transparent 94%)'
     const mobileBottom = 'linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%)'
     return (
-      <section className="relative flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
+      <section className="tex-grain relative flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
         {HERO_MOTIFS}
 
         {/* Mobile: natural full-width image, height follows aspect ratio */}
@@ -200,7 +230,7 @@ function Hero({ settings }) {
 
   // 3D jewel / video: full-bleed band with text below.
   return (
-    <section className="relative min-h-[68vh] md:min-h-[80vh] flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
+    <section className="tex-grain relative min-h-[68vh] md:min-h-[80vh] flex flex-col overflow-hidden pt-16 md:pt-20" style={{ background: 'var(--maroon-dark)' }}>
       {HERO_MOTIFS}
       <div className="relative flex-1 min-h-[30vh] md:min-h-[42vh]">
         <HeroBackground hero={hero} t={t} />
@@ -624,12 +654,12 @@ function GalleryTile({ item }) {
 /* ── Slogan band ──────────────────────────────────────────────────── */
 function SloganBand({ settings }) {
   return (
-    <section className="relative py-20 md:py-28 text-center overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
+    <section className="tex-grain relative py-24 md:py-32 text-center overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
       <Mandala size={420} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-15" />
-      <div className="container-tight relative">
+      <div className="container-tight relative z-10">
         <Motif size={34} className="mx-auto" />
-        <p className="font-hindi text-3xl md:text-5xl text-white mt-4">{settings.slogan}</p>
-        <p className="text-[var(--gold-light)] mt-3 tracking-widest uppercase text-sm">{settings.sloganEnglish}</p>
+        <p className="font-hindi text-4xl md:text-6xl text-white mt-5 leading-tight">{settings.slogan}</p>
+        <p className="mt-5 eyebrow justify-center flex" style={{ color: 'var(--gold-light)' }}>{settings.sloganEnglish}</p>
       </div>
     </section>
   )

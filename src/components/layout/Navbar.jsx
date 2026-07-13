@@ -71,7 +71,7 @@ export function Navbar() {
                 </div>
               )}
               {(settings.showBrandName !== false || !settings.logo) && (
-                <span className={`font-display text-lg sm:text-xl md:text-2xl tracking-wide truncate transition-colors duration-300 ${heroBg ? 'text-white' : ''}`} style={heroBg ? undefined : { color: 'var(--maroon)' }}>
+                <span className={`font-display text-xl sm:text-2xl md:text-[1.7rem] truncate transition-colors duration-300 ${heroBg ? 'text-white' : ''}`} style={{ fontWeight: 500, letterSpacing: '-0.01em', ...(heroBg ? {} : { color: 'var(--maroon)' }) }}>
                   {settings.brandName}
                 </span>
               )}

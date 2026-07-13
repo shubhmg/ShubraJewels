@@ -40,12 +40,13 @@ export default {
         },
       },
       fontFamily: {
-        // Google Sans feel: Plus Jakarta Sans for display headings, Inter for body
-        serif: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
-        sans:  ['Inter', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
-        hindi:   ['Mukta', 'Inter', 'sans-serif'],
-        mukta:   ['Mukta', 'Inter', 'sans-serif'],
+        // Editorial heritage: Fraunces (high-contrast serif) for display, Hanken
+        // Grotesk for UI/body, Mukta for Devanagari.
+        serif:   ['Fraunces', 'Georgia', 'serif'],
+        display: ['Fraunces', 'Georgia', 'serif'],
+        sans:    ['"Hanken Grotesk"', 'system-ui', 'sans-serif'],
+        hindi:   ['Mukta', '"Hanken Grotesk"', 'sans-serif'],
+        mukta:   ['Mukta', '"Hanken Grotesk"', 'sans-serif'],
       },
       backgroundImage: {
         'gold-gradient': 'linear-gradient(135deg, #C9A84C 0%, #E3C97A 50%, #C9A84C 100%)',

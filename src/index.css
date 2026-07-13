@@ -42,13 +42,24 @@
 
   body {
     @apply font-sans antialiased bg-cream-50 text-dark-900 transition-colors duration-300;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.005em;
   }
 
   html.dark body {
     @apply bg-dark-950 text-cream-50;
   }
 
-  h1, h2, h3, h4 { @apply font-serif; font-weight: 800; }
+  /* Editorial display: Fraunces at refined (not extrabold) weights with optical
+     sizing + tight tracking — the core of the heritage-luxe feel. Individual
+     components set their own weight; bare headings stay elegant. */
+  h1, h2, h3, h4 {
+    @apply font-serif;
+    font-weight: 500;
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+  }
 
   ::selection {
     background-color: rgba(201, 168, 76, 0.25);
@@ -124,9 +135,17 @@
     .product-masonry > * { margin-bottom: 0; break-inside: auto; }
   }
 
-  /* Force extrabold on all display-font elements (headings, pull quotes, etc.) */
+  /* Display serif — refined weight + optical sizing. Editorial, not appy. */
   .font-display {
-    font-weight: 800;
+    @apply font-serif;
+    font-weight: 500;
+    font-optical-sizing: auto;
+    letter-spacing: -0.015em;
+  }
+  /* Editorial italic accent (for a single emphasised word in a headline). */
+  .accent-italic {
+    font-style: italic;
+    font-weight: 400;
   }
 
   /* Devanagari must never inherit letter-spacing/uppercase (breaks matras &
@@ -153,13 +172,15 @@
     @apply absolute left-3 top-3.5 text-sm text-stone-400 pointer-events-none transition-all duration-200 bg-transparent;
   }
 
-  /* Nav link underline */
+  /* Nav link — editorial small-caps with a gold hairline underline. */
   .nav-link {
-    @apply relative text-sm font-medium text-stone-600 hover:text-dark-900 transition-colors duration-200;
+    @apply relative font-semibold uppercase text-stone-600 hover:text-dark-900 transition-colors duration-200;
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
   }
   .nav-link::after {
     content: '';
-    @apply absolute bottom-0 left-0 w-0 h-px bg-gold-500 transition-all duration-300;
+    @apply absolute -bottom-1 left-0 w-0 h-px bg-gold-500 transition-all duration-300;
   }
   .nav-link:hover::after,
   .nav-link.active::after {
@@ -219,10 +240,60 @@
   }
   .btn-outline-gold:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
 
-  /* Maroon-tinted eyebrow label */
+  /* Editorial eyebrow label — small caps, wide tracking, gold. */
   .eyebrow {
-    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em];
+    @apply inline-flex items-center gap-2.5 font-semibold uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.28em;
     color: var(--gold);
+  }
+
+  /* Tactile film grain overlay (feTurbulence). Apply to a `position: relative`
+     band; sits above the background, below content (content should be z-10+). */
+  .tex-grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+
+  /* Warm gold light-bloom behind a hero/product. */
+  .glow-gold {
+    box-shadow: 0 0 120px -30px color-mix(in srgb, var(--gold) 65%, transparent);
+  }
+
+  /* Animated hairline underline for editorial links. */
+  .link-underline {
+    position: relative;
+  }
+  .link-underline::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    height: 1px;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    background: currentColor;
+  }
+  .link-underline:hover::after { transform: scaleX(1); transform-origin: left; }
+
+  /* Infinite marquee row (kinetic brand ticker). */
+  .marquee {
+    display: flex;
+    width: max-content;
+    animation: marquee 34s linear infinite;
+  }
+  .marquee:hover { animation-play-state: paused; }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
   }
 
   /* Gold shimmer bound to the editable var */
