@@ -128,11 +128,23 @@ function buildOrderConfirmationHtml(order, settings = {}) {
   <!-- ══ HEADER ══ -->
   <tr>
     <td style="background:linear-gradient(150deg,${maroon} 0%,${maroonDk} 100%);padding:36px 32px 28px;text-align:center;">
-      <!-- ornament ring -->
+      <!-- logo / brand mark -->
       <table cellpadding="0" cellspacing="0" style="margin:0 auto 16px;">
-        <tr><td style="width:68px;height:68px;border-radius:50%;background:rgba(201,168,76,0.15);
-                       border:1.5px solid rgba(201,168,76,0.45);text-align:center;vertical-align:middle;
-                       font-size:30px;line-height:68px;">🪬</td></tr>
+        <tr><td style="text-align:center;vertical-align:middle;">
+          ${settings.logo
+            ? `<img src="${absImg(settings.logo)}" alt="${storeName}" width="72" height="72"
+                style="width:72px;height:72px;border-radius:50%;object-fit:cover;
+                       border:2px solid rgba(201,168,76,0.45);display:block;" />`
+            : `<div style="width:72px;height:72px;border-radius:50%;
+                          background:rgba(201,168,76,0.15);
+                          border:2px solid rgba(201,168,76,0.45);
+                          font-size:26px;font-weight:800;color:${goldLight};
+                          font-family:'Plus Jakarta Sans',Arial,sans-serif;
+                          line-height:72px;text-align:center;">
+                 ${(storeName).split(' ').map(w=>w[0]).slice(0,2).join('')}
+               </div>`
+          }
+        </td></tr>
       </table>
       <!-- Brand name in Plus Jakarta Sans -->
       <h1 style="margin:0;font-size:28px;font-weight:800;color:#fff;letter-spacing:0.5px;
@@ -312,7 +324,7 @@ export async function sendOrderConfirmation(order, settings = {}) {
     await transport.sendMail({
       from: `"${fromName}" <${fromAddr}>`,
       to: order.customer.email,
-      subject: `✨ Order Confirmed – ${order.orderNo} | ${storeName}`,
+      subject: `✨ Order Confirmed | ${storeName}`,
       html: buildOrderConfirmationHtml(order, settings),
     });
     console.log(`[mailer] confirmation sent to ${order.customer.email} for ${order.orderNo}`);
