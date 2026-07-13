@@ -18,9 +18,6 @@ export function Combobox({
   const inputRef = useRef(null)
   const menuRef = useRef(null)
 
-  // readonly-until-focus: block browser autofill (see Checkout noAutofill note).
-  useEffect(() => { inputRef.current?.setAttribute('readonly', 'readonly') }, [])
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const list = q ? options.filter((o) => o.toLowerCase().includes(q)) : options
@@ -51,7 +48,7 @@ export function Combobox({
     }
   }, [open])
 
-  const openMenu = () => { if (disabled) return; inputRef.current?.removeAttribute('readonly'); setQuery(value || ''); setActive(0); setOpen(true) }
+  const openMenu = () => { if (disabled) return; setQuery(value || ''); setActive(0); setOpen(true) }
 
   const commit = (val) => {
     onChange(val)
@@ -61,7 +58,6 @@ export function Combobox({
   }
 
   const handleBlur = () => {
-    inputRef.current?.setAttribute('readonly', 'readonly')
     // Delay so an option's onMouseDown/onClick lands first.
     setTimeout(() => {
       if (!menuRef.current) return

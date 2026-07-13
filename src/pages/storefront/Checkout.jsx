@@ -675,12 +675,10 @@ export function Checkout() {
 
 const inputBase = 'mt-1 w-full px-4 py-3 rounded-xl border bg-white text-base sm:text-sm outline-none focus:ring-2 transition-shadow disabled:bg-stone-50 disabled:text-stone-400'
 
-// Hard-block browser autofill: the field is `readonly` in the DOM during the
-// browser's autofill pass (page load), so Chrome/Safari never offer it; focus
-// strips readonly imperatively so typing works. `autocomplete=off` alone is
-// ignored by Chrome for address-labelled fields.
+// Discourage browser autofill without breaking mobile input. (The old
+// readonly-until-focus hack blocked the iOS Safari keyboard entirely — tapping
+// a readonly input never fires focus there, so it stayed uneditable.)
 export const noAutofill = {
-  ref: (el) => { if (el && !el.dataset.roInit) { el.setAttribute('readonly', 'readonly'); el.dataset.roInit = '1' } },
   autoComplete: 'off',
   autoCorrect: 'off',
   spellCheck: false,
@@ -702,8 +700,7 @@ function Field({ label, value, onChange, onBlur, placeholder, type = 'text', lis
           list={list}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={(e) => e.currentTarget.removeAttribute('readonly')}
-          onBlur={(e) => { e.currentTarget.setAttribute('readonly', 'readonly'); onBlur?.() }}
+          onBlur={onBlur}
           placeholder={placeholder}
           disabled={disabled}
           inputMode={inputMode}
