@@ -86,8 +86,8 @@ export function AdminOrders() {
   useEffect(() => { const t = setTimeout(() => { setQ(search); setPage(1) }, 350); return () => clearTimeout(t) }, [search])
   useEffect(() => { setPage(1) }, [filter])
 
-  const load = async () => {
-    setLoading(true)
+  const load = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
     const statusParam = filter === 'all' ? '' : filter
     const res = await api.get(`/orders?status=${statusParam}&search=${encodeURIComponent(q)}&page=${page}&limit=${PAGE_LIMIT}`, { auth: true })
     setOrders(res.items || [])
@@ -114,12 +114,24 @@ export function AdminOrders() {
     }
   }
 
+  // Merge a server-updated order back into the list. If a status tab is active
+  // and the order no longer matches it (e.g. Confirmed → Shipped), drop it from
+  // the view; then silently refresh so the tab counts stay accurate.
+  const reconcileOrder = (updated) => {
+    setOrders((os) =>
+      filter !== 'all' && updated.status !== filter
+        ? os.filter((o) => o._id !== updated._id)
+        : os.map((o) => (o._id === updated._id ? updated : o))
+    )
+    load({ silent: true })
+  }
+
   // Any admin patch (status / payment) — reconcile with the server response
   // so auto-effects (stock deduction, COD→paid on delivery) reflect.
   const patchOrder = async (id, patch) => {
     setOrders((os) => os.map((o) => (o._id === id ? { ...o, ...patch } : o)))
     const updated = await api.patch(`/orders/${id}`, patch, { auth: true })
-    setOrders((os) => os.map((o) => (o._id === id ? updated : o)))
+    reconcileOrder(updated)
   }
   const setStatus = (id, status) => patchOrder(id, { status })
 
@@ -145,7 +157,7 @@ export function AdminOrders() {
         <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
       </AdminHeader>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
-      {shipFor && <ShipModal order={shipFor} onClose={() => setShipFor(null)} onShipped={(u) => { setOrders((os) => os.map((o) => (o._id === u._id ? u : o))); setShipFor(null) }} />}
+      {shipFor && <ShipModal order={shipFor} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
 
       {/* Search */}
       <div className="relative mb-4 max-w-sm">
