@@ -50,6 +50,22 @@ const orderSchema = new mongoose.Schema(
       message: { type: String, default: '' },
       shippedAt: { type: Date, default: null },
     },
+    // Courier shipment. `provider: 'manual'` = the owner ships it themselves and
+    // pastes a tracking note (legacy flow). `provider: 'delhivery'` = a Delhivery
+    // waybill was booked via the API; `waybill` + `status` + `labelUrl` are set
+    // from Delhivery and refreshed by the sync action.
+    shipment: {
+      provider: { type: String, enum: ['manual', 'delhivery'], default: 'manual' },
+      waybill: { type: String, default: '' },
+      mode: { type: String, default: '' },          // 'COD' | 'Prepaid' (as sent to Delhivery)
+      codAmount: { type: Number, default: 0 },        // amount to collect on delivery
+      weightGrams: { type: Number, default: 0 },      // weight declared to the courier
+      status: { type: String, default: '' },          // latest courier status
+      statusDetail: { type: String, default: '' },    // location / status type
+      labelUrl: { type: String, default: '' },         // packing-slip PDF link
+      bookedAt: { type: Date, default: null },
+      lastSyncedAt: { type: Date, default: null },
+    },
     // true once this order's items have been deducted from stock (on delivery).
     stockApplied: { type: Boolean, default: false },
     // Payment

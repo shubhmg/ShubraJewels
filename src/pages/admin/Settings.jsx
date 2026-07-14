@@ -80,11 +80,25 @@ export function AdminSettings() {
   const [saved, setSaved] = useState(false)
   const [tab, setTab] = useState('brand')
   const [tgTest, setTgTest] = useState(null) // { ok, msg } after a test send
+  const [dlTest, setDlTest] = useState(null) // Delhivery connection test result
 
-  // Admin endpoint returns secrets (Telegram token) that the public GET strips.
+  // Admin endpoint returns secrets (Telegram + Delhivery tokens) the public GET strips.
   useEffect(() => { api.get('/settings/admin', { auth: true }).then(setS) }, [])
 
   const setTg = (k, v) => setS((p) => ({ ...p, notifications: { ...p.notifications, telegram: { ...p.notifications?.telegram, [k]: v } } }))
+  const setDel = (k, v) => setS((p) => ({ ...p, delhivery: { ...p.delhivery, [k]: v } }))
+
+  const testDelhivery = async () => {
+    setDlTest({ loading: true })
+    try {
+      await api.patch('/settings', { delhivery: s.delhivery }, { auth: true }) // save first so the test uses current values
+      const r = await api.post('/settings/test-delhivery', {}, { auth: true })
+      const d = r || {}
+      setDlTest({ ok: true, msg: `Connected ✓  PIN ${d.pin}: ${d.serviceable ? `serviceable · COD ${d.cod ? 'yes' : 'no'} · Prepaid ${d.prepaid ? 'yes' : 'no'}` : 'not serviceable'}` })
+    } catch (e) {
+      setDlTest({ ok: false, msg: e.message || 'Could not reach Delhivery. Check the API token.' })
+    }
+  }
 
   const testTelegram = async () => {
     setTgTest({ loading: true })
@@ -120,6 +134,7 @@ export function AdminSettings() {
           codFee: Number(pay.codFee) || 0,
           codAdvance: { ...(pay.codAdvance || {}), percent: Number(pay.codAdvance?.percent) || 0 },
         },
+        ...(s.delhivery ? { delhivery: { ...s.delhivery, defaultWeightGrams: Number(s.delhivery.defaultWeightGrams) || 100 } } : {}),
       }
       await api.patch('/settings', payload, { auth: true })
       await refresh()
@@ -253,6 +268,70 @@ export function AdminSettings() {
               <Field field={{ label: 'Advance percent (%)', type: 'number', placeholder: '5', help: '% of the order total paid upfront online. The rest is collected on delivery.' }} value={s.payments?.codAdvance?.percent ?? ''} onChange={(v) => setS((p) => ({ ...p, payments: { ...p.payments, codAdvance: { ...p.payments?.codAdvance, percent: v === '' ? '' : Number(v) } } }))} />
             )}
           </div>
+        </div>
+      </Section>
+      )}
+
+      {tab === 'payments' && (
+      <Section title="Delhivery Shipping (automated)" subtitle="Book courier waybills automatically when you mark an order Shipped. The API token is private and never shown on the website.">
+        <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
+          <p className="font-semibold mb-1.5">How the policy works</p>
+          <ul className="list-disc ml-5 space-y-1 text-zinc-600 text-[13px]">
+            <li><b>All orders</b> — every order books a Delhivery waybill when you ship it.</li>
+            <li><b>COD only</b> — Cash-on-Delivery orders go via Delhivery; prepaid ones you ship yourself.</li>
+            <li><b>Prepaid only</b> — online-paid orders go via Delhivery; COD you ship yourself.</li>
+            <li><b>Manual</b> — nothing is automatic; you press “Ship via Delhivery” per order when you want.</li>
+          </ul>
+          <p className="text-xs text-zinc-500 mt-2">Orders outside the policy still show a manual tracking box (paste any courier’s message), exactly as before.</p>
+        </div>
+
+        <div className="space-y-4">
+          <Field field={{ label: 'Enable Delhivery integration', type: 'toggle' }} value={!!s.delhivery?.enabled} onChange={(v) => setDel('enabled', v)} />
+
+          {s.delhivery?.enabled && (
+            <>
+              <Field field={{ label: 'Automation policy', type: 'select', options: [
+                { value: 'manual', label: 'Manual — I press the button per order' },
+                { value: 'all', label: 'All orders' },
+                { value: 'cod', label: 'COD orders only' },
+                { value: 'prepaid', label: 'Prepaid orders only' },
+              ] }} value={s.delhivery?.policy || 'manual'} onChange={(v) => setDel('policy', v)} />
+
+              <Field field={{ label: 'API token', placeholder: 'Delhivery API token', help: 'From the Delhivery One dashboard → API Setup. Kept private — never sent to the storefront.' }} value={s.delhivery?.token || ''} onChange={(v) => setDel('token', v.trim())} />
+
+              <Field field={{ label: 'Pickup warehouse name', placeholder: 'Exactly as registered', help: 'The registered warehouse/client name in Delhivery — case-sensitive, must match exactly.' }} value={s.delhivery?.pickupName || ''} onChange={(v) => setDel('pickupName', v)} />
+
+              <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Pickup / return address (for the label & RTO)</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <Field field={{ label: 'Pickup phone' }} value={s.delhivery?.pickupPhone || ''} onChange={(v) => setDel('pickupPhone', v)} />
+                  <Field field={{ label: 'Pickup PIN' }} value={s.delhivery?.pickupPin || ''} onChange={(v) => setDel('pickupPin', v)} />
+                </div>
+                <Field field={{ label: 'Pickup address' }} value={s.delhivery?.pickupAddress || ''} onChange={(v) => setDel('pickupAddress', v)} />
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <Field field={{ label: 'Pickup city' }} value={s.delhivery?.pickupCity || ''} onChange={(v) => setDel('pickupCity', v)} />
+                  <Field field={{ label: 'Pickup state' }} value={s.delhivery?.pickupState || ''} onChange={(v) => setDel('pickupState', v)} />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Field field={{ label: 'Default weight per item (grams)', type: 'number', placeholder: '100', help: 'Used when a product has no weight. Multiplied by total quantity.' }} value={s.delhivery?.defaultWeightGrams ?? ''} onChange={(v) => setDel('defaultWeightGrams', v === '' ? '' : Number(v))} />
+                <Field field={{ label: 'Package description', placeholder: 'Imitation jewellery (jhumka)', help: 'Shown on the shipping label / manifest.' }} value={s.delhivery?.productDesc || ''} onChange={(v) => setDel('productDesc', v)} />
+              </div>
+
+              <Field field={{ label: 'Use staging (test) endpoint', type: 'toggle', help: 'Point at Delhivery’s staging server for testing. Turn OFF for real shipments.' }} value={!!s.delhivery?.staging} onChange={(v) => setDel('staging', v)} />
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <Btn variant="outline" onClick={testDelhivery} disabled={dlTest?.loading || !s.delhivery?.token}>
+                  {dlTest?.loading ? 'Checking…' : 'Test connection'}
+                </Btn>
+                {dlTest && !dlTest.loading && (
+                  <span className="text-sm font-medium" style={{ color: dlTest.ok ? '#15803d' : '#b91c1c' }}>{dlTest.msg}</span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>
+            </>
+          )}
         </div>
       </Section>
       )}

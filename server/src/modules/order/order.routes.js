@@ -10,6 +10,10 @@ import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
 import { sendOrderConfirmation, sendOrderShipped } from '../../utils/mailer.js';
 import { reconcileOrderStock, checkAvailability, reserveProducts, releaseProducts } from './orderStock.js';
+import {
+  delhiveryConfig, delhiveryReady, checkServiceability,
+  createShipment, cancelShipment, trackShipment, labelLink, trackingUrl,
+} from '../../utils/delhivery.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -229,6 +233,162 @@ router.patch(
     }
 
     res.json({ success: true, data: order });
+  })
+);
+
+// Customer-facing tracking note auto-filled when a Delhivery waybill is booked.
+function delhiveryTrackingMessage(waybill) {
+  return `Shipped via Delhivery. Tracking ID: ${waybill}\nTrack your parcel: ${trackingUrl(waybill)}`;
+}
+
+// ADMIN — book a Delhivery shipment for an order, then mark it Shipped.
+// Creates the waybill, stores the shipment on the order, auto-fills the customer
+// tracking message, and emails the shipped notification (best-effort).
+router.post(
+  '/:id/ship-delhivery',
+  requireAdmin,
+  validate({
+    params: Joi.object({ id: objectId.required() }),
+    body: Joi.object({ weight: Joi.number().min(1).max(50000).optional() }).default({}),
+  }),
+  asyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id);
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
+    if (order.shipment?.provider === 'delhivery' && order.shipment?.waybill) {
+      throw ApiError.badRequest(`Already booked with Delhivery (AWB ${order.shipment.waybill}).`);
+    }
+
+    const settings = await getSettings();
+    if (!delhiveryReady(delhiveryConfig(settings))) {
+      throw ApiError.badRequest('Delhivery is not fully configured. Add the API token and pickup warehouse in Settings.');
+    }
+
+    const result = await createShipment(settings, order.toObject(), { weight: req.body.weight });
+    if (!result.ok) throw ApiError.badRequest(result.error || 'Delhivery could not book this shipment.');
+
+    const wasShipped = order.status === 'shipped';
+    order.shipment = {
+      provider: 'delhivery',
+      waybill: result.waybill,
+      mode: result.mode,
+      codAmount: result.codAmount || 0,
+      weightGrams: result.weight || 0,
+      status: 'Booked',
+      statusDetail: '',
+      labelUrl: '',
+      bookedAt: new Date(),
+      lastSyncedAt: new Date(),
+    };
+    order.tracking.message = delhiveryTrackingMessage(result.waybill);
+    order.status = 'shipped';
+    if (!order.tracking.shippedAt) order.tracking.shippedAt = new Date();
+    order.expiresAt = null;
+    await reconcileOrderStock(order);
+    await order.save();
+
+    // Fetch the label link in the background (it may not be ready instantly).
+    labelLink(settings, result.waybill)
+      .then((l) => { if (l.ok) Order.updateOne({ _id: order._id }, { 'shipment.labelUrl': l.url }).catch(() => {}); })
+      .catch(() => {});
+
+    // Email the customer their shipment update (best-effort).
+    if (!wasShipped) {
+      sendOrderShipped(order.toObject(), settings)
+        .then((r) => { if (!r.ok) console.error('[mailer] shipped email failed:', r.error); })
+        .catch((e) => console.error('[mailer] unexpected error:', e.message));
+    }
+
+    res.json({ success: true, data: order });
+  })
+);
+
+// ADMIN — refresh a Delhivery shipment's live status.
+router.post(
+  '/:id/sync-shipment',
+  requireAdmin,
+  validate({ params: Joi.object({ id: objectId.required() }) }),
+  asyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id);
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.shipment?.provider !== 'delhivery' || !order.shipment?.waybill) {
+      throw ApiError.badRequest('No Delhivery shipment on this order.');
+    }
+    const settings = await getSettings();
+    const [t, l] = await Promise.all([
+      trackShipment(settings, order.shipment.waybill),
+      order.shipment.labelUrl ? Promise.resolve({ ok: false }) : labelLink(settings, order.shipment.waybill),
+    ]);
+    if (t.ok) {
+      order.shipment.status = t.status || order.shipment.status;
+      order.shipment.statusDetail = [t.statusType, t.location].filter(Boolean).join(' · ');
+      // Auto-advance to Delivered when the courier confirms delivery.
+      if (t.delivered && order.status === 'shipped') {
+        order.status = 'delivered';
+        if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
+        await reconcileOrderStock(order);
+      }
+    }
+    if (l.ok) order.shipment.labelUrl = l.url;
+    order.shipment.lastSyncedAt = new Date();
+    await order.save();
+    res.json({ success: true, data: order, meta: { synced: t.ok, error: t.ok ? null : t.error } });
+  })
+);
+
+// ADMIN — cancel a Delhivery shipment (does not change the order's own status).
+router.post(
+  '/:id/cancel-shipment',
+  requireAdmin,
+  validate({ params: Joi.object({ id: objectId.required() }) }),
+  asyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id);
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.shipment?.provider !== 'delhivery' || !order.shipment?.waybill) {
+      throw ApiError.badRequest('No Delhivery shipment on this order.');
+    }
+    const settings = await getSettings();
+    const r = await cancelShipment(settings, order.shipment.waybill);
+    if (!r.ok) throw ApiError.badRequest(r.error || 'Delhivery could not cancel this waybill.');
+    order.shipment.status = 'Cancelled';
+    order.shipment.lastSyncedAt = new Date();
+    await order.save();
+    res.json({ success: true, data: order });
+  })
+);
+
+// ADMIN — get the packing-slip / shipping-label PDF link for a waybill.
+router.get(
+  '/:id/label',
+  requireAdmin,
+  validate({ params: Joi.object({ id: objectId.required() }) }),
+  asyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id);
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.shipment?.provider !== 'delhivery' || !order.shipment?.waybill) {
+      throw ApiError.badRequest('No Delhivery shipment on this order.');
+    }
+    const settings = await getSettings();
+    const r = await labelLink(settings, order.shipment.waybill);
+    if (!r.ok) throw ApiError.badRequest(r.error || 'Label not ready yet. Try again in a moment.');
+    if (order.shipment.labelUrl !== r.url) {
+      order.shipment.labelUrl = r.url;
+      await order.save();
+    }
+    res.json({ success: true, data: { url: r.url } });
+  })
+);
+
+// ADMIN — Delhivery PIN serviceability probe (for the ship form).
+router.get(
+  '/delhivery/serviceability',
+  requireAdmin,
+  validate({ query: Joi.object({ pin: Joi.string().pattern(/^\d{6}$/).required() }) }),
+  asyncHandler(async (req, res) => {
+    const settings = await getSettings();
+    const r = await checkServiceability(settings, req.query.pin);
+    if (!r.ok) throw ApiError.badRequest(r.error || 'Could not check serviceability');
+    res.json({ success: true, data: r });
   })
 );
 

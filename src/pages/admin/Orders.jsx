@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
@@ -59,6 +59,19 @@ function Stepper({ status }) {
   )
 }
 
+// Prepaid vs COD for an order (mirrors the server's orderPaymentMode).
+const paymentMode = (o) => (o.paymentStatus === 'paid' || !['cod', 'cash', 'none'].includes(o.paymentMethod) ? 'Prepaid' : 'COD')
+// Does the admin's Delhivery policy auto-route THIS order?
+const policyApplies = (cfg, o) => {
+  if (!cfg?.ready) return false
+  const m = paymentMode(o)
+  if (cfg.policy === 'all') return true
+  if (cfg.policy === 'cod') return m === 'COD'
+  if (cfg.policy === 'prepaid') return m === 'Prepaid'
+  return false
+}
+const trackUrl = (wb) => `https://www.delhivery.com/track/package/${encodeURIComponent(wb)}`
+
 // Payment badge — Paid, advance-paid COD, else COD.
 function payBadge(o) {
   if (o.paymentStatus === 'paid') return { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
@@ -79,8 +92,20 @@ export function AdminOrders() {
   const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
   const [shipFor, setShipFor] = useState(null) // order being marked shipped (tracking form)
+  const [delCfg, setDelCfg] = useState(null)   // Delhivery config (enabled/policy/ready)
 
   const [wiping, setWiping] = useState(false)
+
+  // Delhivery config drives the ship flow (auto-book vs manual). Read from the
+  // admin settings endpoint (the token itself stays server-side).
+  useEffect(() => {
+    api.get('/settings/admin', { auth: true })
+      .then((s) => {
+        const d = s?.delhivery || {}
+        setDelCfg({ enabled: !!d.enabled, policy: d.policy || 'manual', ready: !!(d.enabled && d.token && d.pickupName), defaultWeightGrams: Number(d.defaultWeightGrams) || 100 })
+      })
+      .catch(() => setDelCfg({ enabled: false, ready: false }))
+  }, [])
 
   // Debounced search; reset to page 1 on new query/filter.
   useEffect(() => { const t = setTimeout(() => { setQ(search); setPage(1) }, 350); return () => clearTimeout(t) }, [search])
@@ -135,6 +160,32 @@ export function AdminOrders() {
   }
   const setStatus = (id, status) => patchOrder(id, { status })
 
+  // Delhivery per-order actions (sync status / cancel waybill / open label).
+  const [busy, setBusy] = useState(null) // `${id}:${action}` while a request runs
+  const shipmentAction = async (id, action, path) => {
+    setBusy(`${id}:${action}`)
+    try {
+      const res = await api.post(`/orders/${id}/${path}`, {}, { auth: true })
+      if (res?._id) reconcileOrder(res)
+      return res
+    } catch (e) {
+      window.alert(e?.message || 'Action failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+  const openLabel = async (id) => {
+    setBusy(`${id}:label`)
+    try {
+      const r = await api.get(`/orders/${id}/label`, { auth: true })
+      if (r?.url) window.open(r.url, '_blank', 'noopener')
+    } catch (e) {
+      window.alert(e?.message || 'Label not ready yet. Try Sync, then retry.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   // Run an order's next step. "Mark Shipped" opens the tracking form first.
   const advance = (o) => {
     const a = nextAction(o.status)
@@ -157,7 +208,7 @@ export function AdminOrders() {
         <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
       </AdminHeader>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
-      {shipFor && <ShipModal order={shipFor} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
+      {shipFor && <ShipModal order={shipFor} delCfg={delCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
 
       {/* Search */}
       <div className="relative mb-4 max-w-sm">
@@ -237,8 +288,32 @@ export function AdminOrders() {
                     {/* Progress */}
                     <div className="bg-white rounded-xl p-3 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
 
-                    {/* Tracking message when shipped */}
-                    {(o.status === 'shipped' || o.status === 'delivered') && o.tracking?.message && (
+                    {/* Delhivery shipment — waybill, live status, label + actions */}
+                    {o.shipment?.provider === 'delhivery' && o.shipment?.waybill && (
+                      <div className="rounded-xl px-3 py-3 text-sm" style={{ background: 'color-mix(in srgb, #6366f1 9%, transparent)' }}>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="font-semibold text-indigo-700 flex items-center gap-1.5"><Package size={14} /> Delhivery {o.shipment.mode && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold uppercase">{o.shipment.mode}</span>}</p>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-indigo-700 font-bold">{o.shipment.status || 'Booked'}</span>
+                        </div>
+                        <p className="text-zinc-600 mt-1.5">AWB <a href={trackUrl(o.shipment.waybill)} target="_blank" rel="noopener noreferrer" className="font-mono font-semibold text-indigo-700 hover:underline">{o.shipment.waybill}</a>
+                          {o.shipment.codAmount > 0 && <> · collect <b>{fmt(o.shipment.codAmount)}</b></>}
+                          {o.shipment.weightGrams > 0 && <span className="text-zinc-400"> · {o.shipment.weightGrams} g</span>}
+                        </p>
+                        {o.shipment.statusDetail && <p className="text-xs text-zinc-500 mt-0.5">{o.shipment.statusDetail}</p>}
+                        <div className="flex items-center gap-2 flex-wrap mt-2.5">
+                          <a href={trackUrl(o.shipment.waybill)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100 hover:bg-indigo-50 cursor-pointer"><ExternalLink size={12} /> Track</a>
+                          <button onClick={() => openLabel(o._id)} disabled={busy === `${o._id}:label`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100 hover:bg-indigo-50 cursor-pointer disabled:opacity-50"><FileText size={12} /> Label</button>
+                          <button onClick={() => shipmentAction(o._id, 'sync', 'sync-shipment')} disabled={busy === `${o._id}:sync`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-zinc-600 text-xs font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 cursor-pointer disabled:opacity-50"><RefreshCw size={12} className={busy === `${o._id}:sync` ? 'animate-spin' : ''} /> Sync</button>
+                          {o.shipment.status !== 'Cancelled' && o.status !== 'delivered' && (
+                            <button onClick={() => { if (window.confirm(`Cancel Delhivery waybill ${o.shipment.waybill}? The order status won't change.`)) shipmentAction(o._id, 'cancel', 'cancel-shipment') }} disabled={busy === `${o._id}:cancel`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-red-600 text-xs font-semibold ring-1 ring-red-100 hover:bg-red-50 cursor-pointer disabled:opacity-50"><XCircle size={12} /> Cancel AWB</button>
+                          )}
+                          {o.shipment.lastSyncedAt && <span className="text-[11px] text-zinc-400">Synced {new Date(o.shipment.lastSyncedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tracking message when shipped (manual courier note) */}
+                    {(o.status === 'shipped' || o.status === 'delivered') && o.tracking?.message && o.shipment?.provider !== 'delhivery' && (
                       <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #8b5cf6 8%, transparent)' }}>
                         <p className="font-semibold text-violet-700 flex items-center gap-1.5"><Truck size={14} /> Tracking</p>
                         <p className="text-zinc-600 mt-0.5 whitespace-pre-wrap break-words">{o.tracking.message}</p>
@@ -311,15 +386,33 @@ export function AdminOrders() {
   )
 }
 
-// Mark an order Shipped with a single tracking message the customer will see —
-// paste the delivery partner's note (tracking id + link) straight in.
-function ShipModal({ order, onClose, onShipped }) {
+// Ship an order. When Delhivery is configured, book a waybill via the API
+// (auto-fills the customer tracking message); otherwise (or by choice) paste a
+// manual tracking note the customer will see.
+function ShipModal({ order, delCfg, onClose, onShipped }) {
+  const alreadyShipped = order.status === 'shipped' || order.status === 'delivered'
+  const canDelhivery = !!delCfg?.ready && !alreadyShipped
+  const [method, setMethod] = useState(canDelhivery && policyApplies(delCfg, order) ? 'delhivery' : 'manual')
+
   const [message, setMessage] = useState(order.tracking?.message || '')
+  const totalQty = (order.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1
+  const [weight, setWeight] = useState(String((delCfg?.defaultWeightGrams || 100) * totalQty))
+  const [serv, setServ] = useState(null) // serviceability result
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
-  const alreadyShipped = order.status === 'shipped' || order.status === 'delivered'
 
-  const submit = async () => {
+  const pin = order.address?.pincode
+  // Auto-check serviceability once when the Delhivery tab is active + PIN present.
+  useEffect(() => {
+    if (method !== 'delhivery' || !pin || serv) return
+    let live = true
+    api.get(`/orders/delhivery/serviceability?pin=${encodeURIComponent(pin)}`, { auth: true })
+      .then((r) => { if (live) setServ({ ok: true, ...r }) })
+      .catch((e) => { if (live) setServ({ ok: false, error: e.message }) })
+    return () => { live = false }
+  }, [method, pin]) // eslint-disable-line
+
+  const submitManual = async () => {
     setSaving(true); setErr('')
     try {
       const patch = { tracking: { message: message.trim() } }
@@ -329,14 +422,60 @@ function ShipModal({ order, onClose, onShipped }) {
     } catch (e) { setErr(e.message || 'Could not save'); setSaving(false) }
   }
 
+  const submitDelhivery = async () => {
+    setSaving(true); setErr('')
+    try {
+      const body = weight && Number(weight) > 0 ? { weight: Number(weight) } : {}
+      const updated = await api.post(`/orders/${order._id}/ship-delhivery`, body, { auth: true })
+      onShipped(updated)
+    } catch (e) { setErr(e.message || 'Delhivery could not book this shipment'); setSaving(false) }
+  }
+
+  const mode = paymentMode(order)
+
   return (
     <Modal open onClose={onClose} title={alreadyShipped ? 'Edit tracking' : `Ship ${order.orderNo}`} footer={<>
       <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      <Btn onClick={submit} disabled={saving}><Truck size={15} /> {saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped')}</Btn>
+      {method === 'delhivery'
+        ? <Btn onClick={submitDelhivery} disabled={saving}><Package size={15} /> {saving ? 'Booking…' : 'Book Delhivery & Ship'}</Btn>
+        : <Btn onClick={submitManual} disabled={saving}><Truck size={15} /> {saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped')}</Btn>}
     </>}>
-      <p className="text-sm text-zinc-500 -mt-1 mb-1">Paste the delivery partner's tracking message (id + link). It's shown on the customer's order tracker exactly as typed.</p>
-      <Field field={{ label: 'Tracking message', type: 'textarea', placeholder: 'e.g. Shipped via Delhivery. Tracking: 1234567890 — https://delhivery.com/track/1234567890' }} value={message} onChange={setMessage} />
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {canDelhivery && (
+        <div className="flex gap-2 mb-3">
+          {[{ v: 'delhivery', label: 'Delhivery (auto)', Icon: Package }, { v: 'manual', label: 'Manual note', Icon: Truck }].map(({ v, label, Icon }) => (
+            <button key={v} onClick={() => { setMethod(v); setErr('') }}
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold cursor-pointer transition border ${method === v ? 'text-white border-transparent' : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300'}`}
+              style={method === v ? { background: 'var(--maroon)' } : undefined}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {method === 'delhivery' ? (
+        <div className="space-y-3">
+          <p className="text-sm text-zinc-500 -mt-1">Books a Delhivery waybill for this order as <b>{mode}</b>{mode === 'COD' && <> (collect <b>{fmt(Math.max(0, (order.total || 0) - (order.advancePaid || 0)))}</b> on delivery)</>}. The customer’s tracking link is filled in automatically.</p>
+
+          {/* Serviceability */}
+          <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #6366f1 8%, transparent)' }}>
+            <p className="font-semibold text-indigo-700">Delivery to PIN {pin || '—'}</p>
+            {!pin ? <p className="text-red-600 text-xs mt-0.5">No PIN on this order — add one before booking.</p>
+              : !serv ? <p className="text-zinc-500 text-xs mt-0.5">Checking serviceability…</p>
+              : !serv.ok ? <p className="text-amber-600 text-xs mt-0.5">Couldn’t verify ({serv.error}). You can still try to book.</p>
+              : serv.serviceable
+                ? <p className="text-emerald-700 text-xs mt-0.5">Serviceable{serv.city ? ` · ${serv.city}, ${serv.state}` : ''} · COD {serv.cod ? '✓' : '✗'} · Prepaid {serv.prepaid ? '✓' : '✗'}{mode === 'COD' && !serv.cod ? ' — COD not available here!' : ''}</p>
+                : <p className="text-red-600 text-xs mt-0.5">Not serviceable by Delhivery. Ship manually instead.</p>}
+          </div>
+
+          <Field field={{ label: 'Package weight (grams)', type: 'number', help: `Default ${delCfg?.defaultWeightGrams || 100} g × ${totalQty} item(s). Adjust if needed.` }} value={weight} onChange={setWeight} />
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-zinc-500 -mt-1 mb-1">Paste the delivery partner's tracking message (id + link). It's shown on the customer's order tracker exactly as typed.</p>
+          <Field field={{ label: 'Tracking message', type: 'textarea', placeholder: 'e.g. Shipped via Delhivery. Tracking: 1234567890 — https://delhivery.com/track/1234567890' }} value={message} onChange={setMessage} />
+        </>
+      )}
+      {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
     </Modal>
   )
 }
