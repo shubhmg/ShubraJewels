@@ -102,7 +102,14 @@ export function AdminOrders() {
     api.get('/settings/admin', { auth: true })
       .then((s) => {
         const d = s?.delhivery || {}
-        setDelCfg({ enabled: !!d.enabled, policy: d.policy || 'manual', ready: !!(d.enabled && d.token && d.pickupName), defaultWeightGrams: Number(d.defaultWeightGrams) || 100 })
+        setDelCfg({
+          enabled: !!d.enabled,
+          policy: d.policy || 'manual',
+          hasToken: !!d.token,
+          hasPickup: !!d.pickupName,
+          ready: !!(d.enabled && d.token && d.pickupName),
+          defaultWeightGrams: Number(d.defaultWeightGrams) || 100,
+        })
       })
       .catch(() => setDelCfg({ enabled: false, ready: false }))
   }, [])
@@ -391,8 +398,12 @@ export function AdminOrders() {
 // manual tracking note the customer will see.
 function ShipModal({ order, delCfg, onClose, onShipped }) {
   const alreadyShipped = order.status === 'shipped' || order.status === 'delivered'
-  const canDelhivery = !!delCfg?.ready && !alreadyShipped
-  const [method, setMethod] = useState(canDelhivery && policyApplies(delCfg, order) ? 'delhivery' : 'manual')
+  // Show the Delhivery tab whenever the integration is switched on — even if
+  // setup is incomplete — so the admin gets told what's missing (rather than
+  // the option silently vanishing).
+  const showDelhivery = !!delCfg?.enabled && !alreadyShipped
+  const delReady = !!delCfg?.ready
+  const [method, setMethod] = useState(showDelhivery && delReady && policyApplies(delCfg, order) ? 'delhivery' : 'manual')
 
   const [message, setMessage] = useState(order.tracking?.message || '')
   const totalQty = (order.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1
@@ -404,7 +415,7 @@ function ShipModal({ order, delCfg, onClose, onShipped }) {
   const pin = order.address?.pincode
   // Auto-check serviceability once when the Delhivery tab is active + PIN present.
   useEffect(() => {
-    if (method !== 'delhivery' || !pin || serv) return
+    if (method !== 'delhivery' || !delReady || !pin || serv) return
     let live = true
     api.get(`/orders/delhivery/serviceability?pin=${encodeURIComponent(pin)}`, { auth: true })
       .then((r) => { if (live) setServ({ ok: true, ...r }) })
@@ -437,10 +448,10 @@ function ShipModal({ order, delCfg, onClose, onShipped }) {
     <Modal open onClose={onClose} title={alreadyShipped ? 'Edit tracking' : `Ship ${order.orderNo}`} footer={<>
       <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
       {method === 'delhivery'
-        ? <Btn onClick={submitDelhivery} disabled={saving}><Package size={15} /> {saving ? 'Booking…' : 'Book Delhivery & Ship'}</Btn>
+        ? <Btn onClick={submitDelhivery} disabled={saving || !delReady}><Package size={15} /> {saving ? 'Booking…' : 'Book Delhivery & Ship'}</Btn>
         : <Btn onClick={submitManual} disabled={saving}><Truck size={15} /> {saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped')}</Btn>}
     </>}>
-      {canDelhivery && (
+      {showDelhivery && (
         <div className="flex gap-2 mb-3">
           {[{ v: 'delhivery', label: 'Delhivery (auto)', Icon: Package }, { v: 'manual', label: 'Manual note', Icon: Truck }].map(({ v, label, Icon }) => (
             <button key={v} onClick={() => { setMethod(v); setErr('') }}
@@ -454,6 +465,15 @@ function ShipModal({ order, delCfg, onClose, onShipped }) {
 
       {method === 'delhivery' ? (
         <div className="space-y-3">
+          {!delReady && (
+            <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)' }}>
+              <p className="font-semibold text-amber-700">Finish Delhivery setup first</p>
+              <p className="text-amber-700/90 text-xs mt-0.5">
+                Missing {[!delCfg?.hasToken && 'API token', !delCfg?.hasPickup && 'pickup warehouse name'].filter(Boolean).join(' & ')}.
+                Go to <b>Settings → Payments &amp; Shipping → Delhivery</b>, fill them in, and hit <b>Save Changes</b>.
+              </p>
+            </div>
+          )}
           <p className="text-sm text-zinc-500 -mt-1">Books a Delhivery waybill for this order as <b>{mode}</b>{mode === 'COD' && <> (collect <b>{fmt(Math.max(0, (order.total || 0) - (order.advancePaid || 0)))}</b> on delivery)</>}. The customer’s tracking link is filled in automatically.</p>
 
           {/* Serviceability */}
