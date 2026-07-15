@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
@@ -16,15 +16,15 @@ const PAY_METHODS = [
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 // 'pending' kept for legacy orders only; new orders start Confirmed.
 const STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled']
-const STATUS_COLOR = {
-  pending: 'bg-blue-50 text-blue-600', confirmed: 'bg-blue-50 text-blue-600',
-  shipped: 'bg-violet-50 text-violet-600', delivered: 'bg-emerald-50 text-emerald-600',
-  cancelled: 'bg-red-50 text-red-600',
+// Unified status token — a soft chip + a dot colour, no more left-edge spine.
+const STATUS = {
+  pending:   { label: 'Confirmed', color: '#2563eb', chip: 'bg-blue-50 text-blue-700 ring-blue-100' },
+  confirmed: { label: 'Confirmed', color: '#2563eb', chip: 'bg-blue-50 text-blue-700 ring-blue-100' },
+  shipped:   { label: 'Shipped',   color: '#7c3aed', chip: 'bg-violet-50 text-violet-700 ring-violet-100' },
+  delivered: { label: 'Delivered', color: '#059669', chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+  cancelled: { label: 'Cancelled', color: '#dc2626', chip: 'bg-red-50 text-red-700 ring-red-100' },
 }
-// Left-edge colour spine per status — instant visual scan.
-const STATUS_SPINE = {
-  pending: '#3b82f6', confirmed: '#3b82f6', shipped: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444',
-}
+const st = (s) => STATUS[s] || STATUS.confirmed
 
 // The single next-step action for an order (drives the primary button).
 function nextAction(status) {
@@ -33,25 +33,37 @@ function nextAction(status) {
   return null
 }
 
-// Compact horizontal stepper for the order detail.
+// Clean horizontal stepper for the order detail.
 const STAGES = [{ key: 'confirmed', label: 'Confirmed' }, { key: 'shipped', label: 'Shipped' }, { key: 'delivered', label: 'Delivered' }]
 function Stepper({ status }) {
-  if (status === 'cancelled') return <span className="text-xs font-bold text-red-600">✖ Cancelled</span>
+  if (status === 'cancelled') return (
+    <div className="inline-flex items-center gap-2 text-sm font-bold text-red-600"><XCircle size={16} /> Order cancelled</div>
+  )
   const idx = Math.max(0, STAGES.findIndex((s) => s.key === status))
   return (
     <div className="flex items-center">
       {STAGES.map((s, i) => {
         const done = i <= idx
+        const current = i === idx
         const isLast = i === STAGES.length - 1
         return (
           <div key={s.key} className="flex items-center" style={{ flex: isLast ? '0 0 auto' : 1 }}>
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full grid place-items-center shrink-0" style={{ background: done ? 'var(--maroon)' : '#e7e5e4', color: '#fff' }}>
-                {done ? <Check size={12} /> : <span className="w-1 h-1 rounded-full bg-stone-400" />}
+            <div className="flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded-full grid place-items-center shrink-0 transition-all"
+                style={{
+                  background: done ? 'var(--maroon)' : '#fff',
+                  color: '#fff',
+                  boxShadow: current
+                    ? '0 0 0 4px color-mix(in srgb, var(--maroon) 16%, transparent)'
+                    : done ? 'none' : 'inset 0 0 0 2px #e4e4e7',
+                }}
+              >
+                {done ? <Check size={13} strokeWidth={3} /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#d4d4d8' }} />}
               </div>
-              <span className="text-[11px] font-semibold" style={{ color: done ? 'var(--ink)' : '#a8a29e' }}>{s.label}</span>
+              <span className="text-xs font-semibold" style={{ color: done ? 'var(--ink)' : '#a1a1aa' }}>{s.label}</span>
             </div>
-            {!isLast && <div className="h-0.5 flex-1 mx-2 rounded-full" style={{ background: i < idx ? 'var(--maroon)' : '#e7e5e4' }} />}
+            {!isLast && <div className="h-[3px] flex-1 mx-2.5 rounded-full" style={{ background: i < idx ? 'var(--maroon)' : '#ececee' }} />}
           </div>
         )
       })}
@@ -266,45 +278,67 @@ export function AdminOrders() {
             const isOpen = open === o._id
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
             const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            const s = st(o.status)
+            const pb = payBadge(o)
+            const a = nextAction(o.status)
+            const firstImg = (o.items || []).find((it) => it.image)?.image
             return (
-              <div key={o._id} className="admin-row overflow-hidden" style={{ borderLeft: `4px solid ${STATUS_SPINE[o.status] || '#3b82f6'}` }}>
-                <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setOpen(isOpen ? null : o._id)}>
-                  <div className="w-11 h-11 rounded-full grid place-items-center text-sm font-bold text-white shrink-0 hidden sm:grid" style={{ background: 'var(--maroon)' }}>{initial}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-zinc-900">{o.orderNo}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${STATUS_COLOR[o.status]}`}>{o.status === 'pending' ? 'confirmed' : o.status}</span>
-                      {(() => { const b = payBadge(o); return <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${b.cls}`}>{b.label}</span> })()}
-                    </div>
-                    <p className="text-sm text-zinc-700 truncate mt-0.5">{o.customer?.name}</p>
-                    <p className="text-xs text-zinc-400">{date} · {o.items?.length} item(s)</p>
-                    {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
-                      <p className="text-[11px] font-semibold mt-1" style={{ color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} paid · {fmt(o.total - o.advancePaid)} due on delivery</p>
+              <div key={o._id} className="rounded-2xl bg-white ring-1 ring-zinc-200/70 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_24px_-8px_rgba(0,0,0,0.15)] transition-shadow overflow-hidden">
+                {/* Header — tap anywhere to expand */}
+                <div className="p-4 sm:p-5 cursor-pointer" onClick={() => setOpen(isOpen ? null : o._id)}>
+                  <div className="flex items-start gap-3.5">
+                    {/* Thumbnail / avatar */}
+                    {firstImg ? (
+                      <img src={firstImg} alt="" className="w-12 h-12 rounded-2xl object-cover shrink-0 ring-1 ring-black/5" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-2xl grid place-items-center text-base font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark, #5a121c))' }}>{initial}</div>
                     )}
+
+                    {/* Identity */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-extrabold text-zinc-900 text-[15px] tracking-tight">{o.orderNo}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ring-1" style={{ background: `color-mix(in srgb, ${s.color} 10%, white)`, color: s.color, borderColor: 'transparent', boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${s.color} 20%, transparent)` }}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{s.label}
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
+                      </div>
+                      <p className="text-[15px] font-semibold text-zinc-800 truncate mt-1.5">{o.customer?.name}</p>
+                      <p className="text-[13px] text-zinc-400 mt-0.5">{date} · {o.items?.length} item{o.items?.length === 1 ? '' : 's'}</p>
+                      {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
+                        <p className="text-[11px] font-semibold mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md" style={{ background: 'color-mix(in srgb, #7c3aed 10%, transparent)', color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} paid · {fmt(o.total - o.advancePaid)} due</p>
+                      )}
+                    </div>
+
+                    {/* Total */}
+                    <div className="text-right shrink-0 pl-1">
+                      <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Total</p>
+                      <p className="text-xl sm:text-[22px] font-extrabold leading-tight mt-0.5" style={{ color: 'var(--maroon)', fontVariantNumeric: 'tabular-nums' }}>{fmt(o.total)}</p>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end shrink-0 gap-2">
-                    <p className="font-bold text-lg leading-none" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</p>
-                    {(() => {
-                      const a = nextAction(o.status)
-                      return a ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); advance(o) }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white cursor-pointer transition hover:brightness-110"
-                          style={{ background: 'var(--maroon)' }}
-                        >
-                          <a.icon size={13} /> {a.label}
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-zinc-400 flex items-center gap-0.5">{isOpen ? 'Hide' : 'Details'}{isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
-                      )
-                    })()}
+
+                  {/* Action bar */}
+                  <div className="flex items-center justify-between gap-3 mt-3.5">
+                    <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-zinc-400">
+                      {isOpen ? 'Hide details' : 'View details'}
+                      {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </span>
+                    {a && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); advance(o) }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] shadow-sm"
+                        style={{ background: 'var(--maroon)' }}
+                      >
+                        <a.icon size={15} /> {a.label}
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {isOpen && (
-                  <div className="border-t border-zinc-100 bg-zinc-50/60 p-4 space-y-4">
+                  <div className="border-t border-zinc-100 bg-zinc-50/50 p-4 sm:p-5 space-y-4">
                     {/* Progress */}
-                    <div className="bg-white rounded-xl p-3 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
+                    <div className="bg-white rounded-2xl p-4 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
 
                     {/* Courier shipment — waybill, live status, label + actions */}
                     {o.shipment?.provider && o.shipment.provider !== 'manual' && o.shipment?.waybill && (
@@ -339,48 +373,71 @@ export function AdminOrders() {
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                      {o.items.map((it, i) => (
-                        <div key={i} className="flex items-center gap-3 text-sm">
-                          <div className="w-9 h-9 rounded-lg overflow-hidden bg-white shrink-0 ring-1 ring-zinc-100">
-                            {it.image && <img src={it.image} alt="" className="w-full h-full object-cover" />}
+                    {/* Items + money breakdown */}
+                    <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
+                      <p className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Items</p>
+                      <div className="divide-y divide-zinc-50">
+                        {o.items.map((it, i) => (
+                          <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-50 shrink-0 ring-1 ring-zinc-100">
+                              {it.image && <img src={it.image} alt="" className="w-full h-full object-cover" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-semibold text-zinc-800 truncate">{it.name}</p>
+                              <p className="text-[12px] text-zinc-400">{it.qty} × {fmt(it.price)}</p>
+                            </div>
+                            <span className="text-[14px] font-bold text-zinc-900 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(it.price * it.qty)}</span>
                           </div>
-                          <span className="flex-1 min-w-0 truncate text-zinc-700">{it.name}</span>
-                          <span className="text-zinc-400 text-xs">× {it.qty}</span>
-                          <span className="font-semibold text-zinc-900 w-20 text-right">{fmt(it.price * it.qty)}</span>
+                        ))}
+                      </div>
+                      <div className="px-4 py-3 border-t border-zinc-100 space-y-1.5 text-[13px]" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        <div className="flex justify-between text-zinc-500"><span>Subtotal</span><span>{fmt(o.subtotal)}</span></div>
+                        {o.shipping > 0 && <div className="flex justify-between text-zinc-500"><span>Shipping</span><span>{fmt(o.shipping)}</span></div>}
+                        {o.codFee > 0 && <div className="flex justify-between text-zinc-500"><span>COD fee</span><span>{fmt(o.codFee)}</span></div>}
+                        {o.discount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount{o.couponCode ? ` · ${o.couponCode}` : ''}</span><span>−{fmt(o.discount)}</span></div>}
+                        <div className="flex justify-between items-center pt-1.5 mt-0.5 border-t border-zinc-100">
+                          <span className="text-[13px] font-bold text-zinc-700">Total</span>
+                          <span className="text-[16px] font-extrabold" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</span>
                         </div>
-                      ))}
+                      </div>
                     </div>
 
-                    <div className="grid sm:grid-cols-2 gap-4 pt-3 border-t border-zinc-100">
-                      <div className="text-sm">
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">Customer</p>
-                        <p className="font-medium text-zinc-800">{o.customer?.name}</p>
-                        <a href={`tel:${o.customer?.phone}`} className="inline-flex items-center gap-1.5 mt-0.5" style={{ color: 'var(--maroon)' }}><Phone size={12} />{o.customer?.phone}</a>
-                        {o.customer?.email && <p className="text-zinc-500">{o.customer.email}</p>}
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {/* Customer */}
+                      <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Customer</p>
+                        <p className="font-bold text-[15px] text-zinc-900">{o.customer?.name}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <a href={`tel:${o.customer?.phone}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 transition" style={{ color: 'var(--maroon)' }}><Phone size={13} />{o.customer?.phone}</a>
+                          {o.customer?.email && <a href={`mailto:${o.customer.email}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-zinc-500 ring-1 ring-zinc-200 hover:bg-zinc-50 transition max-w-full truncate">{o.customer.email}</a>}
+                        </div>
                         {(o.address?.line1 || o.address?.city) && (
-                          <p className="text-zinc-500 mt-2">{[o.address.line1, o.address.line2, o.address.landmark && `Near ${o.address.landmark}`, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</p>
+                          <div className="mt-3 flex gap-2 text-[13px] text-zinc-600 leading-relaxed">
+                            <MapPin size={14} className="shrink-0 mt-0.5 text-zinc-400" />
+                            <span>{[o.address.line1, o.address.line2, o.address.landmark && `Near ${o.address.landmark}`, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</span>
+                          </div>
                         )}
-                        {o.notes && <p className="text-zinc-500 mt-2 italic">“{o.notes}”</p>}
+                        {o.notes && <p className="text-[13px] text-zinc-500 mt-3 pl-3 border-l-2 border-zinc-200 italic">“{o.notes}”</p>}
                       </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">Payment</p>
+
+                      {/* Payment + stage */}
+                      <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Payment</p>
                         {o.advancePaid > 0 && (
-                          <p className="text-xs text-zinc-600 mb-2">Advance <b>{fmt(o.advancePaid)}</b> paid online · balance <b>{fmt(o.total - o.advancePaid)}</b> due on delivery</p>
+                          <p className="text-[12px] text-zinc-600 mb-2.5 px-2.5 py-1.5 rounded-lg" style={{ background: 'color-mix(in srgb, #7c3aed 8%, transparent)' }}>Advance <b>{fmt(o.advancePaid)}</b> paid online · <b>{fmt(o.total - o.advancePaid)}</b> due on delivery</p>
                         )}
                         <div className="flex items-center gap-2 flex-wrap">
                           <Dropdown value={o.paymentMethod || 'cod'} onChange={(v) => patchOrder(o._id, { paymentMethod: v })} align="left" options={PAY_METHODS} />
                           <button
                             onClick={() => patchOrder(o._id, { paymentStatus: o.paymentStatus === 'paid' ? 'unpaid' : 'paid' })}
-                            className={`px-3.5 py-2 rounded-full text-xs font-bold cursor-pointer transition ${o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                            className={`px-3.5 py-2 rounded-lg text-[13px] font-bold cursor-pointer transition ${o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
                           >
-                            {o.paymentStatus === 'paid' ? <><Check size={13} className="inline -mt-0.5" /> Paid</> : 'Mark paid'}
+                            {o.paymentStatus === 'paid' ? <><Check size={14} className="inline -mt-0.5" /> Paid</> : 'Mark paid'}
                           </button>
                         </div>
 
-                        {/* Edge-case status override */}
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1.5 font-bold mt-4">Change stage</p>
-                        <Dropdown value={o.status === 'pending' ? 'confirmed' : o.status} onChange={(v) => setStatus(o._id, v)} align="left" options={STATUSES.map((s) => ({ value: s, label: s }))} />
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2 font-bold mt-4">Change stage</p>
+                        <Dropdown value={o.status === 'pending' ? 'confirmed' : o.status} onChange={(v) => setStatus(o._id, v)} align="left" className="w-full" options={STATUSES.map((v) => ({ value: v, label: v }))} />
                       </div>
                     </div>
                   </div>
