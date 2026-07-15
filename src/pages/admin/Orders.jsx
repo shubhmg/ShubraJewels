@@ -414,6 +414,7 @@ export function AdminOrders() {
 function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShipEdit, onShipmentAction, onOpenLabel }) {
   const [show, setShow] = useState(false)
   const [preview, setPreview] = useState(null) // item image opened full-screen
+  const [moreMethods, setMoreMethods] = useState(false) // reveal Cash/UPI/Bank chips
   const close = () => { setShow(false); setTimeout(onClose, 200) }
 
   useEffect(() => {
@@ -602,22 +603,33 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
               )
             })()}
 
-            {/* Method chips */}
+            {/* Method chips — the two real store methods up front; Cash/UPI/Bank
+                (for manually logged orders) tucked behind "More" */}
             <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mt-4 mb-2">Method</p>
             <div className="flex flex-wrap gap-1.5">
-              {PAY_METHODS.map((m) => {
-                const on = (o.paymentMethod || 'cod') === m.value
-                return (
-                  <button
-                    key={m.value}
-                    onClick={() => !on && onPatch(o._id, { paymentMethod: m.value })}
-                    className={`px-3 py-1.5 rounded-lg text-[12px] font-bold cursor-pointer transition-colors ${on ? 'text-white' : 'bg-white text-zinc-500 ring-1 ring-zinc-200 hover:ring-zinc-300 hover:text-zinc-700'}`}
-                    style={on ? { background: 'var(--maroon)' } : undefined}
-                  >
-                    {PAY_SHORT[m.value] || m.label}
-                  </button>
-                )
-              })}
+              {PAY_METHODS
+                .filter((m) => moreMethods || ['cod', 'razorpay'].includes(m.value) || (o.paymentMethod || 'cod') === m.value)
+                .map((m) => {
+                  const on = (o.paymentMethod || 'cod') === m.value
+                  return (
+                    <button
+                      key={m.value}
+                      onClick={() => !on && onPatch(o._id, { paymentMethod: m.value })}
+                      className={`px-3 py-1.5 rounded-lg text-[12px] font-bold cursor-pointer transition-colors ${on ? 'text-white' : 'bg-white text-zinc-500 ring-1 ring-zinc-200 hover:ring-zinc-300 hover:text-zinc-700'}`}
+                      style={on ? { background: 'var(--maroon)' } : undefined}
+                    >
+                      {PAY_SHORT[m.value] || m.label}
+                    </button>
+                  )
+                })}
+              {!moreMethods && (
+                <button
+                  onClick={() => setMoreMethods(true)}
+                  className="px-3 py-1.5 rounded-lg text-[12px] font-bold text-zinc-400 border border-dashed border-zinc-300 hover:text-zinc-600 hover:border-zinc-400 cursor-pointer transition-colors"
+                >
+                  More…
+                </button>
+              )}
             </div>
           </div>
 
