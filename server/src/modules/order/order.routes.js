@@ -524,7 +524,9 @@ router.get(
 );
 
 // PUBLIC (token-verified) — Shiprocket status webhook. Configure in Shiprocket →
-// Settings → API → Webhooks with URL {site}/api/orders/shiprocket-webhook and
+// Settings → API → Webhooks with URL {site}/api/orders/courier-webhook and
+// NOTE: Shiprocket forbids the words shiprocket/kartrocket/sr/kr in webhook
+// URLs — hence the neutral path name.
 // the x-api-key header set to settings.shiprocket.webhookToken. Shiprocket
 // pushes every status change; when the courier confirms delivery the order
 // auto-advances to Delivered (and COD flips to paid) — no Sync click needed.
@@ -532,9 +534,9 @@ router.get(
 // possibly without custom headers) and refuses the URL on any non-200 — so
 // this endpoint always answers 200. Unauthorized calls are silently IGNORED
 // (nothing is updated), which keeps spoofing harmless.
-router.get('/shiprocket-webhook', (_req, res) => res.json({ success: true }));
+router.get('/courier-webhook', (_req, res) => res.json({ success: true }));
 router.post(
-  '/shiprocket-webhook',
+  '/courier-webhook',
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
     const expected = settings.shiprocket?.webhookToken || '';

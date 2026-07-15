@@ -396,8 +396,8 @@ export function AdminSettings() {
                 <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Status webhook (auto-mark delivered)</p>
                 <p className="text-xs text-zinc-500 -mt-1">Shiprocket pushes every tracking update to your site — orders mark themselves Delivered (and COD flips to paid) with zero clicks. Setup: in Shiprocket → <b>Settings → API → Webhooks</b>, add the URL below and set the <b>x-api-key</b> header to your token.</p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 min-w-0 truncate text-[12px] bg-zinc-50 rounded-lg px-3 py-2 text-zinc-600">{`${window.location.origin}/api/orders/shiprocket-webhook`}</code>
-                  <Btn variant="outline" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/api/orders/shiprocket-webhook`)}>Copy</Btn>
+                  <code className="flex-1 min-w-0 truncate text-[12px] bg-zinc-50 rounded-lg px-3 py-2 text-zinc-600">{`${window.location.origin}/api/orders/courier-webhook`}</code>
+                  <Btn variant="outline" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/api/orders/courier-webhook`)}>Copy</Btn>
                 </div>
                 <Field field={{ label: 'Webhook token (x-api-key)', type: 'password', placeholder: 'Any long random string', help: 'Must match the token you set in Shiprocket. Leave empty to keep the webhook disabled.' }} value={s.shiprocket?.webhookToken || ''} onChange={(v) => setSr('webhookToken', v.trim())} />
                 {!s.shiprocket?.webhookToken && (
