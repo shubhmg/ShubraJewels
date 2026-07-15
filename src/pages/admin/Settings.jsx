@@ -294,11 +294,11 @@ export function AdminSettings() {
 
           {s.shiprocket?.enabled && (
             <>
-              <Field field={{ label: 'Automation policy', type: 'select', options: [
-                { value: 'manual', label: 'Manual — I press the button per order' },
-                { value: 'all', label: 'All orders' },
-                { value: 'cod', label: 'COD orders only' },
-                { value: 'prepaid', label: 'Prepaid orders only' },
+              <Field field={{ label: 'Routing policy', type: 'select', help: 'Which ship option opens first when you press Mark Shipped. You can always switch tabs on a specific order.', options: [
+                { value: 'all', label: 'Shiprocket for all orders' },
+                { value: 'cod', label: 'Shiprocket for COD · manual for prepaid' },
+                { value: 'prepaid', label: 'Shiprocket for prepaid · manual for COD' },
+                { value: 'manual', label: 'Manual note first — I pick per order' },
               ] }} value={s.shiprocket?.policy || 'manual'} onChange={(v) => setSr('policy', v)} />
 
               <div className="grid sm:grid-cols-2 gap-3">

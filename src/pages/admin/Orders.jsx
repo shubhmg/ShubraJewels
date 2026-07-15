@@ -934,7 +934,19 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
   const tabs = []
   if (!alreadyShipped && srCfg?.enabled) tabs.push({ v: 'shiprocket', label: 'Shiprocket' })
   tabs.push({ v: 'manual', label: 'Manual note' })
-  const [method, setMethod] = useState(!alreadyShipped && srReady ? 'shiprocket' : 'manual')
+
+  // The admin's routing policy decides which tab opens by default (they can
+  // always tap the other): all → Shiprocket for everything; cod → Shiprocket
+  // for COD, manual for prepaid; prepaid → the reverse; manual → manual first.
+  const policyRoutes = (() => {
+    if (!srReady) return false
+    const pol = srCfg?.policy || 'manual'
+    if (pol === 'all') return true
+    if (pol === 'cod') return mode === 'COD'
+    if (pol === 'prepaid') return mode === 'Prepaid'
+    return false
+  })()
+  const [method, setMethod] = useState(!alreadyShipped && policyRoutes ? 'shiprocket' : 'manual')
 
   // Sheet entrance/exit + Esc + scroll lock (restores the drawer's lock state).
   const [show, setShow] = useState(false)
