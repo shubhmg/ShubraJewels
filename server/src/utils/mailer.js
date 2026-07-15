@@ -55,7 +55,12 @@ function formatAddress(addr = {}) {
 // ---------------------------------------------------------------------------
 
 function buildOrderEmailHtml(order, settings = {}, variant = 'confirmed') {
-  const isShipped  = variant === 'shipped';
+  const isShipped   = variant === 'shipped';
+  const isCancelled = variant === 'cancelled';
+  // Money already taken from the customer (to be refunded on cancellation).
+  const refundAmt = isCancelled
+    ? (order.paymentStatus === 'paid' ? Number(order.total || 0) : Number(order.advancePaid || 0))
+    : 0;
   const storeName  = settings.brandName || 'Shubra Jewels';
   const storeEmail = env.emailFrom || env.brevoSmtpUser;
   const t          = settings.theme || {};
@@ -118,7 +123,9 @@ function buildOrderEmailHtml(order, settings = {}, variant = 'confirmed') {
     ? shipmentHtml(shipMsg, maroon)
     : 'Your order has been carefully packed and is on its way to you. 📦';
 
-  const titleText  = isShipped ? `Your order is on its way — ${order.orderNo}` : `Order Confirmed — ${order.orderNo}`;
+  const titleText = isCancelled
+    ? `Your order has been cancelled — ${order.orderNo}`
+    : isShipped ? `Your order is on its way — ${order.orderNo}` : `Order Confirmed — ${order.orderNo}`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -174,20 +181,45 @@ function buildOrderEmailHtml(order, settings = {}, variant = 'confirmed') {
   <!-- ══ STATUS BANNER ══ -->
   <tr>
     <td style="background:${goldPale};padding:24px 32px 20px;text-align:center;">
-      <span style="display:inline-block;background:${isShipped ? maroon : gold};color:#fff;font-size:11px;font-weight:700;
+      <span style="display:inline-block;background:${isCancelled || isShipped ? maroon : gold};color:#fff;font-size:11px;font-weight:700;
                    letter-spacing:2px;text-transform:uppercase;border-radius:30px;padding:5px 20px;
-                   font-family:'Plus Jakarta Sans',Arial,sans-serif;">${isShipped ? '📦 &nbsp;Shipped' : '✓ &nbsp;Order Confirmed'}</span>
+                   font-family:'Plus Jakarta Sans',Arial,sans-serif;">${isCancelled ? '✖ &nbsp;Order Cancelled' : isShipped ? '📦 &nbsp;Shipped' : '✓ &nbsp;Order Confirmed'}</span>
       <h2 style="margin:14px 0 6px;font-size:22px;font-weight:800;color:${maroon};
                  font-family:'Plus Jakarta Sans',Arial,sans-serif;">
-        ${isShipped ? `It's on its way, ${firstName}! 🚚` : `Thank you, ${firstName}! ✨`}
+        ${isCancelled ? `We're sorry, ${firstName} 🙏` : isShipped ? `It's on its way, ${firstName}! 🚚` : `Thank you, ${firstName}! ✨`}
       </h2>
       <p style="margin:0;font-size:14px;color:#8a7060;font-family:Arial,sans-serif;line-height:1.6;">
-        ${isShipped
+        ${isCancelled
+          ? `Your order <strong style="color:${maroon};font-family:'Plus Jakarta Sans',Arial,sans-serif;">${order.orderNo}</strong> has been cancelled.`
+          : isShipped
           ? `Great news — your order <strong style="color:${maroon};font-family:'Plus Jakarta Sans',Arial,sans-serif;">${order.orderNo}</strong> has shipped.`
           : `Your order <strong style="color:${maroon};font-family:'Plus Jakarta Sans',Arial,sans-serif;">${order.orderNo}</strong> has been placed and we're getting it ready.`}
       </p>
     </td>
   </tr>
+
+  ${isCancelled ? `
+  <!-- ══ CANCELLATION DETAILS (primary focus) ══ -->
+  <tr>
+    <td class="inner-pad" style="padding:26px 32px 4px;">
+      <div style="background:${cream};border:1.5px solid ${gold};border-radius:16px;padding:22px 24px;">
+        <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+                  color:${gold};font-family:'Plus Jakarta Sans',Arial,sans-serif;">Why was it cancelled?</p>
+        <p style="margin:0;font-size:15px;color:${ink};line-height:1.75;font-family:Arial,sans-serif;">
+          ${escapeHtml((order.cancelReason || '').trim()) || 'We were unable to fulfil this order.'}
+        </p>
+        ${refundAmt > 0 ? `
+        <div style="height:1px;background:linear-gradient(90deg,transparent,${goldPale},transparent);margin:16px 0;"></div>
+        <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+                  color:${gold};font-family:'Plus Jakarta Sans',Arial,sans-serif;">💸 &nbsp;Your Refund</p>
+        <p style="margin:0;font-size:15px;color:${ink};line-height:1.75;font-family:Arial,sans-serif;">
+          The <strong style="color:${maroon};font-family:'Plus Jakarta Sans',Arial,sans-serif;">${fmt(refundAmt)}</strong> you paid
+          ${order.paymentStatus === 'paid' ? '' : 'as advance '}will be refunded to your original payment method within
+          <strong>5–7 business days</strong>. No action is needed from your side.
+        </p>` : ''}
+      </div>
+    </td>
+  </tr>` : ''}
 
   ${isShipped ? `
   <!-- ══ SHIPMENT UPDATE (primary focus) ══ -->
@@ -258,7 +290,7 @@ function buildOrderEmailHtml(order, settings = {}, variant = 'confirmed') {
                       color:${gold};font-family:'Plus Jakarta Sans',Arial,sans-serif;">Payment</p>
             <p style="margin:0;font-size:13px;color:${ink};line-height:1.8;font-family:Arial,sans-serif;">
               <strong style="font-family:'Plus Jakarta Sans',Arial,sans-serif;">${payLabel[order.paymentMethod] || 'Cash on Delivery'}</strong><br>
-              <span style="color:#9a8a7a;">Amount collected on delivery</span>
+              <span style="color:#9a8a7a;">${order.paymentStatus === 'paid' ? 'Paid online' : isCancelled ? 'Nothing to collect' : 'Amount collected on delivery'}</span>
               ${order.couponCode ? `<br><span style="color:${gold};font-weight:600;font-family:'Plus Jakarta Sans',Arial,sans-serif;">🏷 ${order.couponCode} applied</span>` : ''}
             </p>
           </td>
@@ -285,9 +317,11 @@ function buildOrderEmailHtml(order, settings = {}, variant = 'confirmed') {
       <div style="background:${cream};border-radius:14px;padding:22px 24px;text-align:center;
                   border:1px solid ${goldPale};">
         <p style="margin:0 0 8px;font-size:15px;font-weight:700;color:${maroon};
-                  font-family:'Plus Jakarta Sans',Arial,sans-serif;">${isShipped ? 'Almost there!' : 'What happens next?'}</p>
+                  font-family:'Plus Jakarta Sans',Arial,sans-serif;">${isCancelled ? 'We hope to see you again' : isShipped ? 'Almost there!' : 'What happens next?'}</p>
         <p style="margin:0;font-size:13px;color:#8a7060;font-family:Arial,sans-serif;line-height:1.8;">
-          ${isShipped
+          ${isCancelled
+            ? `${refundAmt > 0 ? 'Your refund is on its way.' : 'No payment was taken for this order.'}<br>Have a question? Just reply to this email — we're happy to help. 💛`
+            : isShipped
             ? `Your jhumkas are en route to you.<br>Have a question? Just reply to this email. 💛`
             : `Our artisans will carefully pack your jhumkas with love.<br>You'll receive a shipping update soon. 📦`}
         </p>
@@ -389,6 +423,38 @@ export async function sendOrderShipped(order, settings = {}) {
     return { ok: true };
   } catch (err) {
     console.error('[mailer] shipped send failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Send an order-cancelled email to the customer. Same layout, with the
+ * cancellation reason (order.cancelReason) as the primary focus and a refund
+ * note when the customer had paid anything (online full or COD advance).
+ * Best-effort — never throws. Returns { ok, error }.
+ */
+export async function sendOrderCancelled(order, settings = {}) {
+  console.log('[mailer] cancelled email for', order?.orderNo, '| email:', order?.customer?.email);
+  if (!order.customer?.email) return { ok: false, error: 'no customer email' };
+
+  const transport = getTransport();
+  if (!transport) return { ok: false, error: 'SMTP not configured' };
+
+  const storeName = settings.brandName || 'Shubra Jewels';
+  const fromName = env.emailFromName || storeName;
+  const fromAddr = env.emailFrom || env.brevoSmtpUser;
+
+  try {
+    await transport.sendMail({
+      from: `"${fromName}" <${fromAddr}>`,
+      to: order.customer.email,
+      subject: `Your order ${order.orderNo} has been cancelled | ${storeName}`,
+      html: buildOrderEmailHtml(order, settings, 'cancelled'),
+    });
+    console.log(`[mailer] cancelled email sent to ${order.customer.email} for ${order.orderNo}`);
+    return { ok: true };
+  } catch (err) {
+    console.error('[mailer] cancelled send failed:', err.message);
     return { ok: false, error: err.message };
   }
 }

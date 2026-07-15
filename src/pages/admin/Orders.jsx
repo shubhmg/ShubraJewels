@@ -238,7 +238,15 @@ export function AdminOrders() {
             <span className="text-zinc-300 mx-1.5">·</span>{counts.all || 0} total
           </p>
         </div>
-        <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
+        <button
+          onClick={() => setNewOpen(true)}
+          aria-label="New order"
+          title="New order"
+          className="w-10 h-10 grid place-items-center rounded-xl text-white shadow-sm cursor-pointer transition-all hover:brightness-110 active:scale-95 shrink-0"
+          style={{ background: 'var(--maroon)' }}
+        >
+          <Plus size={19} strokeWidth={2.5} />
+        </button>
       </div>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
       {shipFor && <ShipModal order={shipFor} delCfg={delCfg} srCfg={srCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
@@ -443,6 +451,7 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
   const [preview, setPreview] = useState(null) // item image opened full-screen
   const [moreMethods, setMoreMethods] = useState(false) // reveal Cash/UPI/Bank chips
   const [copied, setCopied] = useState(false) // address copied feedback
+  const [cancelOpen, setCancelOpen] = useState(false) // cancel-with-reason sheet
 
   // Copy name + phone + full address — exactly what a courier form wants.
   const copyAddress = () => {
@@ -474,7 +483,8 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
-      if (document.getElementById('ship-modal-root')) return // ship sheet is on top
+      // A sheet stacked above the drawer handles its own Esc.
+      if (document.getElementById('ship-modal-root') || document.getElementById('cancel-sheet-root')) return
       if (preview) setPreview(null)
       else close()
     }
@@ -751,15 +761,20 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
               })}
             </div>
             {o.status === 'cancelled' ? (
-              <button
-                onClick={() => onSetStatus(o._id, 'confirmed')}
-                className="w-full mt-2.5 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-colors text-blue-600 bg-blue-50 hover:bg-blue-100"
-              >
-                Restore order to Confirmed
-              </button>
+              <>
+                {o.cancelReason && (
+                  <p className="mt-2.5 text-[12px] text-red-600 bg-red-50 rounded-xl px-3.5 py-2.5 leading-relaxed"><b>Reason:</b> {o.cancelReason}</p>
+                )}
+                <button
+                  onClick={() => onSetStatus(o._id, 'confirmed')}
+                  className="w-full mt-2.5 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-colors text-blue-600 bg-blue-50 hover:bg-blue-100"
+                >
+                  Restore order to Confirmed
+                </button>
+              </>
             ) : (
               <button
-                onClick={() => { if (window.confirm(`Cancel order ${o.orderNo}? Reserved stock is returned to inventory.`)) onSetStatus(o._id, 'cancelled') }}
+                onClick={() => setCancelOpen(true)}
                 className="w-full mt-2.5 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-colors text-red-500 bg-white ring-1 ring-red-100 hover:bg-red-50"
               >
                 <XCircle size={13} className="inline -mt-0.5 mr-1" />Cancel order
@@ -768,6 +783,18 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
           </div>
         </div>
       </div>
+
+      {/* Cancel with a customer-facing reason (emails the customer) */}
+      {cancelOpen && (
+        <CancelSheet
+          o={o}
+          onClose={() => setCancelOpen(false)}
+          onConfirm={async (reason) => {
+            await onPatch(o._id, { status: 'cancelled', cancelReason: reason })
+            setCancelOpen(false)
+          }}
+        />
+      )}
 
       {/* Full-screen item image preview — tap anywhere (or Esc) to close */}
       {preview && (
@@ -782,6 +809,131 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
           <img src={preview} alt="" className="max-w-full max-h-full object-contain rounded-lg select-none" draggable={false} />
         </div>
       )}
+    </div>
+  )
+}
+
+// Customer-facing preset reasons — these go verbatim into the cancellation email.
+const CANCEL_REASONS = [
+  'This item is currently out of stock',
+  'We are unable to deliver to your PIN code',
+  'Cancelled on your request',
+  'There was an issue with the payment',
+]
+
+// Cancel an order with a reason. The reason is emailed to the customer along
+// with a refund note if they paid anything (online full or COD advance).
+function CancelSheet({ o, onClose, onConfirm }) {
+  const [show, setShow] = useState(false)
+  const [reason, setReason] = useState(CANCEL_REASONS[0])
+  const [custom, setCustom] = useState(false)
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const close = () => { setShow(false); setTimeout(onClose, 200) }
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShow(true))
+    const onKey = (e) => { if (e.key === 'Escape') close() }
+    window.addEventListener('keydown', onKey)
+    return () => { cancelAnimationFrame(id); window.removeEventListener('keydown', onKey) }
+  }, []) // eslint-disable-line
+
+  const finalReason = custom ? text.trim() : reason
+  const paidAmt = o.paymentStatus === 'paid' ? Number(o.total || 0) : Number(o.advancePaid || 0)
+
+  const confirm = async () => {
+    setSaving(true)
+    try { await onConfirm(finalReason) } catch (e) { window.alert(e?.message || 'Could not cancel the order'); setSaving(false) }
+  }
+
+  return (
+    <div id="cancel-sheet-root" className="fixed inset-0 z-[70]">
+      <div className={`absolute inset-0 bg-zinc-900/50 transition-opacity duration-200 ${show ? 'opacity-100' : 'opacity-0'}`} onClick={close} />
+      <div className="absolute inset-0 flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+        <div className={`pointer-events-auto w-full sm:max-w-md bg-zinc-50 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[85dvh] overflow-hidden transition-all duration-200 ease-out ${show ? 'translate-y-0 opacity-100' : 'translate-y-full sm:translate-y-4 sm:opacity-0'}`}>
+
+          <div className="sm:hidden pt-2.5 grid place-items-center bg-white"><span className="w-10 h-1 rounded-full bg-zinc-200" /></div>
+
+          {/* Header */}
+          <div className="bg-white px-5 pt-2.5 sm:pt-5 pb-4 border-b border-zinc-100 shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-red-400 font-bold">Cancel order</p>
+                <p className="font-extrabold text-[17px] text-zinc-900 tracking-tight mt-0.5">{o.orderNo}</p>
+              </div>
+              <button onClick={close} className="w-9 h-9 grid place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer transition shrink-0" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <p className="text-[13px] text-zinc-500 px-1">The customer is emailed this reason, so it's written to them. Reserved stock returns to inventory.</p>
+
+            <div className="space-y-1.5">
+              {CANCEL_REASONS.map((r) => {
+                const on = !custom && reason === r
+                return (
+                  <button
+                    key={r}
+                    onClick={() => { setCustom(false); setReason(r) }}
+                    className="w-full text-left px-3.5 py-3 rounded-xl text-[13px] font-semibold cursor-pointer transition-colors flex items-center justify-between gap-2"
+                    style={on
+                      ? { background: 'color-mix(in srgb, var(--maroon) 8%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                      : { background: '#fff', color: '#52525b', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                  >
+                    {r}
+                    {on && <Check size={15} strokeWidth={3} className="shrink-0" />}
+                  </button>
+                )
+              })}
+              <button
+                onClick={() => setCustom(true)}
+                className="w-full text-left px-3.5 py-3 rounded-xl text-[13px] font-semibold cursor-pointer transition-colors flex items-center justify-between gap-2"
+                style={custom
+                  ? { background: 'color-mix(in srgb, var(--maroon) 8%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                  : { background: '#fff', color: '#52525b', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+              >
+                Write my own reason…
+                {custom && <Check size={15} strokeWidth={3} className="shrink-0" />}
+              </button>
+              {custom && (
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  rows={3}
+                  autoFocus
+                  placeholder="Reason shown to the customer…"
+                  className="w-full px-3.5 py-3 rounded-xl text-[13px] bg-white outline-none resize-none ring-1 ring-zinc-200 focus:ring-2 focus:ring-[var(--maroon)] transition"
+                />
+              )}
+            </div>
+
+            {/* Refund situation */}
+            {paidAmt > 0 ? (
+              <div className="rounded-2xl px-4 py-3 text-[13px] leading-relaxed" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
+                <p className="font-bold text-amber-700">Customer paid {fmt(paidAmt)}{o.paymentStatus === 'paid' ? ' online' : ' as advance'}</p>
+                <p className="text-amber-700/90 text-[12px] mt-0.5">The email tells them it will be refunded in 5–7 business days. <b>Refund it from your Razorpay dashboard</b> — it is not automatic.</p>
+              </div>
+            ) : (
+              <p className="text-[12px] text-zinc-400 px-1">No payment was taken for this order — nothing to refund.</p>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="bg-white border-t border-zinc-100 p-4 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+            <button
+              onClick={confirm}
+              disabled={saving || (custom && !text.trim())}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-default"
+              style={{ background: '#dc2626' }}
+            >
+              <XCircle size={16} /> {saving ? 'Cancelling…' : 'Cancel order & email customer'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

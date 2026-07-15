@@ -8,7 +8,7 @@ import { computeCharges } from '../../utils/pricing.js';
 import { resolveItems } from '../../utils/resolveItems.js';
 import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
-import { sendOrderConfirmation, sendOrderShipped } from '../../utils/mailer.js';
+import { sendOrderConfirmation, sendOrderShipped, sendOrderCancelled } from '../../utils/mailer.js';
 import { reconcileOrderStock, checkAvailability, reserveProducts, releaseProducts } from './orderStock.js';
 import * as delhivery from '../../utils/delhivery.js';
 import * as shiprocket from '../../utils/shiprocket.js';
@@ -199,6 +199,7 @@ router.patch(
       paymentStatus: Joi.string().valid('unpaid', 'paid'),
       paymentMethod: Joi.string().valid('razorpay', 'cod', 'cash', 'upi', 'bank'),
       notes: Joi.string().allow('').max(1000),
+      cancelReason: Joi.string().allow('').max(300),
       tracking: Joi.object({
         message: Joi.string().allow('').max(1000),
       }),
@@ -209,7 +210,9 @@ router.patch(
     if (!order) throw ApiError.notFound('Order not found');
 
     const wasShipped = order.status === 'shipped';
+    const wasCancelled = order.status === 'cancelled';
     if (req.body.status !== undefined) order.status = req.body.status;
+    if (req.body.cancelReason !== undefined) order.cancelReason = req.body.cancelReason;
     if (req.body.notes !== undefined) order.notes = req.body.notes;
     if (req.body.paymentMethod !== undefined) order.paymentMethod = req.body.paymentMethod;
     order.expiresAt = null; // admin touched it — keep it, never auto-expire
@@ -244,6 +247,15 @@ router.patch(
       getSettings()
         .then((s) => sendOrderShipped(order.toObject(), s))
         .then((r) => { if (!r.ok) console.error('[mailer] shipped email failed:', r.error); })
+        .catch((e) => console.error('[mailer] unexpected error:', e.message));
+    }
+
+    // Email the customer when the order is cancelled — includes the admin's
+    // reason and a refund note if anything was paid (best-effort).
+    if (!wasCancelled && order.status === 'cancelled') {
+      getSettings()
+        .then((s) => sendOrderCancelled(order.toObject(), s))
+        .then((r) => { if (!r.ok) console.error('[mailer] cancelled email failed:', r.error); })
         .catch((e) => console.error('[mailer] unexpected error:', e.message));
     }
 

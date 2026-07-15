@@ -75,6 +75,9 @@ const orderSchema = new mongoose.Schema(
     // re-books send `{orderNo}-R{n}`. Lives outside `shipment` so it survives a
     // "Cancel & reset" (which wipes `shipment`).
     shipmentAttempts: { type: Number, default: 0 },
+    // Why the order was cancelled (admin-picked preset or custom text). Shown
+    // to the customer in the cancellation email and in the admin drawer.
+    cancelReason: { type: String, default: '' },
     // true once this order's items have been deducted from stock (on delivery).
     stockApplied: { type: Boolean, default: false },
     // Payment. Two real store methods (razorpay = paid online at checkout,
