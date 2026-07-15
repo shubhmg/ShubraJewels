@@ -143,30 +143,47 @@ router.get(
     query: Joi.object({
       status: Joi.string().allow('').default(''),
       search: Joi.string().allow('').max(120).default(''),
+      // Payment sub-filter: 'paid' = money already received (prepaid/online),
+      // 'cod' = to be collected on delivery (not yet paid).
+      payment: Joi.string().valid('', 'paid', 'cod').default(''),
       page: Joi.number().min(1).default(1),
       limit: Joi.number().min(1).max(100).default(20),
     }),
   }),
   asyncHandler(async (req, res) => {
-    const { status, search, page, limit } = req.query;
+    const { status, search, payment, page, limit } = req.query;
     const base = {}; // search-only filter (status excluded so tab counts stay accurate)
     if (search) {
       const rx = new RegExp(escapeRegex(search), 'i');
       base.$or = [{ orderNo: rx }, { 'customer.name': rx }, { 'customer.phone': rx }];
     }
-    const listFilter = status ? { ...base, status } : base;
+    const statusFilter = status ? { ...base, status } : base;
+    const payMatch = payment === 'paid' ? { paymentStatus: 'paid' }
+      : payment === 'cod' ? { paymentStatus: { $ne: 'paid' } }
+      : null;
+    const listFilter = payMatch ? { ...statusFilter, ...payMatch } : statusFilter;
 
-    const [items, statusAgg] = await Promise.all([
+    const [items, statusAgg, payAgg, total] = await Promise.all([
       Order.find(listFilter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Order.aggregate([{ $match: base }, { $group: { _id: '$status', c: { $sum: 1 } } }]),
+      // Paid-vs-COD split within the active status (drives the sub-filter chips).
+      Order.aggregate([
+        { $match: statusFilter },
+        { $group: { _id: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 'paid', 'cod'] }, c: { $sum: 1 } } },
+      ]),
+      payMatch ? Order.countDocuments(listFilter) : Promise.resolve(null),
     ]);
 
     const counts = { all: 0 };
     ORDER_STATUSES.forEach((s) => { counts[s] = 0; });
     for (const g of statusAgg) { counts[g._id] = g.c; counts.all += g.c; }
-    const total = status ? (counts[status] || 0) : counts.all;
 
-    res.json({ success: true, data: { items, total, page, limit, counts } });
+    const paymentCounts = { all: 0, paid: 0, cod: 0 };
+    for (const g of payAgg) { paymentCounts[g._id] = g.c; paymentCounts.all += g.c; }
+
+    const totalCount = total != null ? total : (status ? (counts[status] || 0) : counts.all);
+
+    res.json({ success: true, data: { items, total: totalCount, page, limit, counts, paymentCounts } });
   })
 );
 

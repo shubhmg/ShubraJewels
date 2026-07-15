@@ -100,6 +100,8 @@ export function AdminOrders() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(null)
   const [filter, setFilter] = useState('confirmed')
+  const [payFilter, setPayFilter] = useState('') // '' | 'paid' | 'cod' — sub-filter within a status
+  const [payCounts, setPayCounts] = useState({ all: 0, paid: 0, cod: 0 })
   const [search, setSearch] = useState('')
   const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
@@ -139,18 +141,20 @@ export function AdminOrders() {
 
   // Debounced search; reset to page 1 on new query/filter.
   useEffect(() => { const t = setTimeout(() => { setQ(search); setPage(1) }, 350); return () => clearTimeout(t) }, [search])
-  useEffect(() => { setPage(1) }, [filter])
+  useEffect(() => { setPage(1); setPayFilter('') }, [filter]) // status change → back to page 1, clear the payment sub-filter
+  useEffect(() => { setPage(1) }, [payFilter])
 
   const load = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
     const statusParam = filter === 'all' ? '' : filter
-    const res = await api.get(`/orders?status=${statusParam}&search=${encodeURIComponent(q)}&page=${page}&limit=${PAGE_LIMIT}`, { auth: true })
+    const res = await api.get(`/orders?status=${statusParam}&payment=${payFilter}&search=${encodeURIComponent(q)}&page=${page}&limit=${PAGE_LIMIT}`, { auth: true })
     setOrders(res.items || [])
     setCounts(res.counts || { all: 0 })
+    setPayCounts(res.paymentCounts || { all: 0, paid: 0, cod: 0 })
     setTotal(res.total || 0)
     setLoading(false)
   }
-  useEffect(() => { load() }, [filter, q, page]) // eslint-disable-line
+  useEffect(() => { load() }, [filter, payFilter, q, page]) // eslint-disable-line
 
   // Pre-launch cleanup: wipe all (test) orders.
   const deleteAll = async () => {
@@ -268,6 +272,31 @@ export function AdminOrders() {
           )
         })}
       </div>
+
+      {/* Payment sub-filter — split Confirmed into "to collect" (COD) vs already paid */}
+      {filter === 'confirmed' && (
+        <div className="flex items-center gap-2 mb-4 -mt-1">
+          <span className="text-[11px] uppercase tracking-wider text-stone-400 font-bold mr-0.5">Payment</span>
+          <div className="inline-flex p-0.5 rounded-full bg-cream-100 dark:bg-stone-800">
+            {[
+              { v: '', label: 'All', n: payCounts.all },
+              { v: 'cod', label: 'COD', n: payCounts.cod },
+              { v: 'paid', label: 'Paid online', n: payCounts.paid },
+            ].map(({ v, label, n }) => {
+              const on = payFilter === v
+              return (
+                <button
+                  key={v || 'all'}
+                  onClick={() => setPayFilter(v)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${on ? 'bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-100 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+                >
+                  {label} <span className={on ? 'text-stone-400' : 'text-stone-400'}>({n})</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gold-500" /></div>
       ) : orders.length === 0 ? (
