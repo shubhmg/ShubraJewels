@@ -343,6 +343,65 @@ router.post(
   })
 );
 
+// ADMIN — bulk-book Shiprocket for many orders at once. Uses the default
+// weight (defaultWeightKg × qty) per order, books sequentially (avoids courier
+// assignment races/rate limits), then clubs ONE pickup request for the whole
+// batch when auto-pickup is on. Partial success is normal: failures are
+// returned per order and those orders stay untouched in To Ship.
+router.post(
+  '/bulk-ship',
+  requireAdmin,
+  validate({ body: Joi.object({ ids: Joi.array().items(objectId).min(1).max(50).required() }) }),
+  asyncHandler(async (req, res) => {
+    const settings = await getSettings();
+    const cfg = shiprocket.shiprocketConfig(settings);
+    if (!shiprocket.shiprocketReady(cfg)) {
+      throw ApiError.badRequest('Shiprocket is not fully configured. Add the email, API password and pickup location in Settings.');
+    }
+
+    const booked = [];
+    const failed = [];
+    const shipmentIds = [];
+
+    for (const id of req.body.ids) {
+      const order = await Order.findById(id);
+      if (!order) { failed.push({ orderNo: String(id), error: 'Order not found' }); continue; }
+      if (order.status === 'cancelled') { failed.push({ orderNo: order.orderNo, error: 'Order is cancelled' }); continue; }
+      if (order.shipment?.waybill) { failed.push({ orderNo: order.orderNo, error: `Already booked (AWB ${order.shipment.waybill})` }); continue; }
+
+      const { result, attempt } = await bookWithRetry(order, (ref) =>
+        shiprocket.createShipment(settings, order.toObject(), { orderRef: ref, skipPickup: true }));
+      if (!result.ok) { failed.push({ orderNo: order.orderNo, error: result.error || 'Booking failed' }); continue; }
+
+      const wasShipped = order.status === 'shipped';
+      order.shipmentAttempts = attempt;
+      await applyBooking(order, settings, {
+        provider: 'shiprocket',
+        waybill: result.awb,
+        shipmentId: result.shipmentId,
+        srOrderId: result.srOrderId,
+        courierName: result.courierName,
+        trackingUrl: result.trackingUrl,
+        mode: result.mode,
+        codAmount: result.codAmount || 0,
+        weightGrams: Math.round((result.weightKg || 0) * 1000),
+        labelUrl: result.labelUrl || '',
+      }, wasShipped);
+      booked.push({ orderNo: order.orderNo, awb: result.awb, courierName: result.courierName });
+      if (result.shipmentId) shipmentIds.push(result.shipmentId);
+    }
+
+    // One clubbed pickup request for everything booked (auto-pickup only).
+    let pickupScheduled = false;
+    if (cfg.autoPickup && shipmentIds.length) {
+      const p = await shiprocket.schedulePickup(settings, shipmentIds);
+      pickupScheduled = !!p.ok;
+    }
+
+    res.json({ success: true, data: { booked, failed, pickupScheduled } });
+  })
+);
+
 // ADMIN — refresh a courier shipment's live status (any provider).
 router.post(
   '/:id/sync-shipment',

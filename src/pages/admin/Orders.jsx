@@ -108,6 +108,8 @@ export function AdminOrders() {
   const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
   const [shipFor, setShipFor] = useState(null) // order being marked shipped (tracking form)
+  const [selected, setSelected] = useState([])  // order ids picked for bulk shipping (To Ship tab)
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [srCfg, setSrCfg] = useState(null)     // Shiprocket config (enabled/policy/ready)
 
   // Courier config drives the ship flow (auto-book vs manual). Read from the
@@ -134,6 +136,7 @@ export function AdminOrders() {
   useEffect(() => { const t = setTimeout(() => { setQ(search); setPage(1) }, 350); return () => clearTimeout(t) }, [search])
   useEffect(() => { setPage(1); setPayFilter('') }, [filter]) // status change → back to page 1, clear the payment sub-filter
   useEffect(() => { setPage(1) }, [payFilter])
+  useEffect(() => { setSelected([]) }, [filter, payFilter, q, page])
 
   const load = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
@@ -351,12 +354,24 @@ export function AdminOrders() {
             const firstImg = (o.items || []).find((it) => it.image)?.image
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
             const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+            const canBulk = filter === 'confirmed' && srCfg?.enabled && !o.shipment?.waybill
+            const isSel = selected.includes(o._id)
             return (
               <div
                 key={o._id}
                 onClick={() => setDrawer(o)}
-                className="group flex items-center gap-3 sm:gap-4 px-3.5 sm:px-5 py-3.5 cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--gold)_5%,white)]"
+                className={`group flex items-center gap-3 sm:gap-4 px-3.5 sm:px-5 py-3.5 cursor-pointer transition-colors ${isSel ? 'bg-[color-mix(in_srgb,var(--gold)_9%,white)]' : 'hover:bg-[color-mix(in_srgb,var(--gold)_5%,white)]'}`}
               >
+                {canBulk && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelected((xs) => (xs.includes(o._id) ? xs.filter((x) => x !== o._id) : [...xs, o._id])) }}
+                    aria-label={isSel ? 'Deselect order' : 'Select order'}
+                    className="w-5 h-5 rounded-md grid place-items-center shrink-0 cursor-pointer transition-colors"
+                    style={isSel ? { background: 'var(--maroon)', color: '#fff' } : { background: '#fff', boxShadow: 'inset 0 0 0 1.5px #d4d4d8' }}
+                  >
+                    {isSel && <Check size={13} strokeWidth={3} />}
+                  </button>
+                )}
                 {firstImg ? (
                   <img src={firstImg} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0 ring-1 ring-black/5" />
                 ) : (
@@ -406,6 +421,30 @@ export function AdminOrders() {
           <span className="text-[13px] font-bold text-zinc-500" style={{ fontVariantNumeric: 'tabular-nums' }}>{page} <span className="text-zinc-300 font-medium">/</span> {pages}</span>
           <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="w-9 h-9 grid place-items-center rounded-xl bg-white ring-1 ring-zinc-200 hover:ring-zinc-300 disabled:opacity-40 cursor-pointer transition"><ChevronRight size={16} /></button>
         </div>
+      )}
+
+      {/* ── Bulk ship bar — floats while orders are selected ── */}
+      {selected.length > 0 && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 bg-white rounded-2xl shadow-[0_14px_44px_-10px_rgba(0,0,0,0.35)] ring-1 ring-zinc-200 pl-4 pr-2 py-2 max-w-[calc(100vw-24px)]">
+          <span className="text-[13px] font-bold text-zinc-800 whitespace-nowrap">{selected.length} selected</span>
+          <button onClick={() => setSelected(orders.filter((o) => !o.shipment?.waybill).map((o) => o._id))} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer whitespace-nowrap">All on page</button>
+          <button onClick={() => setSelected([])} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer">Clear</button>
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] whitespace-nowrap"
+            style={{ background: 'var(--maroon)' }}
+          >
+            <Package size={14} /> Book {selected.length} via Shiprocket
+          </button>
+        </div>
+      )}
+      {bulkOpen && (
+        <BulkShipSheet
+          orders={orders.filter((o) => selected.includes(o._id))}
+          srCfg={srCfg}
+          onClose={() => setBulkOpen(false)}
+          onDone={() => { setBulkOpen(false); setSelected([]); load() }}
+        />
       )}
 
       {/* ── Detail drawer ───────────────────────────────────── */}
@@ -913,6 +952,153 @@ function CancelSheet({ o, onClose, onConfirm }) {
             >
               <XCircle size={16} /> {saving ? 'Cancelling…' : 'Cancel order & email customer'}
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Bulk-book Shiprocket for the selected orders using default weights
+// (defaultWeightKg × items per order). One request books everything
+// sequentially server-side and clubs a single pickup; partial failures stay
+// in To Ship with their reasons shown here.
+function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
+  const [show, setShow] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState(null) // { booked, failed, pickupScheduled }
+  const [err, setErr] = useState('')
+  const srReady = !!srCfg?.ready
+  const close = () => { setShow(false); setTimeout(result ? onDone : onClose, 200) }
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShow(true))
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e) => { if (e.key === 'Escape' && !saving) close() }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      cancelAnimationFrame(id)
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [saving, result]) // eslint-disable-line
+
+  const wKg = (o) => (((srCfg?.defaultWeightKg || 0.3) * ((o.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1))).toFixed(2)
+
+  const submit = async () => {
+    setSaving(true); setErr('')
+    try {
+      const r = await api.post('/orders/bulk-ship', { ids: orders.map((o) => o._id) }, { auth: true })
+      setResult(r || { booked: [], failed: [] })
+    } catch (e) {
+      setErr(e?.message || 'Bulk booking failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70]">
+      <div className={`absolute inset-0 bg-zinc-900/50 transition-opacity duration-200 ${show ? 'opacity-100' : 'opacity-0'}`} onClick={() => !saving && close()} />
+      <div className="absolute inset-0 flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+        <div className={`pointer-events-auto w-full sm:max-w-md bg-zinc-50 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[85dvh] overflow-hidden transition-all duration-200 ease-out ${show ? 'translate-y-0 opacity-100' : 'translate-y-full sm:translate-y-4 sm:opacity-0'}`}>
+
+          <div className="sm:hidden pt-2.5 grid place-items-center bg-white"><span className="w-10 h-1 rounded-full bg-zinc-200" /></div>
+
+          {/* Header */}
+          <div className="bg-white px-5 pt-2.5 sm:pt-5 pb-4 border-b border-zinc-100 shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Bulk ship</p>
+                <p className="font-extrabold text-[17px] text-zinc-900 tracking-tight mt-0.5">{result ? 'Booking results' : `${orders.length} order${orders.length === 1 ? '' : 's'} via Shiprocket`}</p>
+              </div>
+              <button onClick={close} disabled={saving} className="w-9 h-9 grid place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer transition shrink-0 disabled:opacity-40" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {result ? (
+              <>
+                {result.booked?.length > 0 && (
+                  <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
+                    <p className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wider font-bold text-emerald-600">Booked ({result.booked.length})</p>
+                    <div className="divide-y divide-zinc-50">
+                      {result.booked.map((b) => (
+                        <div key={b.orderNo} className="flex items-center justify-between gap-2 px-4 py-2.5 text-[13px]">
+                          <span className="font-bold text-zinc-800">{b.orderNo}</span>
+                          <span className="text-zinc-500 truncate">{b.courierName || 'Courier assigned'} · <span className="font-mono">{b.awb}</span></span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {result.failed?.length > 0 && (
+                  <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
+                    <p className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wider font-bold text-red-500">Failed ({result.failed.length}) — still in To Ship</p>
+                    <div className="divide-y divide-zinc-50">
+                      {result.failed.map((f, i) => (
+                        <div key={i} className="px-4 py-2.5 text-[13px]">
+                          <span className="font-bold text-zinc-800">{f.orderNo}</span>
+                          <p className="text-red-500 text-[12px] mt-0.5">{f.error}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-[12px] text-zinc-400 px-1">
+                  {result.pickupScheduled
+                    ? 'One clubbed pickup has been requested for the whole batch.'
+                    : 'Pickup not auto-scheduled — schedule it from the Shiprocket dashboard (or turn on auto-pickup in Settings).'}
+                </p>
+              </>
+            ) : (
+              <>
+                {!srReady && (
+                  <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
+                    <p className="font-semibold text-amber-700">Finish Shiprocket setup first</p>
+                    <p className="text-amber-700/90 text-xs mt-0.5">Add the email, API password and pickup location in <b>Settings → Payments &amp; Shipping → Shiprocket</b>.</p>
+                  </div>
+                )}
+                <p className="text-[13px] text-zinc-500 px-1">Each order books with its <b className="text-zinc-700">default weight</b> ({srCfg?.defaultWeightKg || 0.3} kg × items). Shiprocket assigns the recommended courier per order and the pickup is clubbed. Odd-sized parcels? Ship them individually instead.</p>
+                <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
+                  <div className="divide-y divide-zinc-50">
+                    {orders.map((o) => (
+                      <div key={o._id} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-bold text-zinc-800">{o.orderNo}</span>
+                          <p className="text-zinc-400 truncate text-[12px]">{o.customer?.name}</p>
+                        </div>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase ${paymentMode(o) === 'COD' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{paymentMode(o)}</span>
+                        <span className="text-zinc-500 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>{wKg(o)} kg</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+            {err && <p className="text-[13px] font-semibold text-red-600 px-1">{err}</p>}
+          </div>
+
+          {/* Footer */}
+          <div className="bg-white border-t border-zinc-100 p-4 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+            {result ? (
+              <button onClick={close} className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: 'var(--maroon)' }}>
+                <Check size={16} strokeWidth={3} /> Done
+              </button>
+            ) : (
+              <button
+                onClick={submit}
+                disabled={saving || !srReady || orders.length === 0}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-default"
+                style={{ background: 'var(--maroon)' }}
+              >
+                {saving ? <><RefreshCw size={15} className="animate-spin" /> Booking {orders.length} order{orders.length === 1 ? '' : 's'}…</> : <><Package size={16} /> Book {orders.length} & Ship</>}
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -129,7 +129,7 @@ export async function checkServiceability(settingDoc, { pickupPin, deliveryPin, 
 
 // Book a parcel: create order → assign AWB → (schedule pickup) → fetch label.
 // Returns { ok, awb, courierName, shipmentId, srOrderId, trackingUrl, mode, codAmount, weightKg, labelUrl, error }.
-export async function createShipment(settingDoc, order, { weightKg, orderRef } = {}) {
+export async function createShipment(settingDoc, order, { weightKg, orderRef, skipPickup } = {}) {
   const cfg = shiprocketConfig(settingDoc);
   if (!shiprocketReady(cfg)) return { ok: false, error: 'Shiprocket is not fully configured (email, password + pickup location required).' };
   const auth = await ensureToken(settingDoc);
@@ -193,8 +193,9 @@ export async function createShipment(settingDoc, order, { weightKg, orderRef } =
   const courierName = awbData.courier_name || '';
 
   // Schedule pickup only if enabled (off by default so test bookings never
-  // summon a courier). Real orders turn this on, or schedule from the dashboard.
-  if (cfg.autoPickup) {
+  // summon a courier). Bulk booking passes skipPickup and clubs ONE pickup
+  // request for the whole batch afterwards (see schedulePickup).
+  if (cfg.autoPickup && !skipPickup) {
     srFetch(auth.token, 'POST', '/courier/generate/pickup', { shipment_id: [shipmentId] }).catch(() => {});
   }
   let labelUrl = '';
@@ -242,6 +243,17 @@ export async function labelLink(settingDoc, shipmentId) {
   const url = r.data?.label_url;
   if (!url) return { ok: false, error: r.data?.message || 'Label not ready yet', raw: r.data };
   return { ok: true, url };
+}
+
+// Request a courier pickup for many shipments in ONE call — Shiprocket clubs
+// them into a single pickup per courier/day. Returns { ok, error }.
+export async function schedulePickup(settingDoc, shipmentIds) {
+  const auth = await ensureToken(settingDoc);
+  if (!auth.ok) return { ok: false, error: auth.error };
+  const r = await srFetch(auth.token, 'POST', '/courier/generate/pickup', { shipment_id: shipmentIds.map(Number) });
+  // "already scheduled" responses still mean the packets are on a pickup.
+  const ok = r.httpOk || /already/i.test(JSON.stringify(r.data || {}));
+  return ok ? { ok: true, raw: r.data } : { ok: false, error: r.data?.message || 'Pickup request failed', raw: r.data };
 }
 
 // Cancel a Shiprocket order (by its internal order id). Returns { ok, error }.
