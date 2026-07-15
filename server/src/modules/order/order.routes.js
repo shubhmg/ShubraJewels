@@ -376,11 +376,16 @@ router.post(
   })
 );
 
-// ADMIN — cancel a courier shipment (does not change the order's own status).
+// ADMIN — cancel a courier shipment. With `revert:true` (one-click cleanup),
+// also clears the shipment/tracking and moves a Shipped order back to Confirmed
+// so it can be re-booked (used for test bookings + re-ship with another courier).
 router.post(
   '/:id/cancel-shipment',
   requireAdmin,
-  validate({ params: Joi.object({ id: objectId.required() }) }),
+  validate({
+    params: Joi.object({ id: objectId.required() }),
+    body: Joi.object({ revert: Joi.boolean().default(false) }).default({}),
+  }),
   asyncHandler(async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) throw ApiError.notFound('Order not found');
@@ -392,8 +397,21 @@ router.post(
       ? await shiprocket.cancelShipment(settings, sh.srOrderId)
       : await delhivery.cancelShipment(settings, sh.waybill);
     if (!r.ok) throw ApiError.badRequest(r.error || 'Courier could not cancel this shipment.');
-    order.shipment.status = 'Cancelled';
-    order.shipment.lastSyncedAt = new Date();
+
+    if (req.body.revert) {
+      // Wipe the shipment + the auto-filled tracking note, and step the order
+      // back to Confirmed (only from Shipped) so it's clean for re-booking.
+      order.set('shipment', { provider: 'manual' });
+      order.tracking.message = '';
+      order.tracking.shippedAt = null;
+      if (order.status === 'shipped') {
+        order.status = 'confirmed';
+        await reconcileOrderStock(order); // shipped→confirmed keeps stock reserved
+      }
+    } else {
+      order.shipment.status = 'Cancelled';
+      order.shipment.lastSyncedAt = new Date();
+    }
     await order.save();
     res.json({ success: true, data: order });
   })

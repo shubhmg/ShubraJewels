@@ -180,10 +180,10 @@ export function AdminOrders() {
 
   // Delhivery per-order actions (sync status / cancel waybill / open label).
   const [busy, setBusy] = useState(null) // `${id}:${action}` while a request runs
-  const shipmentAction = async (id, action, path) => {
+  const shipmentAction = async (id, action, path, body = {}) => {
     setBusy(`${id}:${action}`)
     try {
-      const res = await api.post(`/orders/${id}/${path}`, {}, { auth: true })
+      const res = await api.post(`/orders/${id}/${path}`, body, { auth: true })
       if (res?._id) reconcileOrder(res)
       return res
     } catch (e) {
@@ -323,7 +323,7 @@ export function AdminOrders() {
                           <button onClick={() => openLabel(o._id)} disabled={busy === `${o._id}:label`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100 hover:bg-indigo-50 cursor-pointer disabled:opacity-50"><FileText size={12} /> Label</button>
                           <button onClick={() => shipmentAction(o._id, 'sync', 'sync-shipment')} disabled={busy === `${o._id}:sync`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-zinc-600 text-xs font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 cursor-pointer disabled:opacity-50"><RefreshCw size={12} className={busy === `${o._id}:sync` ? 'animate-spin' : ''} /> Sync</button>
                           {o.shipment.status !== 'Cancelled' && o.status !== 'delivered' && (
-                            <button onClick={() => { if (window.confirm(`Cancel Delhivery waybill ${o.shipment.waybill}? The order status won't change.`)) shipmentAction(o._id, 'cancel', 'cancel-shipment') }} disabled={busy === `${o._id}:cancel`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-red-600 text-xs font-semibold ring-1 ring-red-100 hover:bg-red-50 cursor-pointer disabled:opacity-50"><XCircle size={12} /> Cancel AWB</button>
+                            <button onClick={() => { if (window.confirm(`Cancel AWB ${o.shipment.waybill}?\n\nThis cancels the shipment with the courier and moves the order back to Confirmed (clearing the tracking) so you can re-book. Freight is refunded to your courier wallet if it hasn't been picked up.`)) shipmentAction(o._id, 'cancel', 'cancel-shipment', { revert: true }) }} disabled={busy === `${o._id}:cancel`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-red-600 text-xs font-semibold ring-1 ring-red-100 hover:bg-red-50 cursor-pointer disabled:opacity-50"><XCircle size={12} /> Cancel &amp; reset</button>
                           )}
                           {o.shipment.lastSyncedAt && <span className="text-[11px] text-zinc-400">Synced {new Date(o.shipment.lastSyncedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
                         </div>
