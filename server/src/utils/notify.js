@@ -104,9 +104,9 @@ export async function sendTelegram(settings, text, { replyMarkup, photo, photos 
 }
 
 const PAYMENT_LABEL = {
-  none: 'Not set', razorpay: 'Online', cod: 'COD', whatsapp: 'WhatsApp', cash: 'Cash', upi: 'UPI', bank: 'Bank',
+  razorpay: 'Online', cod: 'COD', cash: 'Cash', upi: 'UPI', bank: 'Bank',
 };
-const PAY_STATUS = { paid: '🟢 Paid', submitted: '🟡 Awaiting verification', unpaid: '🔴 Unpaid' };
+const PAY_STATUS = { paid: '🟢 Paid', unpaid: '🔴 Unpaid' };
 
 // Full postal address as a readable block, including landmark.
 function addressBlock(addr = {}) {

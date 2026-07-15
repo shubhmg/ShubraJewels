@@ -77,11 +77,13 @@ const orderSchema = new mongoose.Schema(
     shipmentAttempts: { type: Number, default: 0 },
     // true once this order's items have been deducted from stock (on delivery).
     stockApplied: { type: Boolean, default: false },
-    // Payment
-    paymentMethod: { type: String, enum: ['none', 'razorpay', 'cod', 'whatsapp', 'cash', 'upi', 'bank'], default: 'none' },
-    // 'submitted' = customer paid via UPI and submitted a reference; awaiting
-    // admin verification against the bank statement.
-    paymentStatus: { type: String, enum: ['unpaid', 'submitted', 'paid'], default: 'unpaid' },
+    // Payment. Two real store methods (razorpay = paid online at checkout,
+    // cod = collect on delivery); cash/upi/bank exist for manually logged
+    // orders. Legacy 'none'/'whatsapp' methods and the 'submitted' status
+    // (old manual-UPI verification flow) were retired — see
+    // migrateLegacyPaymentStates() below.
+    paymentMethod: { type: String, enum: ['razorpay', 'cod', 'cash', 'upi', 'bank'], default: 'cod' },
+    paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
     razorpayOrderId: { type: String, default: '' },
     razorpayPaymentId: { type: String, default: '' },
     // COD advance (partial prepayment via Razorpay to confirm a COD order).
@@ -113,4 +115,17 @@ orderSchema.index(
 orderSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const Order = mongoose.model('Order', orderSchema);
+
+// One-time cleanup (Jul 2026): retire legacy payment states. Idempotent —
+// matches nothing once migrated — and runs via updateMany (bypasses schema
+// validation), so old docs are rewritten into the new enums safely.
+//   paymentStatus 'submitted' (unverified manual-UPI) → 'unpaid'
+//   paymentMethod 'whatsapp'/'none' (pay-on-delivery era) → 'cod'
+export async function migrateLegacyPaymentStates() {
+  const a = await Order.updateMany({ paymentStatus: 'submitted' }, { $set: { paymentStatus: 'unpaid' } });
+  const b = await Order.updateMany({ paymentMethod: { $in: ['whatsapp', 'none'] } }, { $set: { paymentMethod: 'cod' } });
+  const n = (a.modifiedCount || 0) + (b.modifiedCount || 0);
+  if (n) console.log(`[migrate] cleaned legacy payment states on ${n} order(s)`);
+}
+
 export default Order;

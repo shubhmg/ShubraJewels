@@ -28,7 +28,7 @@ const PAY_OPTS = [
   { value: 'cash', label: 'Cash' },
   { value: 'bank', label: 'Bank Transfer' },
 ]
-const PAY_LABEL = { razorpay: 'Online', cod: 'COD', upi: 'UPI', cash: 'Cash', bank: 'Bank', whatsapp: 'WhatsApp', none: 'Other' }
+const PAY_LABEL = { razorpay: 'Online', cod: 'COD', upi: 'UPI', cash: 'Cash', bank: 'Bank' }
 const STATUS_COLOR = { confirmed: '#C9A84C', shipped: '#7B1E2B', delivered: '#059669', cancelled: '#DC2626' }
 
 const PRESETS = [

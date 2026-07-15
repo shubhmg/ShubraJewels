@@ -20,11 +20,13 @@ const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 const STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled']
 
 // The order pipeline — each stage is a tappable stat card that IS the filter.
+// `archive` stages (done/dead orders) render as quiet compact pills so the
+// owner's eye stays on live work (To Ship / In Transit).
 const PIPELINE = [
   { key: 'confirmed', label: 'To Ship',    icon: Package,     color: '#2563eb' },
   { key: 'shipped',   label: 'In Transit', icon: Truck,       color: '#7c3aed' },
-  { key: 'delivered', label: 'Delivered',  icon: PackageCheck, color: '#059669' },
-  { key: 'cancelled', label: 'Cancelled',  icon: XCircle,     color: '#dc2626' },
+  { key: 'delivered', label: 'Delivered',  icon: PackageCheck, color: '#059669', archive: true },
+  { key: 'cancelled', label: 'Cancelled',  icon: XCircle,     color: '#dc2626', archive: true },
 ]
 const STATUS = {
   pending:   { label: 'Confirmed', color: '#2563eb' },
@@ -81,7 +83,7 @@ function Stepper({ status }) {
 }
 
 // Prepaid vs COD for an order (mirrors the server's orderPaymentMode).
-const paymentMode = (o) => (o.paymentStatus === 'paid' || !['cod', 'cash', 'none'].includes(o.paymentMethod) ? 'Prepaid' : 'COD')
+const paymentMode = (o) => (o.paymentStatus === 'paid' || !['cod', 'cash'].includes(o.paymentMethod) ? 'Prepaid' : 'COD')
 // Does the admin's courier policy auto-route THIS order?
 const policyApplies = (cfg, o) => {
   if (!cfg?.ready) return false
@@ -241,28 +243,53 @@ export function AdminOrders() {
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
       {shipFor && <ShipModal order={shipFor} delCfg={delCfg} srCfg={srCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
 
-      {/* ── Pipeline — tappable stage cards ARE the filter ──── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
-        {PIPELINE.map(({ key, label, icon: Icon, color }) => {
-          const active = filter === key
-          const n = countFor(key)
-          return (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`text-left rounded-2xl p-3.5 sm:p-4 cursor-pointer transition-all ${active ? 'bg-white shadow-[0_10px_28px_-14px_rgba(0,0,0,0.25)]' : 'bg-white/60 ring-1 ring-zinc-200/60 hover:bg-white hover:shadow-[0_4px_16px_-10px_rgba(0,0,0,0.2)]'}`}
-              style={active ? { boxShadow: `0 10px 28px -14px rgba(0,0,0,0.25), inset 0 0 0 2px ${color}` } : undefined}
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-9 h-9 rounded-xl grid place-items-center" style={{ background: `color-mix(in srgb, ${color} ${active ? 15 : 9}%, white)`, color }}>
-                  <Icon size={17} />
+      {/* ── Pipeline — live work gets the big cards; Delivered/Cancelled are
+             quiet archive pills so they never pull focus ─────── */}
+      <div className="flex flex-col lg:flex-row gap-2.5 sm:gap-3 mb-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 flex-1">
+          {PIPELINE.filter((p) => !p.archive).map(({ key, label, icon: Icon, color }) => {
+            const active = filter === key
+            const n = countFor(key)
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`text-left rounded-2xl p-3.5 sm:p-4 cursor-pointer transition-all ${active ? 'bg-white shadow-[0_10px_28px_-14px_rgba(0,0,0,0.25)]' : 'bg-white/60 ring-1 ring-zinc-200/60 hover:bg-white hover:shadow-[0_4px_16px_-10px_rgba(0,0,0,0.2)]'}`}
+                style={active ? { boxShadow: `0 10px 28px -14px rgba(0,0,0,0.25), inset 0 0 0 2px ${color}` } : undefined}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl grid place-items-center" style={{ background: `color-mix(in srgb, ${color} ${active ? 15 : 9}%, white)`, color }}>
+                    <Icon size={17} />
+                  </div>
+                  <span className="text-[22px] sm:text-2xl font-extrabold leading-none text-zinc-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{n}</span>
                 </div>
-                <span className="text-[22px] sm:text-2xl font-extrabold leading-none text-zinc-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{n}</span>
-              </div>
-              <p className="text-[12px] font-bold mt-2.5" style={{ color: active ? color : '#71717a' }}>{label}</p>
-            </button>
-          )
-        })}
+                <p className="text-[12px] font-bold mt-2.5" style={{ color: active ? color : '#71717a' }}>{label}</p>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Archive — greyscale until selected */}
+        <div className="flex lg:flex-col gap-2 lg:w-44 lg:justify-center">
+          {PIPELINE.filter((p) => p.archive).map(({ key, label, icon: Icon, color }) => {
+            const active = filter === key
+            const n = countFor(key)
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className="flex-1 lg:flex-none flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-left cursor-pointer transition-all"
+                style={active
+                  ? { background: '#fff', boxShadow: `0 10px 28px -14px rgba(0,0,0,0.25), inset 0 0 0 2px ${color}` }
+                  : { background: 'rgba(255,255,255,0.45)', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.05)' }}
+              >
+                <Icon size={15} style={{ color: active ? color : '#b6b6bd' }} />
+                <span className="text-[12px] font-bold flex-1" style={{ color: active ? color : '#a1a1aa' }}>{label}</span>
+                <span className="text-[13px] font-extrabold" style={{ fontVariantNumeric: 'tabular-nums', color: active ? color : '#b6b6bd' }}>{n}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Toolbar: search + payment split ─────────────────── */}

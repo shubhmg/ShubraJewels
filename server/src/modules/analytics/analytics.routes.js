@@ -162,7 +162,7 @@ router.get(
 // payment method. Returns KPI summary, a daily revenue/orders trend (gap-filled
 // so the chart is continuous), top products, and payment/status breakdowns.
 const REPORT_STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled'];
-const REPORT_PAYMENTS = ['cod', 'razorpay', 'upi', 'cash', 'bank', 'whatsapp', 'none'];
+const REPORT_PAYMENTS = ['cod', 'razorpay', 'upi', 'cash', 'bank'];
 const TZ = 'Asia/Kolkata';
 
 router.get(

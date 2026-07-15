@@ -196,8 +196,8 @@ router.patch(
     params: Joi.object({ id: objectId.required() }),
     body: Joi.object({
       status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled'),
-      paymentStatus: Joi.string().valid('unpaid', 'submitted', 'paid'),
-      paymentMethod: Joi.string().valid('none', 'razorpay', 'cod', 'whatsapp', 'cash', 'upi', 'bank'),
+      paymentStatus: Joi.string().valid('unpaid', 'paid'),
+      paymentMethod: Joi.string().valid('razorpay', 'cod', 'cash', 'upi', 'bank'),
       notes: Joi.string().allow('').max(1000),
       tracking: Joi.object({
         message: Joi.string().allow('').max(1000),
@@ -223,9 +223,9 @@ router.patch(
     // Reserve / release inventory to match the new state.
     await reconcileOrderStock(order);
 
-    // Cash is collected on delivery — COD/WhatsApp orders become paid when delivered
+    // Cash is collected on delivery — COD/cash orders become paid when delivered
     // (and revert to unpaid if moved back). Razorpay + UPI keep their own status.
-    const collectOnDelivery = ['cod', 'whatsapp', 'cash', 'none'].includes(order.paymentMethod);
+    const collectOnDelivery = ['cod', 'cash'].includes(order.paymentMethod);
     if (order.status === 'delivered') {
       if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
     } else if (collectOnDelivery) {

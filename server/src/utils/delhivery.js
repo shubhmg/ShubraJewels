@@ -50,7 +50,7 @@ export function delhiveryReady(cfg) {
 export function orderPaymentMode(order) {
   // Fully paid (online/UPI/advance covering all) → Prepaid; else COD.
   const paid = order.paymentStatus === 'paid';
-  const isCod = ['cod', 'cash', 'none'].includes(order.paymentMethod);
+  const isCod = ['cod', 'cash'].includes(order.paymentMethod);
   return paid || !isCod ? 'Prepaid' : 'COD';
 }
 
