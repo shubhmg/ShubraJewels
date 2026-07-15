@@ -523,6 +523,45 @@ router.get(
   })
 );
 
+// PUBLIC (token-verified) — Shiprocket status webhook. Configure in Shiprocket →
+// Settings → API → Webhooks with URL {site}/api/orders/shiprocket-webhook and
+// the x-api-key header set to settings.shiprocket.webhookToken. Shiprocket
+// pushes every status change; when the courier confirms delivery the order
+// auto-advances to Delivered (and COD flips to paid) — no Sync click needed.
+router.post(
+  '/shiprocket-webhook',
+  asyncHandler(async (req, res) => {
+    const settings = await getSettings();
+    const expected = settings.shiprocket?.webhookToken || '';
+    const got = req.headers['x-api-key'] || req.headers['x-webhook-token'] || '';
+    // No token configured = webhook disabled; wrong token = reject. Never
+    // accept unauthenticated status pushes.
+    if (!expected || got !== expected) return res.status(401).json({ success: false, message: 'unauthorized' });
+
+    const b = req.body || {};
+    const awb = String(b.awb || b.awb_code || '').trim();
+    const status = String(b.current_status || b.shipment_status || b.status || '').trim();
+    if (!awb || !status) return res.json({ success: true, data: { ignored: true } });
+
+    const order = await Order.findOne({ 'shipment.provider': 'shiprocket', 'shipment.waybill': awb });
+    if (!order) return res.json({ success: true, data: { ignored: true } }); // unknown AWB — ack anyway (no retries)
+
+    order.shipment.status = status;
+    order.shipment.statusDetail = [b.current_status_body || '', b.location || b.current_location || ''].filter(Boolean).join(' · ');
+    order.shipment.lastSyncedAt = new Date();
+
+    // "Delivered" (but NOT "RTO Delivered" — that's the parcel coming back to us).
+    const delivered = /delivered/i.test(status) && !/rto/i.test(status);
+    if (delivered && order.status === 'shipped') {
+      order.status = 'delivered';
+      if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
+      await reconcileOrderStock(order);
+    }
+    await order.save();
+    res.json({ success: true, data: { orderNo: order.orderNo, status, delivered } });
+  })
+);
+
 // ADMIN — manually log an order (e.g. from WhatsApp) for bookkeeping + inventory.
 router.post(
   '/manual',

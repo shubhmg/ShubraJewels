@@ -164,6 +164,9 @@ const settingSchema = new mongoose.Schema(
       pickupLocation: { type: String, default: '' },   // pickup nickname registered in Shiprocket
       pickupPin: { type: String, default: '' },         // pickup PIN (for serviceability checks)
       autoPickup: { type: Boolean, default: false },    // auto-summon courier pickup on booking
+      // Secret expected in the x-api-key header of Shiprocket webhook calls
+      // (set the same value in Shiprocket → Settings → API → Webhooks).
+      webhookToken: { type: String, default: '' },
 
       defaultWeightKg: { type: Number, default: 0.3 }, // per-unit weight (kg), × qty
       length: { type: Number, default: 12 },           // parcel dims (cm)

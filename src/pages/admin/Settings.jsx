@@ -393,6 +393,19 @@ export function AdminSettings() {
               <Field field={{ label: 'Auto-schedule courier pickup on booking', type: 'toggle', help: 'When ON, booking a shipment immediately requests a courier pickup. Keep OFF while testing (so no courier is summoned) — turn ON for live orders, or schedule pickups from the Shiprocket dashboard.' }} value={!!s.shiprocket?.autoPickup} onChange={(v) => setSr('autoPickup', v)} />
 
               <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Status webhook (auto-mark delivered)</p>
+                <p className="text-xs text-zinc-500 -mt-1">Shiprocket pushes every tracking update to your site — orders mark themselves Delivered (and COD flips to paid) with zero clicks. Setup: in Shiprocket → <b>Settings → API → Webhooks</b>, add the URL below and set the <b>x-api-key</b> header to your token.</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 min-w-0 truncate text-[12px] bg-zinc-50 rounded-lg px-3 py-2 text-zinc-600">{`${window.location.origin}/api/orders/shiprocket-webhook`}</code>
+                  <Btn variant="outline" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/api/orders/shiprocket-webhook`)}>Copy</Btn>
+                </div>
+                <Field field={{ label: 'Webhook token (x-api-key)', type: 'password', placeholder: 'Any long random string', help: 'Must match the token you set in Shiprocket. Leave empty to keep the webhook disabled.' }} value={s.shiprocket?.webhookToken || ''} onChange={(v) => setSr('webhookToken', v.trim())} />
+                {!s.shiprocket?.webhookToken && (
+                  <Btn variant="outline" onClick={() => setSr('webhookToken', (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)))}>Generate token</Btn>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
                 <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Default parcel</p>
                 <Field field={{ label: 'Default weight per item (kg)', type: 'number', placeholder: '0.3', help: 'Used when a product has no weight. Multiplied by total quantity.' }} value={s.shiprocket?.defaultWeightKg ?? ''} onChange={(v) => setSr('defaultWeightKg', v === '' ? '' : Number(v))} />
                 <div className="grid grid-cols-3 gap-3">
