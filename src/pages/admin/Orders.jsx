@@ -12,6 +12,8 @@ const PAY_METHODS = [
   { value: 'upi', label: 'UPI' }, { value: 'bank', label: 'Bank transfer' },
   { value: 'razorpay', label: 'Razorpay (online)' },
 ]
+// Compact labels for the drawer's method chips.
+const PAY_SHORT = { cod: 'COD', cash: 'Cash', upi: 'UPI', bank: 'Bank', razorpay: 'Razorpay' }
 
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 // 'pending' kept for legacy orders only; new orders start Confirmed.
@@ -116,8 +118,6 @@ export function AdminOrders() {
   const [delCfg, setDelCfg] = useState(null)   // Delhivery config (enabled/policy/ready)
   const [srCfg, setSrCfg] = useState(null)     // Shiprocket config (enabled/policy/ready)
 
-  const [wiping, setWiping] = useState(false)
-
   // Courier config drives the ship flow (auto-book vs manual). Read from the
   // admin settings endpoint (the tokens/passwords stay server-side).
   useEffect(() => {
@@ -162,23 +162,6 @@ export function AdminOrders() {
     setLoading(false)
   }
   useEffect(() => { load() }, [filter, payFilter, q, page]) // eslint-disable-line
-
-  // Pre-launch cleanup: wipe all (test) orders.
-  const deleteAll = async () => {
-    if ((counts.all || 0) === 0) return
-    if (!window.confirm(`Delete ALL ${counts.all} orders permanently? This is for pre-launch testing cleanup and cannot be undone.`)) return
-    setWiping(true)
-    try {
-      const res = await api.post('/orders/delete-all', { confirm: 'DELETE_ALL' }, { auth: true })
-      setPage(1)
-      await load()
-      window.alert(`Deleted ${res?.deletedCount ?? 0} order(s).`)
-    } catch (e) {
-      window.alert(e?.message || 'Could not delete orders')
-    } finally {
-      setWiping(false)
-    }
-  }
 
   // Merge a server-updated order back into the list (and the open drawer). If a
   // status tab is active and the order no longer matches it (e.g. Confirmed →
@@ -242,9 +225,9 @@ export function AdminOrders() {
 
   return (
     <div className="max-w-5xl">
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
-        <div>
+      {/* ── Header — button sits beside the title, never on its own row ── */}
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <div className="min-w-0">
           <h1 className="font-display text-2xl sm:text-[28px] font-extrabold tracking-tight text-zinc-900">Orders</h1>
           <p className="text-[13px] text-zinc-500 mt-1">
             {toShip > 0
@@ -253,14 +236,7 @@ export function AdminOrders() {
             <span className="text-zinc-300 mx-1.5">·</span>{counts.all || 0} total
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {(counts.all || 0) > 0 && (
-            <button onClick={deleteAll} disabled={wiping} className="px-3 py-2 rounded-xl text-[13px] font-semibold text-red-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer disabled:opacity-50">
-              {wiping ? 'Deleting…' : 'Delete all'}
-            </button>
-          )}
-          <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
-        </div>
+        <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
       </div>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
       {shipFor && <ShipModal order={shipFor} delCfg={delCfg} srCfg={srCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
@@ -315,7 +291,7 @@ export function AdminOrders() {
                   onClick={() => setPayFilter(v)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${on ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
                 >
-                  {label} <span className="font-semibold text-zinc-400">{n}</span>
+                  {label} <span className="font-semibold text-zinc-400">({n})</span>
                 </button>
               )
             })}
@@ -437,19 +413,30 @@ export function AdminOrders() {
 // items + money breakdown, customer, payment. All actions live here.
 function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShipEdit, onShipmentAction, onOpenLabel }) {
   const [show, setShow] = useState(false)
+  const [preview, setPreview] = useState(null) // item image opened full-screen
   const close = () => { setShow(false); setTimeout(onClose, 200) }
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setShow(true))
-    const onKey = (e) => { if (e.key === 'Escape') close() }
-    window.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     return () => {
       cancelAnimationFrame(id)
-      window.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
     }
-  }, []) // eslint-disable-line
+  }, [])
+
+  // Esc closes the topmost layer only: ship sheet (handles itself) → image
+  // preview → then the drawer.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      if (document.getElementById('ship-modal-root')) return // ship sheet is on top
+      if (preview) setPreview(null)
+      else close()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [preview]) // eslint-disable-line
 
   const s = st(o.status)
   const pb = payBadge(o)
@@ -543,13 +530,18 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
             <p className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Items</p>
             <div className="divide-y divide-zinc-50">
               {o.items.map((it, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-50 shrink-0 ring-1 ring-zinc-100">
+                <div key={i} className="flex items-start gap-3 px-4 py-2.5">
+                  <button
+                    onClick={() => it.image && setPreview(it.image)}
+                    disabled={!it.image}
+                    className="w-12 h-12 rounded-xl overflow-hidden bg-zinc-50 shrink-0 ring-1 ring-zinc-100 cursor-zoom-in disabled:cursor-default hover:ring-2 hover:ring-[var(--gold)] transition"
+                    aria-label={it.image ? `Preview ${it.name}` : undefined}
+                  >
                     {it.image && <img src={it.image} alt="" className="w-full h-full object-cover" />}
-                  </div>
+                  </button>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold text-zinc-800 truncate">{it.name}</p>
-                    <p className="text-[12px] text-zinc-400">{it.qty} × {fmt(it.price)}</p>
+                    <p className="text-[14px] font-semibold text-zinc-800 leading-snug">{it.name}</p>
+                    <p className="text-[12px] text-zinc-400 mt-0.5">{it.qty} × {fmt(it.price)}</p>
                   </div>
                   <span className="text-[14px] font-bold text-zinc-900 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(it.price * it.qty)}</span>
                 </div>
@@ -584,23 +576,111 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
             {o.notes && <p className="text-[13px] text-zinc-500 mt-3 pl-3 border-l-2 border-zinc-200 italic">“{o.notes}”</p>}
           </div>
 
-          {/* Payment + stage override */}
+          {/* Payment — switch row + method chips (no dropdowns) */}
           <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Payment</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Dropdown value={o.paymentMethod || 'cod'} onChange={(v) => onPatch(o._id, { paymentMethod: v })} align="left" options={PAY_METHODS} />
-              <button
-                onClick={() => onPatch(o._id, { paymentStatus: o.paymentStatus === 'paid' ? 'unpaid' : 'paid' })}
-                className={`px-3.5 py-2 rounded-lg text-[13px] font-bold cursor-pointer transition ${o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-              >
-                {o.paymentStatus === 'paid' ? <><Check size={14} className="inline -mt-0.5" /> Paid</> : 'Mark paid'}
-              </button>
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Payment</p>
+
+            {/* One-tap paid toggle */}
+            {(() => {
+              const paid = o.paymentStatus === 'paid'
+              return (
+                <button
+                  onClick={() => onPatch(o._id, { paymentStatus: paid ? 'unpaid' : 'paid' })}
+                  className="w-full mt-2.5 flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl cursor-pointer transition-colors"
+                  style={{
+                    background: paid ? 'color-mix(in srgb, #059669 9%, white)' : '#fafafa',
+                    boxShadow: `inset 0 0 0 1px ${paid ? 'color-mix(in srgb, #059669 30%, transparent)' : '#e4e4e7'}`,
+                  }}
+                >
+                  <span className="text-[13px] font-bold" style={{ color: paid ? '#047857' : '#71717a' }}>
+                    {paid ? <><Check size={14} className="inline -mt-0.5 mr-1" strokeWidth={3} />Payment received</> : 'Payment pending'}
+                  </span>
+                  <span className="relative w-10 h-6 rounded-full transition-colors shrink-0" style={{ background: paid ? '#059669' : '#d4d4d8' }}>
+                    <span className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all" style={{ left: paid ? 18 : 2 }} />
+                  </span>
+                </button>
+              )
+            })()}
+
+            {/* Method chips */}
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mt-4 mb-2">Method</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PAY_METHODS.map((m) => {
+                const on = (o.paymentMethod || 'cod') === m.value
+                return (
+                  <button
+                    key={m.value}
+                    onClick={() => !on && onPatch(o._id, { paymentMethod: m.value })}
+                    className={`px-3 py-1.5 rounded-lg text-[12px] font-bold cursor-pointer transition-colors ${on ? 'text-white' : 'bg-white text-zinc-500 ring-1 ring-zinc-200 hover:ring-zinc-300 hover:text-zinc-700'}`}
+                    style={on ? { background: 'var(--maroon)' } : undefined}
+                  >
+                    {PAY_SHORT[m.value] || m.label}
+                  </button>
+                )
+              })}
             </div>
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2 font-bold mt-4">Change stage</p>
-            <Dropdown value={o.status === 'pending' ? 'confirmed' : o.status} onChange={(v) => onSetStatus(o._id, v)} align="left" className="w-full" options={STATUSES.map((v) => ({ value: v, label: v }))} />
+          </div>
+
+          {/* Order stage — segmented selector + cancel/restore (no dropdown) */}
+          <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mb-2.5">Order stage</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {STAGES.map(({ key, label }) => {
+                const cur = (o.status === 'pending' ? 'confirmed' : o.status) === key
+                const color = st(key).color
+                const pick = () => {
+                  if (cur) return
+                  // Moving into Shipped goes through the proper ship flow (courier
+                  // booking / tracking note) instead of silently flipping status.
+                  if (key === 'shipped' && (o.status === 'confirmed' || o.status === 'pending')) return onShipEdit(o)
+                  onSetStatus(o._id, key)
+                }
+                return (
+                  <button
+                    key={key}
+                    onClick={pick}
+                    className="py-2.5 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-colors"
+                    style={cur
+                      ? { background: `color-mix(in srgb, ${color} 11%, white)`, color, boxShadow: `inset 0 0 0 1.5px ${color}` }
+                      : { background: '#fff', color: o.status === 'cancelled' ? '#d4d4d8' : '#71717a', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            {o.status === 'cancelled' ? (
+              <button
+                onClick={() => onSetStatus(o._id, 'confirmed')}
+                className="w-full mt-2.5 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-colors text-blue-600 bg-blue-50 hover:bg-blue-100"
+              >
+                Restore order to Confirmed
+              </button>
+            ) : (
+              <button
+                onClick={() => { if (window.confirm(`Cancel order ${o.orderNo}? Reserved stock is returned to inventory.`)) onSetStatus(o._id, 'cancelled') }}
+                className="w-full mt-2.5 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-colors text-red-500 bg-white ring-1 ring-red-100 hover:bg-red-50"
+              >
+                <XCircle size={13} className="inline -mt-0.5 mr-1" />Cancel order
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Full-screen item image preview — tap anywhere (or Esc) to close */}
+      {preview && (
+        <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out animate-fade-in" onClick={() => setPreview(null)}>
+          <button
+            onClick={() => setPreview(null)}
+            className="absolute top-4 right-4 w-10 h-10 grid place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 cursor-pointer transition"
+            aria-label="Close preview"
+          >
+            <X size={20} />
+          </button>
+          <img src={preview} alt="" className="max-w-full max-h-full object-contain rounded-lg select-none" draggable={false} />
+        </div>
+      )}
     </div>
   )
 }
@@ -631,6 +711,22 @@ function ShipModal({ order, delCfg, srCfg, onClose, onShipped }) {
     return 'manual'
   }
   const [method, setMethod] = useState(pick())
+
+  // Sheet entrance/exit + Esc + scroll lock (restores the drawer's lock state).
+  const [show, setShow] = useState(false)
+  const close = () => { setShow(false); setTimeout(onClose, 200) }
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShow(true))
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e) => { if (e.key === 'Escape') close() }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      cancelAnimationFrame(id)
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, []) // eslint-disable-line
 
   const [message, setMessage] = useState(order.tracking?.message || '')
   const [gWeight, setGWeight] = useState(String((delCfg?.defaultWeightGrams || 100) * totalQty)) // grams (Delhivery)
@@ -685,62 +781,117 @@ function ShipModal({ order, delCfg, srCfg, onClose, onShipped }) {
     ? [!delCfg?.hasToken && 'API token', !delCfg?.hasPickup && 'pickup warehouse name'].filter(Boolean).join(' & ')
     : [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
 
+  const primaryLabel = method === 'manual'
+    ? (saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped'))
+    : (saving ? 'Booking…' : `Book ${method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'} & Ship`)
+
   return (
-    <Modal open onClose={onClose} title={alreadyShipped ? 'Edit tracking' : `Ship ${order.orderNo}`} footer={<>
-      <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-      {method === 'manual'
-        ? <Btn onClick={submitManual} disabled={saving}><Truck size={15} /> {saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped')}</Btn>
-        : <Btn onClick={() => submitCourier(method)} disabled={saving || !activeReady}><Package size={15} /> {saving ? 'Booking…' : `Book ${method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'} & Ship`}</Btn>}
-    </>}>
-      {tabs.length > 1 && (
-        <div className="flex gap-2 mb-3">
-          {tabs.map(({ v, label, Icon }) => (
-            <button key={v} onClick={() => { setMethod(v); setErr('') }}
-              className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold cursor-pointer transition border ${method === v ? 'text-white border-transparent' : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300'}`}
-              style={method === v ? { background: 'var(--maroon)' } : undefined}>
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-        </div>
-      )}
+    <div id="ship-modal-root" className="fixed inset-0 z-[70]">
+      <div className={`absolute inset-0 bg-zinc-900/50 transition-opacity duration-200 ${show ? 'opacity-100' : 'opacity-0'}`} onClick={close} />
+      <div className="absolute inset-0 flex items-end sm:items-center justify-center sm:p-4 pointer-events-none">
+        <div className={`pointer-events-auto w-full sm:max-w-md bg-zinc-50 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[85dvh] overflow-hidden transition-all duration-200 ease-out ${show ? 'translate-y-0 opacity-100' : 'translate-y-full sm:translate-y-4 sm:opacity-0'}`}>
 
-      {method === 'manual' ? (
-        <>
-          <p className="text-sm text-zinc-500 -mt-1 mb-1">Paste the delivery partner's tracking message (id + link). It's shown on the customer's order tracker exactly as typed.</p>
-          <Field field={{ label: 'Tracking message', type: 'textarea', placeholder: 'e.g. Shipped via Delhivery. Tracking: 1234567890 — https://delhivery.com/track/1234567890' }} value={message} onChange={setMessage} />
-        </>
-      ) : (
-        <div className="space-y-3">
-          {!activeReady && (
-            <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)' }}>
-              <p className="font-semibold text-amber-700">Finish {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'} setup first</p>
-              <p className="text-amber-700/90 text-xs mt-0.5">
-                Missing {missingMsg}. Go to <b>Settings → Payments &amp; Shipping → {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'}</b>, fill them in, and hit <b>Save Changes</b>.
-              </p>
+          {/* Grab handle (mobile bottom sheet) */}
+          <div className="sm:hidden pt-2.5 grid place-items-center bg-white"><span className="w-10 h-1 rounded-full bg-zinc-200" /></div>
+
+          {/* Header */}
+          <div className="bg-white px-5 pt-2.5 sm:pt-5 pb-4 border-b border-zinc-100 shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">{alreadyShipped ? 'Edit tracking' : 'Ship order'}</p>
+                <p className="font-extrabold text-[17px] text-zinc-900 tracking-tight mt-0.5">{order.orderNo}</p>
+              </div>
+              <button onClick={close} className="w-9 h-9 grid place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer transition shrink-0" aria-label="Close">
+                <X size={18} />
+              </button>
             </div>
-          )}
-          <p className="text-sm text-zinc-500 -mt-1">Books a {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'} waybill for this order as <b>{mode}</b>{mode === 'COD' && <> (collect <b>{fmt(Math.max(0, (order.total || 0) - (order.advancePaid || 0)))}</b> on delivery)</>}. The customer’s tracking link is filled in automatically.</p>
 
-          {/* Serviceability */}
-          <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #6366f1 8%, transparent)' }}>
-            <p className="font-semibold text-indigo-700">Delivery to PIN {pin || '—'}</p>
-            {!pin ? <p className="text-red-600 text-xs mt-0.5">No PIN on this order — add one before booking.</p>
-              : !activeReady ? <p className="text-zinc-400 text-xs mt-0.5">Finish setup to check serviceability.</p>
-              : !serv ? <p className="text-zinc-500 text-xs mt-0.5">Checking serviceability…</p>
-              : !serv.ok ? <p className="text-amber-600 text-xs mt-0.5">Couldn’t verify ({serv.error}). You can still try to book.</p>
-              : !serv.serviceable ? <p className="text-red-600 text-xs mt-0.5">Not serviceable by {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'}. Try the other courier or ship manually.</p>
-              : method === 'shiprocket'
-                ? <p className="text-emerald-700 text-xs mt-0.5">Serviceable · {serv.couriers?.length || 0} courier(s){serv.cheapest ? ` · from ₹${Math.round(serv.cheapest.rate || 0)} (${serv.cheapest.name})` : ''}. Shiprocket picks the recommended one.</p>
-                : <p className="text-emerald-700 text-xs mt-0.5">Serviceable{serv.city ? ` · ${serv.city}, ${serv.state}` : ''} · COD {serv.cod ? '✓' : '✗'} · Prepaid {serv.prepaid ? '✓' : '✗'}{mode === 'COD' && !serv.cod ? ' — COD not available here!' : ''}</p>}
+            {/* Method — segmented, same language as the stage selector */}
+            {tabs.length > 1 && (
+              <div className={`grid gap-1.5 mt-3.5 ${tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {tabs.map(({ v, label }) => {
+                  const on = method === v
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => { setMethod(v); setErr('') }}
+                      className="py-2.5 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-colors"
+                      style={on
+                        ? { background: 'color-mix(in srgb, var(--maroon) 10%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                        : { background: '#fff', color: '#71717a', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
-          {method === 'shiprocket'
-            ? <Field field={{ label: 'Package weight (kg)', type: 'number', help: `Default ${srCfg?.defaultWeightKg || 0.3} kg × ${totalQty} item(s). Adjust if needed.` }} value={kWeight} onChange={setKWeight} />
-            : <Field field={{ label: 'Package weight (grams)', type: 'number', help: `Default ${delCfg?.defaultWeightGrams || 100} g × ${totalQty} item(s). Adjust if needed.` }} value={gWeight} onChange={setGWeight} />}
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {method === 'manual' ? (
+              <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                <Field field={{ label: 'Tracking message', type: 'textarea', placeholder: 'e.g. Shipped via Delhivery. Tracking: 1234567890 — https://delhivery.com/track/1234567890' }} value={message} onChange={setMessage} />
+                <p className="text-[12px] text-zinc-400 mt-2">Paste the courier's note (tracking id + link). It's shown to the customer exactly as typed.</p>
+              </div>
+            ) : (
+              <>
+                {!activeReady && (
+                  <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
+                    <p className="font-semibold text-amber-700">Finish {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'} setup first</p>
+                    <p className="text-amber-700/90 text-xs mt-0.5">
+                      Missing {missingMsg}. Go to <b>Settings → Payments &amp; Shipping → {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'}</b>, fill them in, and hit <b>Save Changes</b>.
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[13px] text-zinc-500 px-1">
+                  Books a {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'} waybill as <b className="text-zinc-700">{mode}</b>
+                  {mode === 'COD' && <> — collect <b className="text-zinc-700">{fmt(Math.max(0, (order.total || 0) - (order.advancePaid || 0)))}</b> on delivery</>}.
+                  The customer's tracking link is filled in automatically.
+                </p>
+
+                {/* Serviceability */}
+                <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Delivery to PIN {pin || '—'}</p>
+                  <div className="mt-1.5 text-[13px] font-medium">
+                    {!pin ? <p className="text-red-600">No PIN on this order — add one before booking.</p>
+                      : !activeReady ? <p className="text-zinc-400">Finish setup to check serviceability.</p>
+                      : !serv ? <p className="text-zinc-400 flex items-center gap-2"><RefreshCw size={13} className="animate-spin" /> Checking serviceability…</p>
+                      : !serv.ok ? <p className="text-amber-600">Couldn't verify ({serv.error}). You can still try to book.</p>
+                      : !serv.serviceable ? <p className="text-red-600">Not serviceable by {method === 'shiprocket' ? 'Shiprocket' : 'Delhivery'}. Try the other courier or ship manually.</p>
+                      : method === 'shiprocket'
+                        ? <p className="text-emerald-700">Serviceable · {serv.couriers?.length || 0} courier(s){serv.cheapest ? ` · from ₹${Math.round(serv.cheapest.rate || 0)} (${serv.cheapest.name})` : ''}. Shiprocket picks the recommended one.</p>
+                        : <p className="text-emerald-700">Serviceable{serv.city ? ` · ${serv.city}, ${serv.state}` : ''} · COD {serv.cod ? '✓' : '✗'} · Prepaid {serv.prepaid ? '✓' : '✗'}{mode === 'COD' && !serv.cod ? ' — COD not available here!' : ''}</p>}
+                  </div>
+                </div>
+
+                {/* Weight */}
+                <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                  {method === 'shiprocket'
+                    ? <Field field={{ label: 'Package weight (kg)', type: 'number', help: `Default ${srCfg?.defaultWeightKg || 0.3} kg × ${totalQty} item(s). Adjust if needed.` }} value={kWeight} onChange={setKWeight} />
+                    : <Field field={{ label: 'Package weight (grams)', type: 'number', help: `Default ${delCfg?.defaultWeightGrams || 100} g × ${totalQty} item(s). Adjust if needed.` }} value={gWeight} onChange={setGWeight} />}
+                </div>
+              </>
+            )}
+            {err && <p className="text-[13px] font-semibold text-red-600 px-1">{err}</p>}
+          </div>
+
+          {/* Footer — one full-width action */}
+          <div className="bg-white border-t border-zinc-100 p-4 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+            <button
+              onClick={method === 'manual' ? submitManual : () => submitCourier(method)}
+              disabled={saving || (method !== 'manual' && !activeReady)}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-default"
+              style={{ background: 'var(--maroon)' }}
+            >
+              {method === 'manual' ? <Truck size={16} /> : <Package size={16} />} {primaryLabel}
+            </button>
+          </div>
         </div>
-      )}
-      {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
-    </Modal>
+      </div>
+    </div>
   )
 }
 
