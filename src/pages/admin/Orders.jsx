@@ -86,6 +86,26 @@ function Stepper({ status }) {
 const paymentMode = (o) => (o.paymentStatus === 'paid' || !['cod', 'cash'].includes(o.paymentMethod) ? 'Prepaid' : 'COD')
 const trackUrl = (wb) => `https://shiprocket.co/tracking/${encodeURIComponent(wb)}`
 
+// Group a (createdAt-desc) order list into day buckets for the list headers.
+function groupByDay(orders) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const label = (d) => {
+    const dt = new Date(d); const day = new Date(dt); day.setHours(0, 0, 0, 0)
+    const diff = Math.round((today - day) / 86400000)
+    if (diff === 0) return 'Today'
+    if (diff === 1) return 'Yesterday'
+    return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', ...(dt.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) })
+  }
+  const groups = []
+  for (const o of orders) {
+    const key = new Date(o.createdAt).toDateString()
+    const last = groups[groups.length - 1]
+    if (last && last.key === key) last.items.push(o)
+    else groups.push({ key, label: label(o.createdAt), items: [o] })
+  }
+  return groups
+}
+
 // Payment badge — Paid, advance-paid COD, else COD.
 function payBadge(o) {
   if (o.paymentStatus === 'paid') return { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
@@ -348,12 +368,15 @@ export function AdminOrders() {
         </div>
       ) : (
         <div className="rounded-2xl bg-white ring-1 ring-zinc-200/70 overflow-hidden divide-y divide-zinc-100">
-          {orders.map((o) => {
+          {groupByDay(orders).map(({ key, label, items }) => (
+            <div key={key}>
+              <div className="px-3 sm:px-5 py-1.5 bg-zinc-50/80 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-100">{label}</div>
+              <div className="divide-y divide-zinc-100">
+          {items.map((o) => {
             const pb = payBadge(o)
             const a = nextAction(o.status)
             const firstImg = (o.items || []).find((it) => it.image)?.image
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
-            const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
             const canBulk = filter === 'confirmed' && srCfg?.enabled && !o.shipment?.waybill
             const isSel = selected.includes(o._id)
             return (
@@ -388,7 +411,6 @@ export function AdminOrders() {
                   </div>
                   <p className="text-[12px] sm:text-[13px] text-zinc-500 truncate mt-0.5">
                     {o.customer?.name}
-                    <span className="text-zinc-300 mx-1">·</span>{date}
                     <span className="hidden sm:inline"><span className="text-zinc-300 mx-1">·</span>{o.items?.length} item{o.items?.length === 1 ? '' : 's'}</span>
                   </p>
                   {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
@@ -402,7 +424,7 @@ export function AdminOrders() {
                   <button
                     onClick={(e) => { e.stopPropagation(); advance(o) }}
                     aria-label={a.label}
-                    className="shrink-0 inline-flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl text-[12px] font-bold cursor-pointer transition-colors bg-white ring-1 ring-zinc-200 text-[var(--maroon)] hover:bg-[var(--maroon)] hover:text-white hover:ring-[var(--maroon)]"
+                    className="hidden sm:inline-flex shrink-0 items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold cursor-pointer transition-colors bg-white ring-1 ring-zinc-200 text-[var(--maroon)] hover:bg-[var(--maroon)] hover:text-white hover:ring-[var(--maroon)]"
                   >
                     <a.icon size={14} /><span className="hidden sm:inline">{a.label}</span>
                   </button>
@@ -412,6 +434,9 @@ export function AdminOrders() {
               </div>
             )
           })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
