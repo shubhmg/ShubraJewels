@@ -360,7 +360,7 @@ export function AdminOrders() {
               <div
                 key={o._id}
                 onClick={() => setDrawer(o)}
-                className={`group flex items-center gap-3 sm:gap-4 px-3.5 sm:px-5 py-3.5 cursor-pointer transition-colors ${isSel ? 'bg-[color-mix(in_srgb,var(--gold)_9%,white)]' : 'hover:bg-[color-mix(in_srgb,var(--gold)_5%,white)]'}`}
+                className={`group flex items-center gap-2.5 sm:gap-4 px-3 sm:px-5 py-3 sm:py-3.5 cursor-pointer transition-colors ${isSel ? 'bg-[color-mix(in_srgb,var(--gold)_9%,white)]' : 'hover:bg-[color-mix(in_srgb,var(--gold)_5%,white)]'}`}
               >
                 {canBulk && (
                   <button
@@ -373,41 +373,42 @@ export function AdminOrders() {
                   </button>
                 )}
                 {firstImg ? (
-                  <img src={firstImg} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0 ring-1 ring-black/5" />
+                  <img src={firstImg} alt="" className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl object-cover shrink-0 ring-1 ring-black/5" />
                 ) : (
-                  <div className="w-11 h-11 rounded-xl grid place-items-center text-[15px] font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark, #5a121c))' }}>{initial}</div>
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl grid place-items-center text-[13px] sm:text-[15px] font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark, #5a121c))' }}>{initial}</div>
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-[14px] text-zinc-900 tracking-tight">{o.orderNo}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <span className="font-bold text-[13px] sm:text-[14px] text-zinc-900 tracking-tight truncate">{o.orderNo}</span>
+                    <span className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
                     {o.shipment?.waybill && o.shipment.provider !== 'manual' && (
-                      <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">Shiprocket</span>
+                      <span className="hidden sm:inline shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">Shiprocket</span>
                     )}
                   </div>
-                  <p className="text-[13px] text-zinc-500 truncate mt-0.5">
+                  <p className="text-[12px] sm:text-[13px] text-zinc-500 truncate mt-0.5">
                     {o.customer?.name}
                     <span className="text-zinc-300 mx-1">·</span>{date}
-                    <span className="text-zinc-300 mx-1">·</span>{o.items?.length} item{o.items?.length === 1 ? '' : 's'}
+                    <span className="hidden sm:inline"><span className="text-zinc-300 mx-1">·</span>{o.items?.length} item{o.items?.length === 1 ? '' : 's'}</span>
                   </p>
                   {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
-                    <p className="text-[11px] font-semibold mt-0.5" style={{ color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} · {fmt(o.total - o.advancePaid)} due</p>
+                    <p className="text-[11px] font-semibold mt-0.5 truncate" style={{ color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} · {fmt(o.total - o.advancePaid)} due</p>
                   )}
                 </div>
 
-                <span className="font-extrabold text-[15px] shrink-0" style={{ color: 'var(--maroon)', fontVariantNumeric: 'tabular-nums' }}>{fmt(o.total)}</span>
+                <span className="font-extrabold text-[13px] sm:text-[15px] shrink-0" style={{ color: 'var(--maroon)', fontVariantNumeric: 'tabular-nums' }}>{fmt(o.total)}</span>
 
                 {a && (
                   <button
                     onClick={(e) => { e.stopPropagation(); advance(o) }}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-[12px] font-bold cursor-pointer transition-colors bg-white ring-1 ring-zinc-200 text-[var(--maroon)] hover:bg-[var(--maroon)] hover:text-white hover:ring-[var(--maroon)]"
+                    aria-label={a.label}
+                    className="shrink-0 inline-flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl text-[12px] font-bold cursor-pointer transition-colors bg-white ring-1 ring-zinc-200 text-[var(--maroon)] hover:bg-[var(--maroon)] hover:text-white hover:ring-[var(--maroon)]"
                   >
                     <a.icon size={14} /><span className="hidden sm:inline">{a.label}</span>
                   </button>
                 )}
 
-                <ChevronRight size={16} className="shrink-0 text-zinc-300 group-hover:text-zinc-500 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={16} className="hidden sm:block shrink-0 text-zinc-300 group-hover:text-zinc-500 group-hover:translate-x-0.5 transition-all" />
               </div>
             )
           })}
@@ -425,16 +426,19 @@ export function AdminOrders() {
 
       {/* ── Bulk ship bar — floats while orders are selected ── */}
       {selected.length > 0 && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 bg-white rounded-2xl shadow-[0_14px_44px_-10px_rgba(0,0,0,0.35)] ring-1 ring-zinc-200 pl-4 pr-2 py-2 max-w-[calc(100vw-24px)]">
-          <span className="text-[13px] font-bold text-zinc-800 whitespace-nowrap">{selected.length} selected</span>
-          <button onClick={() => setSelected(orders.filter((o) => !o.shipment?.waybill).map((o) => o._id))} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer whitespace-nowrap">All on page</button>
-          <button onClick={() => setSelected([])} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer">Clear</button>
+        <div className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 bg-white rounded-2xl shadow-[0_14px_44px_-10px_rgba(0,0,0,0.35)] ring-1 ring-zinc-200 pl-3.5 sm:pl-4 pr-2 py-2"
+          style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
+          <span className="text-[13px] font-bold text-zinc-800 whitespace-nowrap shrink-0">{selected.length} selected</span>
+          <button onClick={() => setSelected(orders.filter((o) => !o.shipment?.waybill).map((o) => o._id))} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer whitespace-nowrap shrink-0">
+            <span className="sm:hidden">All</span><span className="hidden sm:inline">All on page</span>
+          </button>
+          <button onClick={() => setSelected([])} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer shrink-0">Clear</button>
           <button
             onClick={() => setBulkOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] whitespace-nowrap"
+            className="flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] whitespace-nowrap"
             style={{ background: 'var(--maroon)' }}
           >
-            <Package size={14} /> Book {selected.length} via Shiprocket
+            <Package size={14} /> Book {selected.length}<span className="hidden sm:inline">&nbsp;via Shiprocket</span>
           </button>
         </div>
       )}
