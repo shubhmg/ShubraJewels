@@ -528,15 +528,20 @@ router.get(
 // the x-api-key header set to settings.shiprocket.webhookToken. Shiprocket
 // pushes every status change; when the courier confirms delivery the order
 // auto-advances to Delivered (and COD flips to paid) — no Sync click needed.
+// Shiprocket's dashboard VALIDATES the URL when you save it (a test ping,
+// possibly without custom headers) and refuses the URL on any non-200 — so
+// this endpoint always answers 200. Unauthorized calls are silently IGNORED
+// (nothing is updated), which keeps spoofing harmless.
+router.get('/shiprocket-webhook', (_req, res) => res.json({ success: true }));
 router.post(
   '/shiprocket-webhook',
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
     const expected = settings.shiprocket?.webhookToken || '';
     const got = req.headers['x-api-key'] || req.headers['x-webhook-token'] || '';
-    // No token configured = webhook disabled; wrong token = reject. Never
-    // accept unauthenticated status pushes.
-    if (!expected || got !== expected) return res.status(401).json({ success: false, message: 'unauthorized' });
+    // No token configured = webhook disabled; wrong/missing token = ACK but
+    // ignore. Never process unauthenticated status pushes.
+    if (!expected || got !== expected) return res.json({ success: true, data: { ignored: true } });
 
     const b = req.body || {};
     const awb = String(b.awb || b.awb_code || '').trim();
