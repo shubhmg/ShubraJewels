@@ -19,6 +19,7 @@ export function shiprocketConfig(settings) {
     policy: s.policy || 'manual',
     pickupLocation: s.pickupLocation || '',
     pickupPin: s.pickupPin || '',
+    autoPickup: !!s.autoPickup, // call generate/pickup after booking (summons courier)
     defaultWeightKg: Number(s.defaultWeightKg) || 0.3,
     dims: {
       length: Number(s.length) || 12,
@@ -128,7 +129,7 @@ export async function checkServiceability(settingDoc, { pickupPin, deliveryPin, 
 
 // Book a parcel: create order → assign AWB → (schedule pickup) → fetch label.
 // Returns { ok, awb, courierName, shipmentId, srOrderId, trackingUrl, mode, codAmount, weightKg, labelUrl, error }.
-export async function createShipment(settingDoc, order, { weightKg } = {}) {
+export async function createShipment(settingDoc, order, { weightKg, orderRef } = {}) {
   const cfg = shiprocketConfig(settingDoc);
   if (!shiprocketReady(cfg)) return { ok: false, error: 'Shiprocket is not fully configured (email, password + pickup location required).' };
   const auth = await ensureToken(settingDoc);
@@ -144,7 +145,7 @@ export async function createShipment(settingDoc, order, { weightKg } = {}) {
   const phone = String(order.customer?.phone || '').replace(/\D/g, '').slice(-10);
 
   const payload = {
-    order_id: order.orderNo,
+    order_id: orderRef || order.orderNo,
     order_date: new Date(order.createdAt || Date.now()).toISOString().slice(0, 16).replace('T', ' '),
     pickup_location: cfg.pickupLocation,
     billing_customer_name: firstName,
@@ -191,8 +192,11 @@ export async function createShipment(settingDoc, order, { weightKg } = {}) {
   }
   const courierName = awbData.courier_name || '';
 
-  // Schedule pickup + fetch label (best-effort; not fatal if not ready).
-  srFetch(auth.token, 'POST', '/courier/generate/pickup', { shipment_id: [shipmentId] }).catch(() => {});
+  // Schedule pickup only if enabled (off by default so test bookings never
+  // summon a courier). Real orders turn this on, or schedule from the dashboard.
+  if (cfg.autoPickup) {
+    srFetch(auth.token, 'POST', '/courier/generate/pickup', { shipment_id: [shipmentId] }).catch(() => {});
+  }
   let labelUrl = '';
   const labelRes = await srFetch(auth.token, 'POST', '/courier/generate/label', { shipment_id: [shipmentId] });
   if (labelRes.data?.label_created === 1 || labelRes.data?.label_url) labelUrl = labelRes.data.label_url || '';

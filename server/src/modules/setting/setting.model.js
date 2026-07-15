@@ -163,6 +163,8 @@ const settingSchema = new mongoose.Schema(
       policy: { type: String, enum: ['all', 'cod', 'prepaid', 'manual'], default: 'manual' },
       pickupLocation: { type: String, default: '' },   // pickup nickname registered in Shiprocket
       pickupPin: { type: String, default: '' },         // pickup PIN (for serviceability checks)
+      autoPickup: { type: Boolean, default: false },    // auto-summon courier pickup on booking
+
       defaultWeightKg: { type: Number, default: 0.3 }, // per-unit weight (kg), × qty
       length: { type: Number, default: 12 },           // parcel dims (cm)
       breadth: { type: Number, default: 10 },

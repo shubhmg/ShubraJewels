@@ -390,6 +390,8 @@ export function AdminSettings() {
                 <Field field={{ label: 'Pickup PIN', placeholder: '302001', help: 'Your pickup pincode — used to check serviceability.' }} value={s.shiprocket?.pickupPin || ''} onChange={(v) => setSr('pickupPin', v)} />
               </div>
 
+              <Field field={{ label: 'Auto-schedule courier pickup on booking', type: 'toggle', help: 'When ON, booking a shipment immediately requests a courier pickup. Keep OFF while testing (so no courier is summoned) — turn ON for live orders, or schedule pickups from the Shiprocket dashboard.' }} value={!!s.shiprocket?.autoPickup} onChange={(v) => setSr('autoPickup', v)} />
+
               <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
                 <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Default parcel</p>
                 <Field field={{ label: 'Default weight per item (kg)', type: 'number', placeholder: '0.3', help: 'Used when a product has no weight. Multiplied by total quantity.' }} value={s.shiprocket?.defaultWeightKg ?? ''} onChange={(v) => setSr('defaultWeightKg', v === '' ? '' : Number(v))} />

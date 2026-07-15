@@ -130,7 +130,8 @@ export async function checkServiceability(settings, pin) {
 }
 
 // Create a forward shipment (CMU). Returns { ok, waybill, mode, error, raw }.
-export async function createShipment(settings, order, { weight } = {}) {
+// `orderRef` overrides the courier-side order id on re-books (must be unique).
+export async function createShipment(settings, order, { weight, orderRef } = {}) {
   const cfg = delhiveryConfig(settings);
   if (!delhiveryReady(cfg)) return { ok: false, error: 'Delhivery is not fully configured (token + pickup warehouse required).' };
 
@@ -148,7 +149,7 @@ export async function createShipment(settings, order, { weight } = {}) {
     state: addr.state || '',
     country: 'India',
     phone: String(order.customer?.phone || '').replace(/\D/g, '').slice(-10),
-    order: order.orderNo,
+    order: orderRef || order.orderNo,
     order_date: (order.createdAt ? new Date(order.createdAt) : new Date()).toISOString(),
     payment_mode: mode, // 'COD' | 'Prepaid'
     cod_amount: String(cod),

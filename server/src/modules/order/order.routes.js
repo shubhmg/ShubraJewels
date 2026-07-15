@@ -240,6 +240,23 @@ function shipmentTrackingMessage(provider, waybill, url) {
   return `Shipped via ${label}. Tracking ID: ${waybill}\nTrack your parcel: ${url}`;
 }
 
+// Book with a courier, retrying with a fresh order reference when the courier
+// rejects a re-used one. Couriers key on the order id and refuse it even after a
+// cancel, so re-books send `{orderNo}-R{n}`. Returns { result, attempt }.
+async function bookWithRetry(order, bookFn) {
+  const base = order.orderNo;
+  const mkRef = (n) => (n <= 1 ? base : `${base}-R${n}`);
+  const dup = (e) => /already (assigned|exist|manifest)|duplicate|order.*(exist|already)/i.test(e || '');
+  let attempt = (order.shipmentAttempts || 0) + 1;
+  let result = await bookFn(mkRef(attempt));
+  let guard = 0;
+  while (!result.ok && dup(result.error) && guard < 6) {
+    attempt += 1; guard += 1;
+    result = await bookFn(mkRef(attempt));
+  }
+  return { result, attempt };
+}
+
 // After a courier booking succeeds, stamp the shipment onto the order, mark it
 // Shipped, auto-fill the customer tracking message + email them (best-effort).
 async function applyBooking(order, settings, shipment, wasShipped) {
@@ -276,10 +293,12 @@ router.post(
     if (!delhivery.delhiveryReady(delhivery.delhiveryConfig(settings))) {
       throw ApiError.badRequest('Delhivery is not fully configured. Add the API token and pickup warehouse in Settings.');
     }
-    const result = await delhivery.createShipment(settings, order.toObject(), { weight: req.body.weight });
+    const { result, attempt } = await bookWithRetry(order, (ref) =>
+      delhivery.createShipment(settings, order.toObject(), { weight: req.body.weight, orderRef: ref }));
     if (!result.ok) throw ApiError.badRequest(result.error || 'Delhivery could not book this shipment.');
 
     const wasShipped = order.status === 'shipped';
+    order.shipmentAttempts = attempt;
     await applyBooking(order, settings, {
       provider: 'delhivery',
       waybill: result.waybill,
@@ -316,10 +335,12 @@ router.post(
     if (!shiprocket.shiprocketReady(shiprocket.shiprocketConfig(settings))) {
       throw ApiError.badRequest('Shiprocket is not fully configured. Add the email, API password and pickup location in Settings.');
     }
-    const result = await shiprocket.createShipment(settings, order.toObject(), { weightKg: req.body.weight });
+    const { result, attempt } = await bookWithRetry(order, (ref) =>
+      shiprocket.createShipment(settings, order.toObject(), { weightKg: req.body.weight, orderRef: ref }));
     if (!result.ok) throw ApiError.badRequest(result.error || 'Shiprocket could not book this shipment.');
 
     const wasShipped = order.status === 'shipped';
+    order.shipmentAttempts = attempt;
     await applyBooking(order, settings, {
       provider: 'shiprocket',
       waybill: result.awb,

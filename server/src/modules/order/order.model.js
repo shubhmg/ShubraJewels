@@ -70,6 +70,11 @@ const orderSchema = new mongoose.Schema(
       bookedAt: { type: Date, default: null },
       lastSyncedAt: { type: Date, default: null },
     },
+    // How many times a courier waybill has been booked for this order. Couriers
+    // key on the order reference and reject a re-used one (even after cancel), so
+    // re-books send `{orderNo}-R{n}`. Lives outside `shipment` so it survives a
+    // "Cancel & reset" (which wipes `shipment`).
+    shipmentAttempts: { type: Number, default: 0 },
     // true once this order's items have been deducted from stock (on delivery).
     stockApplied: { type: Boolean, default: false },
     // Payment
