@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox } from 'lucide-react'
 import { api } from '../../lib/api.js'
-import { AdminHeader, Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
+import { Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
 
 const PAGE_LIMIT = 20
@@ -16,13 +16,20 @@ const PAY_METHODS = [
 const fmt = (n) => '₹' + new Intl.NumberFormat('en-IN').format(n || 0)
 // 'pending' kept for legacy orders only; new orders start Confirmed.
 const STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled']
-// Unified status token — a soft chip + a dot colour, no more left-edge spine.
+
+// The order pipeline — each stage is a tappable stat card that IS the filter.
+const PIPELINE = [
+  { key: 'confirmed', label: 'To Ship',    icon: Package,     color: '#2563eb' },
+  { key: 'shipped',   label: 'In Transit', icon: Truck,       color: '#7c3aed' },
+  { key: 'delivered', label: 'Delivered',  icon: PackageCheck, color: '#059669' },
+  { key: 'cancelled', label: 'Cancelled',  icon: XCircle,     color: '#dc2626' },
+]
 const STATUS = {
-  pending:   { label: 'Confirmed', color: '#2563eb', chip: 'bg-blue-50 text-blue-700 ring-blue-100' },
-  confirmed: { label: 'Confirmed', color: '#2563eb', chip: 'bg-blue-50 text-blue-700 ring-blue-100' },
-  shipped:   { label: 'Shipped',   color: '#7c3aed', chip: 'bg-violet-50 text-violet-700 ring-violet-100' },
-  delivered: { label: 'Delivered', color: '#059669', chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
-  cancelled: { label: 'Cancelled', color: '#dc2626', chip: 'bg-red-50 text-red-700 ring-red-100' },
+  pending:   { label: 'Confirmed', color: '#2563eb' },
+  confirmed: { label: 'Confirmed', color: '#2563eb' },
+  shipped:   { label: 'Shipped',   color: '#7c3aed' },
+  delivered: { label: 'Delivered', color: '#059669' },
+  cancelled: { label: 'Cancelled', color: '#dc2626' },
 }
 const st = (s) => STATUS[s] || STATUS.confirmed
 
@@ -73,7 +80,7 @@ function Stepper({ status }) {
 
 // Prepaid vs COD for an order (mirrors the server's orderPaymentMode).
 const paymentMode = (o) => (o.paymentStatus === 'paid' || !['cod', 'cash', 'none'].includes(o.paymentMethod) ? 'Prepaid' : 'COD')
-// Does the admin's Delhivery policy auto-route THIS order?
+// Does the admin's courier policy auto-route THIS order?
 const policyApplies = (cfg, o) => {
   if (!cfg?.ready) return false
   const m = paymentMode(o)
@@ -98,7 +105,7 @@ export function AdminOrders() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [open, setOpen] = useState(null)
+  const [drawer, setDrawer] = useState(null) // full order object shown in the slide-over
   const [filter, setFilter] = useState('confirmed')
   const [payFilter, setPayFilter] = useState('') // '' | 'paid' | 'cod' — sub-filter within a status
   const [payCounts, setPayCounts] = useState({ all: 0, paid: 0, cod: 0 })
@@ -173,15 +180,16 @@ export function AdminOrders() {
     }
   }
 
-  // Merge a server-updated order back into the list. If a status tab is active
-  // and the order no longer matches it (e.g. Confirmed → Shipped), drop it from
-  // the view; then silently refresh so the tab counts stay accurate.
+  // Merge a server-updated order back into the list (and the open drawer). If a
+  // status tab is active and the order no longer matches it (e.g. Confirmed →
+  // Shipped), drop it from the view; then silently refresh so counts stay right.
   const reconcileOrder = (updated) => {
     setOrders((os) =>
       filter !== 'all' && updated.status !== filter
         ? os.filter((o) => o._id !== updated._id)
         : os.map((o) => (o._id === updated._id ? updated : o))
     )
+    setDrawer((d) => (d && d._id === updated._id ? updated : d))
     load({ silent: true })
   }
 
@@ -194,7 +202,7 @@ export function AdminOrders() {
   }
   const setStatus = (id, status) => patchOrder(id, { status })
 
-  // Delhivery per-order actions (sync status / cancel waybill / open label).
+  // Courier per-order actions (sync status / cancel waybill / open label).
   const [busy, setBusy] = useState(null) // `${id}:${action}` while a request runs
   const shipmentAction = async (id, action, path, body = {}) => {
     setBusy(`${id}:${action}`)
@@ -230,54 +238,71 @@ export function AdminOrders() {
 
   const countFor = (s) => (s === 'all' ? (counts.all || 0) : (counts[s] || 0))
   const pages = Math.max(1, Math.ceil(total / PAGE_LIMIT))
+  const toShip = counts.confirmed || 0
 
   return (
-    <div>
-      <AdminHeader title="Orders" subtitle={`${counts.all || 0} orders`}>
-        {(counts.all || 0) > 0 && (
-          <Btn variant="danger" onClick={deleteAll} disabled={wiping}>
-            <Trash2 size={16} /> {wiping ? 'Deleting…' : 'Delete all'}
-          </Btn>
-        )}
-        <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
-      </AdminHeader>
+    <div className="max-w-5xl">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h1 className="font-display text-2xl sm:text-[28px] font-extrabold tracking-tight text-zinc-900">Orders</h1>
+          <p className="text-[13px] text-zinc-500 mt-1">
+            {toShip > 0
+              ? <><b className="text-zinc-800">{toShip} order{toShip === 1 ? '' : 's'}</b> waiting to ship</>
+              : 'Nothing waiting to ship'}
+            <span className="text-zinc-300 mx-1.5">·</span>{counts.all || 0} total
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {(counts.all || 0) > 0 && (
+            <button onClick={deleteAll} disabled={wiping} className="px-3 py-2 rounded-xl text-[13px] font-semibold text-red-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer disabled:opacity-50">
+              {wiping ? 'Deleting…' : 'Delete all'}
+            </button>
+          )}
+          <Btn onClick={() => setNewOpen(true)}><Plus size={16} /> New Order</Btn>
+        </div>
+      </div>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
       {shipFor && <ShipModal order={shipFor} delCfg={delCfg} srCfg={srCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
 
-      {/* Search */}
-      <div className="relative mb-4 max-w-sm">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search order no., name or phone…"
-          className="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 bg-white text-sm outline-none focus:border-[var(--gold)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--gold)_28%,transparent)]"
-        />
-      </div>
-
-      {/* Status filter tabs */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {STATUSES.map((s) => {
-          const active = filter === s
+      {/* ── Pipeline — tappable stage cards ARE the filter ──── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
+        {PIPELINE.map(({ key, label, icon: Icon, color }) => {
+          const active = filter === key
+          const n = countFor(key)
           return (
             <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold capitalize transition cursor-pointer border ${
-                active ? 'bg-gold-500 text-dark-950 border-gold-500' : 'bg-white dark:bg-stone-900 text-stone-500 border-cream-200 dark:border-stone-700 hover:border-gold-400'
-              }`}
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`text-left rounded-2xl p-3.5 sm:p-4 cursor-pointer transition-all ${active ? 'bg-white shadow-[0_10px_28px_-14px_rgba(0,0,0,0.25)]' : 'bg-white/60 ring-1 ring-zinc-200/60 hover:bg-white hover:shadow-[0_4px_16px_-10px_rgba(0,0,0,0.2)]'}`}
+              style={active ? { boxShadow: `0 10px 28px -14px rgba(0,0,0,0.25), inset 0 0 0 2px ${color}` } : undefined}
             >
-              {s} <span className={active ? 'opacity-70' : 'text-stone-400'}>({countFor(s)})</span>
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl grid place-items-center" style={{ background: `color-mix(in srgb, ${color} ${active ? 15 : 9}%, white)`, color }}>
+                  <Icon size={17} />
+                </div>
+                <span className="text-[22px] sm:text-2xl font-extrabold leading-none text-zinc-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+              </div>
+              <p className="text-[12px] font-bold mt-2.5" style={{ color: active ? color : '#71717a' }}>{label}</p>
             </button>
           )
         })}
       </div>
 
-      {/* Payment sub-filter — split Confirmed into "to collect" (COD) vs already paid */}
-      {filter === 'confirmed' && (
-        <div className="flex items-center gap-2 mb-4 -mt-1">
-          <span className="text-[11px] uppercase tracking-wider text-stone-400 font-bold mr-0.5">Payment</span>
-          <div className="inline-flex p-0.5 rounded-full bg-cream-100 dark:bg-stone-800">
+      {/* ── Toolbar: search + payment split ─────────────────── */}
+      <div className="flex flex-wrap items-center gap-2.5 mb-4">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search order, name or phone…"
+            className="w-full pr-3 py-2.5 rounded-xl ring-1 ring-zinc-200 bg-white text-sm outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--gold)_55%,transparent)] transition"
+            style={{ paddingLeft: 38 }}
+          />
+        </div>
+        {filter === 'confirmed' && (
+          <div className="inline-flex p-1 rounded-xl bg-zinc-200/60">
             {[
               { v: '', label: 'All', n: payCounts.all },
               { v: 'cod', label: 'COD', n: payCounts.cod },
@@ -288,204 +313,294 @@ export function AdminOrders() {
                 <button
                   key={v || 'all'}
                   onClick={() => setPayFilter(v)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${on ? 'bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-100 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${on ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
                 >
-                  {label} <span className={on ? 'text-stone-400' : 'text-stone-400'}>({n})</span>
+                  {label} <span className="font-semibold text-zinc-400">{n}</span>
                 </button>
               )
             })}
           </div>
-        </div>
-      )}
+        )}
+        {!loading && <span className="ml-auto hidden sm:block text-[12px] font-medium text-zinc-400">{total} result{total === 1 ? '' : 's'}</span>}
+      </div>
+
+      {/* ── List ─────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-gold-500" /></div>
+        <div className="rounded-2xl bg-white ring-1 ring-zinc-200/70 overflow-hidden divide-y divide-zinc-100">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
+              <div className="w-11 h-11 rounded-xl bg-zinc-100" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 w-40 bg-zinc-100 rounded-md" />
+                <div className="h-3 w-56 bg-zinc-100 rounded-md" />
+              </div>
+              <div className="h-4 w-16 bg-zinc-100 rounded-md" />
+            </div>
+          ))}
+        </div>
       ) : orders.length === 0 ? (
-        <p className="text-center py-20 text-stone-400">{q ? 'No matching orders.' : (counts.all === 0 ? 'No orders yet.' : `No ${filter} orders.`)}</p>
+        <div className="rounded-2xl bg-white ring-1 ring-zinc-200/70 py-16 flex flex-col items-center text-center px-6">
+          <div className="w-14 h-14 rounded-2xl grid place-items-center mb-3.5" style={{ background: 'color-mix(in srgb, var(--gold) 14%, white)' }}>
+            <Inbox size={24} style={{ color: 'var(--gold)' }} />
+          </div>
+          <p className="font-bold text-[15px] text-zinc-800">
+            {q ? 'No matching orders' : counts.all === 0 ? 'No orders yet' : `Nothing in ${PIPELINE.find((p) => p.key === filter)?.label || filter}`}
+          </p>
+          <p className="text-[13px] text-zinc-400 mt-1 max-w-xs">
+            {q ? 'Try a different order number, name or phone.' : counts.all === 0 ? 'New orders from the store will land here.' : 'Orders move here as their status changes.'}
+          </p>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="rounded-2xl bg-white ring-1 ring-zinc-200/70 overflow-hidden divide-y divide-zinc-100">
           {orders.map((o) => {
-            const isOpen = open === o._id
-            const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
-            const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-            const s = st(o.status)
             const pb = payBadge(o)
             const a = nextAction(o.status)
             const firstImg = (o.items || []).find((it) => it.image)?.image
+            const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
+            const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
             return (
-              <div key={o._id} className="rounded-2xl bg-white ring-1 ring-zinc-200/70 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_24px_-8px_rgba(0,0,0,0.15)] transition-shadow overflow-hidden">
-                {/* Header — tap anywhere to expand */}
-                <div className="p-4 sm:p-5 cursor-pointer" onClick={() => setOpen(isOpen ? null : o._id)}>
-                  <div className="flex items-start gap-3.5">
-                    {/* Thumbnail / avatar */}
-                    {firstImg ? (
-                      <img src={firstImg} alt="" className="w-12 h-12 rounded-2xl object-cover shrink-0 ring-1 ring-black/5" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-2xl grid place-items-center text-base font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark, #5a121c))' }}>{initial}</div>
-                    )}
+              <div
+                key={o._id}
+                onClick={() => setDrawer(o)}
+                className="group flex items-center gap-3 sm:gap-4 px-3.5 sm:px-5 py-3.5 cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--gold)_5%,white)]"
+              >
+                {firstImg ? (
+                  <img src={firstImg} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0 ring-1 ring-black/5" />
+                ) : (
+                  <div className="w-11 h-11 rounded-xl grid place-items-center text-[15px] font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark, #5a121c))' }}>{initial}</div>
+                )}
 
-                    {/* Identity */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-extrabold text-zinc-900 text-[15px] tracking-tight">{o.orderNo}</span>
-                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ring-1" style={{ background: `color-mix(in srgb, ${s.color} 10%, white)`, color: s.color, borderColor: 'transparent', boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${s.color} 20%, transparent)` }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{s.label}
-                        </span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
-                      </div>
-                      <p className="text-[15px] font-semibold text-zinc-800 truncate mt-1.5">{o.customer?.name}</p>
-                      <p className="text-[13px] text-zinc-400 mt-0.5">{date} · {o.items?.length} item{o.items?.length === 1 ? '' : 's'}</p>
-                      {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
-                        <p className="text-[11px] font-semibold mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md" style={{ background: 'color-mix(in srgb, #7c3aed 10%, transparent)', color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} paid · {fmt(o.total - o.advancePaid)} due</p>
-                      )}
-                    </div>
-
-                    {/* Total */}
-                    <div className="text-right shrink-0 pl-1">
-                      <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Total</p>
-                      <p className="text-xl sm:text-[22px] font-extrabold leading-tight mt-0.5" style={{ color: 'var(--maroon)', fontVariantNumeric: 'tabular-nums' }}>{fmt(o.total)}</p>
-                    </div>
-                  </div>
-
-                  {/* Action bar */}
-                  <div className="flex items-center justify-between gap-3 mt-3.5">
-                    <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-zinc-400">
-                      {isOpen ? 'Hide details' : 'View details'}
-                      {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                    </span>
-                    {a && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); advance(o) }}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] shadow-sm"
-                        style={{ background: 'var(--maroon)' }}
-                      >
-                        <a.icon size={15} /> {a.label}
-                      </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-[14px] text-zinc-900 tracking-tight">{o.orderNo}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
+                    {o.shipment?.waybill && o.shipment.provider !== 'manual' && (
+                      <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">{o.shipment.provider === 'shiprocket' ? 'Shiprocket' : 'Delhivery'}</span>
                     )}
                   </div>
+                  <p className="text-[13px] text-zinc-500 truncate mt-0.5">
+                    {o.customer?.name}
+                    <span className="text-zinc-300 mx-1">·</span>{date}
+                    <span className="text-zinc-300 mx-1">·</span>{o.items?.length} item{o.items?.length === 1 ? '' : 's'}
+                  </p>
+                  {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
+                    <p className="text-[11px] font-semibold mt-0.5" style={{ color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} · {fmt(o.total - o.advancePaid)} due</p>
+                  )}
                 </div>
 
-                {isOpen && (
-                  <div className="border-t border-zinc-100 bg-zinc-50/50 p-4 sm:p-5 space-y-4">
-                    {/* Progress */}
-                    <div className="bg-white rounded-2xl p-4 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
+                <span className="font-extrabold text-[15px] shrink-0" style={{ color: 'var(--maroon)', fontVariantNumeric: 'tabular-nums' }}>{fmt(o.total)}</span>
 
-                    {/* Courier shipment — waybill, live status, label + actions */}
-                    {o.shipment?.provider && o.shipment.provider !== 'manual' && o.shipment?.waybill && (
-                      <div className="rounded-xl px-3 py-3 text-sm" style={{ background: 'color-mix(in srgb, #6366f1 9%, transparent)' }}>
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <p className="font-semibold text-indigo-700 flex items-center gap-1.5"><Package size={14} /> {o.shipment.provider === 'shiprocket' ? 'Shiprocket' : 'Delhivery'}{o.shipment.courierName ? ` · ${o.shipment.courierName}` : ''} {o.shipment.mode && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold uppercase">{o.shipment.mode}</span>}</p>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-indigo-700 font-bold">{o.shipment.status || 'Booked'}</span>
-                        </div>
-                        <p className="text-zinc-600 mt-1.5">AWB <a href={o.shipment.trackingUrl || trackUrl(o.shipment.waybill)} target="_blank" rel="noopener noreferrer" className="font-mono font-semibold text-indigo-700 hover:underline">{o.shipment.waybill}</a>
-                          {o.shipment.codAmount > 0 && <> · collect <b>{fmt(o.shipment.codAmount)}</b></>}
-                          {o.shipment.weightGrams > 0 && <span className="text-zinc-400"> · {o.shipment.weightGrams} g</span>}
-                        </p>
-                        {o.shipment.statusDetail && <p className="text-xs text-zinc-500 mt-0.5">{o.shipment.statusDetail}</p>}
-                        <div className="flex items-center gap-2 flex-wrap mt-2.5">
-                          <a href={o.shipment.trackingUrl || trackUrl(o.shipment.waybill)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100 hover:bg-indigo-50 cursor-pointer"><ExternalLink size={12} /> Track</a>
-                          <button onClick={() => openLabel(o._id)} disabled={busy === `${o._id}:label`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100 hover:bg-indigo-50 cursor-pointer disabled:opacity-50"><FileText size={12} /> Label</button>
-                          <button onClick={() => shipmentAction(o._id, 'sync', 'sync-shipment')} disabled={busy === `${o._id}:sync`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-zinc-600 text-xs font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 cursor-pointer disabled:opacity-50"><RefreshCw size={12} className={busy === `${o._id}:sync` ? 'animate-spin' : ''} /> Sync</button>
-                          {o.shipment.status !== 'Cancelled' && o.status !== 'delivered' && (
-                            <button onClick={() => { if (window.confirm(`Cancel AWB ${o.shipment.waybill}?\n\nThis cancels the shipment with the courier and moves the order back to Confirmed (clearing the tracking) so you can re-book. Freight is refunded to your courier wallet if it hasn't been picked up.`)) shipmentAction(o._id, 'cancel', 'cancel-shipment', { revert: true }) }} disabled={busy === `${o._id}:cancel`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-red-600 text-xs font-semibold ring-1 ring-red-100 hover:bg-red-50 cursor-pointer disabled:opacity-50"><XCircle size={12} /> Cancel &amp; reset</button>
-                          )}
-                          {o.shipment.lastSyncedAt && <span className="text-[11px] text-zinc-400">Synced {new Date(o.shipment.lastSyncedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tracking message when shipped (manual courier note) */}
-                    {(o.status === 'shipped' || o.status === 'delivered') && o.tracking?.message && (!o.shipment?.provider || o.shipment.provider === 'manual') && (
-                      <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, #8b5cf6 8%, transparent)' }}>
-                        <p className="font-semibold text-violet-700 flex items-center gap-1.5"><Truck size={14} /> Tracking</p>
-                        <p className="text-zinc-600 mt-0.5 whitespace-pre-wrap break-words">{o.tracking.message}</p>
-                        <button onClick={() => setShipFor(o)} className="block mt-1.5 text-xs text-zinc-500 underline cursor-pointer">Edit message</button>
-                      </div>
-                    )}
-
-                    {/* Items + money breakdown */}
-                    <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
-                      <p className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Items</p>
-                      <div className="divide-y divide-zinc-50">
-                        {o.items.map((it, i) => (
-                          <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-50 shrink-0 ring-1 ring-zinc-100">
-                              {it.image && <img src={it.image} alt="" className="w-full h-full object-cover" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[14px] font-semibold text-zinc-800 truncate">{it.name}</p>
-                              <p className="text-[12px] text-zinc-400">{it.qty} × {fmt(it.price)}</p>
-                            </div>
-                            <span className="text-[14px] font-bold text-zinc-900 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(it.price * it.qty)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="px-4 py-3 border-t border-zinc-100 space-y-1.5 text-[13px]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        <div className="flex justify-between text-zinc-500"><span>Subtotal</span><span>{fmt(o.subtotal)}</span></div>
-                        {o.shipping > 0 && <div className="flex justify-between text-zinc-500"><span>Shipping</span><span>{fmt(o.shipping)}</span></div>}
-                        {o.codFee > 0 && <div className="flex justify-between text-zinc-500"><span>COD fee</span><span>{fmt(o.codFee)}</span></div>}
-                        {o.discount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount{o.couponCode ? ` · ${o.couponCode}` : ''}</span><span>−{fmt(o.discount)}</span></div>}
-                        <div className="flex justify-between items-center pt-1.5 mt-0.5 border-t border-zinc-100">
-                          <span className="text-[13px] font-bold text-zinc-700">Total</span>
-                          <span className="text-[16px] font-extrabold" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {/* Customer */}
-                      <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Customer</p>
-                        <p className="font-bold text-[15px] text-zinc-900">{o.customer?.name}</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <a href={`tel:${o.customer?.phone}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 transition" style={{ color: 'var(--maroon)' }}><Phone size={13} />{o.customer?.phone}</a>
-                          {o.customer?.email && <a href={`mailto:${o.customer.email}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-zinc-500 ring-1 ring-zinc-200 hover:bg-zinc-50 transition max-w-full truncate">{o.customer.email}</a>}
-                        </div>
-                        {(o.address?.line1 || o.address?.city) && (
-                          <div className="mt-3 flex gap-2 text-[13px] text-zinc-600 leading-relaxed">
-                            <MapPin size={14} className="shrink-0 mt-0.5 text-zinc-400" />
-                            <span>{[o.address.line1, o.address.line2, o.address.landmark && `Near ${o.address.landmark}`, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</span>
-                          </div>
-                        )}
-                        {o.notes && <p className="text-[13px] text-zinc-500 mt-3 pl-3 border-l-2 border-zinc-200 italic">“{o.notes}”</p>}
-                      </div>
-
-                      {/* Payment + stage */}
-                      <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Payment</p>
-                        {o.advancePaid > 0 && (
-                          <p className="text-[12px] text-zinc-600 mb-2.5 px-2.5 py-1.5 rounded-lg" style={{ background: 'color-mix(in srgb, #7c3aed 8%, transparent)' }}>Advance <b>{fmt(o.advancePaid)}</b> paid online · <b>{fmt(o.total - o.advancePaid)}</b> due on delivery</p>
-                        )}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Dropdown value={o.paymentMethod || 'cod'} onChange={(v) => patchOrder(o._id, { paymentMethod: v })} align="left" options={PAY_METHODS} />
-                          <button
-                            onClick={() => patchOrder(o._id, { paymentStatus: o.paymentStatus === 'paid' ? 'unpaid' : 'paid' })}
-                            className={`px-3.5 py-2 rounded-lg text-[13px] font-bold cursor-pointer transition ${o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                          >
-                            {o.paymentStatus === 'paid' ? <><Check size={14} className="inline -mt-0.5" /> Paid</> : 'Mark paid'}
-                          </button>
-                        </div>
-
-                        <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2 font-bold mt-4">Change stage</p>
-                        <Dropdown value={o.status === 'pending' ? 'confirmed' : o.status} onChange={(v) => setStatus(o._id, v)} align="left" className="w-full" options={STATUSES.map((v) => ({ value: v, label: v }))} />
-                      </div>
-                    </div>
-                  </div>
+                {a && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); advance(o) }}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-[12px] font-bold cursor-pointer transition-colors bg-white ring-1 ring-zinc-200 text-[var(--maroon)] hover:bg-[var(--maroon)] hover:text-white hover:ring-[var(--maroon)]"
+                  >
+                    <a.icon size={14} /><span className="hidden sm:inline">{a.label}</span>
+                  </button>
                 )}
+
+                <ChevronRight size={16} className="shrink-0 text-zinc-300 group-hover:text-zinc-500 group-hover:translate-x-0.5 transition-all" />
               </div>
             )
           })}
         </div>
       )}
 
+      {/* ── Pagination ──────────────────────────────────────── */}
       {!loading && pages > 1 && (
-        <div className="flex items-center justify-between mt-5 text-sm">
-          <span className="text-zinc-400">Page {page} of {pages} · {total} orders</span>
-          <div className="flex gap-2">
-            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="w-9 h-9 grid place-items-center rounded-lg border border-zinc-300 bg-white disabled:opacity-40 cursor-pointer"><ChevronLeft size={16} /></button>
-            <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="w-9 h-9 grid place-items-center rounded-lg border border-zinc-300 bg-white disabled:opacity-40 cursor-pointer"><ChevronRight size={16} /></button>
-          </div>
+        <div className="flex items-center justify-center gap-4 mt-5">
+          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="w-9 h-9 grid place-items-center rounded-xl bg-white ring-1 ring-zinc-200 hover:ring-zinc-300 disabled:opacity-40 cursor-pointer transition"><ChevronLeft size={16} /></button>
+          <span className="text-[13px] font-bold text-zinc-500" style={{ fontVariantNumeric: 'tabular-nums' }}>{page} <span className="text-zinc-300 font-medium">/</span> {pages}</span>
+          <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="w-9 h-9 grid place-items-center rounded-xl bg-white ring-1 ring-zinc-200 hover:ring-zinc-300 disabled:opacity-40 cursor-pointer transition"><ChevronRight size={16} /></button>
         </div>
       )}
+
+      {/* ── Detail drawer ───────────────────────────────────── */}
+      {drawer && (
+        <OrderDrawer
+          o={drawer}
+          busy={busy}
+          onClose={() => setDrawer(null)}
+          onAdvance={advance}
+          onPatch={patchOrder}
+          onSetStatus={setStatus}
+          onShipEdit={setShipFor}
+          onShipmentAction={shipmentAction}
+          onOpenLabel={openLabel}
+        />
+      )}
+    </div>
+  )
+}
+
+// Slide-over panel with the complete order: progress, courier shipment,
+// items + money breakdown, customer, payment. All actions live here.
+function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShipEdit, onShipmentAction, onOpenLabel }) {
+  const [show, setShow] = useState(false)
+  const close = () => { setShow(false); setTimeout(onClose, 200) }
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShow(true))
+    const onKey = (e) => { if (e.key === 'Escape') close() }
+    window.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      cancelAnimationFrame(id)
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, []) // eslint-disable-line
+
+  const s = st(o.status)
+  const pb = payBadge(o)
+  const a = nextAction(o.status)
+  const sh = o.shipment
+  const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className={`absolute inset-0 bg-zinc-900/40 transition-opacity duration-200 ${show ? 'opacity-100' : 'opacity-0'}`} onClick={close} />
+      <div className={`absolute right-0 top-0 h-full w-full sm:w-[460px] bg-zinc-50 shadow-2xl flex flex-col transition-transform duration-200 ease-out ${show ? 'translate-x-0' : 'translate-x-full'}`}>
+
+        {/* Drawer header */}
+        <div className="bg-white px-4 sm:px-5 pt-4 pb-4 border-b border-zinc-100 shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-extrabold text-[17px] text-zinc-900 tracking-tight">{o.orderNo}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" style={{ background: `color-mix(in srgb, ${s.color} 11%, white)`, color: s.color, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${s.color} 22%, transparent)` }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{s.label}
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
+              </div>
+              <p className="text-[13px] text-zinc-400 mt-1">{date} · {o.items?.length} item{o.items?.length === 1 ? '' : 's'}</p>
+            </div>
+            <button onClick={close} className="w-9 h-9 grid place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer transition shrink-0" aria-label="Close">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="flex items-end justify-between gap-3 mt-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Total</p>
+              <p className="text-[26px] font-extrabold leading-tight" style={{ color: 'var(--maroon)', fontVariantNumeric: 'tabular-nums' }}>{fmt(o.total)}</p>
+              {o.advancePaid > 0 && o.paymentStatus !== 'paid' && (
+                <p className="text-[11px] font-semibold" style={{ color: '#7c3aed' }}>Advance {fmt(o.advancePaid)} paid · {fmt(o.total - o.advancePaid)} due</p>
+              )}
+            </div>
+            {a && (
+              <button
+                onClick={() => onAdvance(o)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] shadow-sm shrink-0"
+                style={{ background: 'var(--maroon)' }}
+              >
+                <a.icon size={15} /> {a.label}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Drawer body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+          {/* Progress */}
+          <div className="bg-white rounded-2xl p-4 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
+
+          {/* Courier shipment — waybill, live status, label + actions */}
+          {sh?.provider && sh.provider !== 'manual' && sh?.waybill && (
+            <div className="rounded-2xl px-4 py-3.5 text-sm" style={{ background: 'color-mix(in srgb, #6366f1 9%, white)' }}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="font-semibold text-indigo-700 flex items-center gap-1.5"><Package size={14} /> {sh.provider === 'shiprocket' ? 'Shiprocket' : 'Delhivery'}{sh.courierName ? ` · ${sh.courierName}` : ''} {sh.mode && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold uppercase">{sh.mode}</span>}</p>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-indigo-700 font-bold">{sh.status || 'Booked'}</span>
+              </div>
+              <p className="text-zinc-600 mt-1.5">AWB <a href={sh.trackingUrl || trackUrl(sh.waybill)} target="_blank" rel="noopener noreferrer" className="font-mono font-semibold text-indigo-700 hover:underline">{sh.waybill}</a>
+                {sh.codAmount > 0 && <> · collect <b>{fmt(sh.codAmount)}</b></>}
+                {sh.weightGrams > 0 && <span className="text-zinc-400"> · {sh.weightGrams} g</span>}
+              </p>
+              {sh.statusDetail && <p className="text-xs text-zinc-500 mt-0.5">{sh.statusDetail}</p>}
+              <div className="flex items-center gap-2 flex-wrap mt-2.5">
+                <a href={sh.trackingUrl || trackUrl(sh.waybill)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100 hover:bg-indigo-50 cursor-pointer"><ExternalLink size={12} /> Track</a>
+                <button onClick={() => onOpenLabel(o._id)} disabled={busy === `${o._id}:label`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-indigo-700 text-xs font-semibold ring-1 ring-indigo-100 hover:bg-indigo-50 cursor-pointer disabled:opacity-50"><FileText size={12} /> Label</button>
+                <button onClick={() => onShipmentAction(o._id, 'sync', 'sync-shipment')} disabled={busy === `${o._id}:sync`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-zinc-600 text-xs font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 cursor-pointer disabled:opacity-50"><RefreshCw size={12} className={busy === `${o._id}:sync` ? 'animate-spin' : ''} /> Sync</button>
+                {sh.status !== 'Cancelled' && o.status !== 'delivered' && (
+                  <button onClick={() => { if (window.confirm(`Cancel AWB ${sh.waybill}?\n\nThis cancels the shipment with the courier and moves the order back to Confirmed (clearing the tracking) so you can re-book. Freight is refunded to your courier wallet if it hasn't been picked up.`)) onShipmentAction(o._id, 'cancel', 'cancel-shipment', { revert: true }) }} disabled={busy === `${o._id}:cancel`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-red-600 text-xs font-semibold ring-1 ring-red-100 hover:bg-red-50 cursor-pointer disabled:opacity-50"><XCircle size={12} /> Cancel &amp; reset</button>
+                )}
+              </div>
+              {sh.lastSyncedAt && <p className="text-[11px] text-zinc-400 mt-2">Synced {new Date(sh.lastSyncedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
+            </div>
+          )}
+
+          {/* Tracking message when shipped (manual courier note) */}
+          {(o.status === 'shipped' || o.status === 'delivered') && o.tracking?.message && (!sh?.provider || sh.provider === 'manual') && (
+            <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #8b5cf6 8%, white)' }}>
+              <p className="font-semibold text-violet-700 flex items-center gap-1.5"><Truck size={14} /> Tracking</p>
+              <p className="text-zinc-600 mt-0.5 whitespace-pre-wrap break-words">{o.tracking.message}</p>
+              <button onClick={() => onShipEdit(o)} className="block mt-1.5 text-xs text-zinc-500 underline cursor-pointer">Edit message</button>
+            </div>
+          )}
+
+          {/* Items + money breakdown */}
+          <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
+            <p className="px-4 pt-3 pb-2 text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Items</p>
+            <div className="divide-y divide-zinc-50">
+              {o.items.map((it, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-50 shrink-0 ring-1 ring-zinc-100">
+                    {it.image && <img src={it.image} alt="" className="w-full h-full object-cover" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-semibold text-zinc-800 truncate">{it.name}</p>
+                    <p className="text-[12px] text-zinc-400">{it.qty} × {fmt(it.price)}</p>
+                  </div>
+                  <span className="text-[14px] font-bold text-zinc-900 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(it.price * it.qty)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-3 border-t border-zinc-100 space-y-1.5 text-[13px]" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <div className="flex justify-between text-zinc-500"><span>Subtotal</span><span>{fmt(o.subtotal)}</span></div>
+              {o.shipping > 0 && <div className="flex justify-between text-zinc-500"><span>Shipping</span><span>{fmt(o.shipping)}</span></div>}
+              {o.codFee > 0 && <div className="flex justify-between text-zinc-500"><span>COD fee</span><span>{fmt(o.codFee)}</span></div>}
+              {o.discount > 0 && <div className="flex justify-between text-emerald-600"><span>Discount{o.couponCode ? ` · ${o.couponCode}` : ''}</span><span>−{fmt(o.discount)}</span></div>}
+              <div className="flex justify-between items-center pt-1.5 mt-0.5 border-t border-zinc-100">
+                <span className="text-[13px] font-bold text-zinc-700">Total</span>
+                <span className="text-[16px] font-extrabold" style={{ color: 'var(--maroon)' }}>{fmt(o.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Customer */}
+          <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Customer</p>
+            <p className="font-bold text-[15px] text-zinc-900">{o.customer?.name}</p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <a href={`tel:${o.customer?.phone}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 transition" style={{ color: 'var(--maroon)' }}><Phone size={13} />{o.customer?.phone}</a>
+              {o.customer?.email && <a href={`mailto:${o.customer.email}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-zinc-500 ring-1 ring-zinc-200 hover:bg-zinc-50 transition max-w-full truncate">{o.customer.email}</a>}
+            </div>
+            {(o.address?.line1 || o.address?.city) && (
+              <div className="mt-3 flex gap-2 text-[13px] text-zinc-600 leading-relaxed">
+                <MapPin size={14} className="shrink-0 mt-0.5 text-zinc-400" />
+                <span>{[o.address.line1, o.address.line2, o.address.landmark && `Near ${o.address.landmark}`, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</span>
+              </div>
+            )}
+            {o.notes && <p className="text-[13px] text-zinc-500 mt-3 pl-3 border-l-2 border-zinc-200 italic">“{o.notes}”</p>}
+          </div>
+
+          {/* Payment + stage override */}
+          <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Payment</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Dropdown value={o.paymentMethod || 'cod'} onChange={(v) => onPatch(o._id, { paymentMethod: v })} align="left" options={PAY_METHODS} />
+              <button
+                onClick={() => onPatch(o._id, { paymentStatus: o.paymentStatus === 'paid' ? 'unpaid' : 'paid' })}
+                className={`px-3.5 py-2 rounded-lg text-[13px] font-bold cursor-pointer transition ${o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+              >
+                {o.paymentStatus === 'paid' ? <><Check size={14} className="inline -mt-0.5" /> Paid</> : 'Mark paid'}
+              </button>
+            </div>
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2 font-bold mt-4">Change stage</p>
+            <Dropdown value={o.status === 'pending' ? 'confirmed' : o.status} onChange={(v) => onSetStatus(o._id, v)} align="left" className="w-full" options={STATUSES.map((v) => ({ value: v, label: v }))} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
