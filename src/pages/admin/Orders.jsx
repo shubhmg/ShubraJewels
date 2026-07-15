@@ -106,10 +106,11 @@ function groupByDay(orders) {
   return groups
 }
 
-// Payment badge — Paid, advance-paid COD, else COD.
+// Payment badge — Paid or COD. A COD order with an advance is STILL a COD
+// order (balance collected on delivery); the advance shows as a detail line,
+// not as its own badge.
 function payBadge(o) {
   if (o.paymentStatus === 'paid') return { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' }
-  if (o.advancePaid > 0) return { label: 'Advance paid', cls: 'bg-blue-100 text-blue-700' }
   if (o.paymentMethod === 'upi') return { label: 'UPI', cls: 'bg-blue-100 text-blue-700' }
   return { label: 'COD', cls: 'bg-amber-100 text-amber-700' }
 }
