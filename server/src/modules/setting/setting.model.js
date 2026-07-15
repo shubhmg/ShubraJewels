@@ -150,6 +150,25 @@ const settingSchema = new mongoose.Schema(
       productDesc: { type: String, default: 'Imitation jewellery (jhumka)' },
     },
 
+    // Shiprocket courier aggregator. `email`/`password` are SECRET (used to mint
+    // the JWT via the login API; stripped from the public GET /settings). `token`
+    // + `tokenExpiry` cache that JWT (~10-day life). `policy` mirrors Delhivery:
+    //   all | cod | prepaid | manual.
+    shiprocket: {
+      enabled: { type: Boolean, default: false },
+      email: { type: String, default: '' },            // Shiprocket account email (secret)
+      password: { type: String, default: '' },         // Shiprocket API password (secret)
+      token: { type: String, default: '' },            // cached JWT (secret)
+      tokenExpiry: { type: Date, default: null },
+      policy: { type: String, enum: ['all', 'cod', 'prepaid', 'manual'], default: 'manual' },
+      pickupLocation: { type: String, default: '' },   // pickup nickname registered in Shiprocket
+      pickupPin: { type: String, default: '' },         // pickup PIN (for serviceability checks)
+      defaultWeightKg: { type: Number, default: 0.3 }, // per-unit weight (kg), × qty
+      length: { type: Number, default: 12 },           // parcel dims (cm)
+      breadth: { type: Number, default: 10 },
+      height: { type: Number, default: 5 },
+    },
+
     // Order notifications. SECRET — the Telegram bot token must never be sent to
     // the public storefront; the /settings GET strips `notifications` and the
     // admin panel reads it via GET /settings/admin.

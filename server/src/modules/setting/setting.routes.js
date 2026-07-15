@@ -4,6 +4,7 @@ import asyncHandler from '../../utils/asyncHandler.js';
 import { getSettings } from './setting.model.js';
 import { sendTelegram } from '../../utils/notify.js';
 import { checkServiceability } from '../../utils/delhivery.js';
+import { ensureToken as ensureShiprocketToken } from '../../utils/shiprocket.js';
 
 const router = express.Router();
 
@@ -15,7 +16,8 @@ router.get(
     const doc = await getSettings();
     const obj = doc.toObject();
     delete obj.notifications;
-    delete obj.delhivery; // courier config incl. API token — admin-only
+    delete obj.delhivery;  // courier config incl. API token — admin-only
+    delete obj.shiprocket; // courier config incl. email/password/JWT — admin-only
     res.json({ success: true, data: obj });
   })
 );
@@ -36,7 +38,7 @@ router.patch(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const doc = await getSettings();
-    const { theme, homepage, shipping, about, content, notifications, delhivery, ...rest } = req.body || {};
+    const { theme, homepage, shipping, about, content, notifications, delhivery, shiprocket, ...rest } = req.body || {};
     Object.assign(doc, rest);
     if (about && typeof about === 'object') {
       doc.about = about; // admin sends the full object (eyebrow, heading, image, paragraphs[], values[])
@@ -68,6 +70,17 @@ router.patch(
       doc.delhivery = { ...cur, ...delhivery };
       doc.markModified('delhivery');
     }
+    if (shiprocket && typeof shiprocket === 'object') {
+      const cur = doc.shiprocket?.toObject?.() || doc.shiprocket || {};
+      const next = { ...cur, ...shiprocket };
+      // If the login credentials changed, drop the cached JWT so it re-logs in.
+      if ((shiprocket.email && shiprocket.email !== cur.email) || (shiprocket.password && shiprocket.password !== cur.password)) {
+        next.token = '';
+        next.tokenExpiry = null;
+      }
+      doc.shiprocket = next;
+      doc.markModified('shiprocket');
+    }
     if (homepage && typeof homepage === 'object') {
       doc.homepage = homepage; // admin editor sends the full object (hero + ordered sections)
       doc.markModified('homepage');
@@ -76,6 +89,7 @@ router.patch(
     const obj = doc.toObject();
     delete obj.notifications;
     delete obj.delhivery;
+    delete obj.shiprocket;
     res.json({ success: true, data: obj });
   })
 );
@@ -103,6 +117,18 @@ router.post(
     const r = await checkServiceability(doc, pin);
     if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Delhivery check failed. Verify the API token.' });
     res.json({ success: true, data: { pin, ...r } });
+  })
+);
+
+// Admin: verify Shiprocket credentials by logging in (mints + caches the JWT).
+router.post(
+  '/test-shiprocket',
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const doc = await getSettings();
+    const r = await ensureShiprocketToken(doc);
+    if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Shiprocket login failed. Check the email and API password.' });
+    res.json({ success: true, data: { loggedIn: true } });
   })
 );
 

@@ -84,6 +84,8 @@ export function Field({ field, value, onChange }) {
         return <textarea rows={field.rows || 3} value={v} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={`${inputCls} resize-none`} />
       case 'number':
         return <input type="number" value={v} placeholder={placeholder} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} className={inputCls} />
+      case 'password':
+        return <input type="password" value={v} placeholder={placeholder} autoComplete="new-password" onChange={(e) => onChange(e.target.value)} className={inputCls} />
       case 'toggle':
         return <Toggle checked={!!value} onChange={onChange} />
       case 'select':

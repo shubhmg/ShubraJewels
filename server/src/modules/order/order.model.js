@@ -55,9 +55,13 @@ const orderSchema = new mongoose.Schema(
     // waybill was booked via the API; `waybill` + `status` + `labelUrl` are set
     // from Delhivery and refreshed by the sync action.
     shipment: {
-      provider: { type: String, enum: ['manual', 'delhivery'], default: 'manual' },
-      waybill: { type: String, default: '' },
-      mode: { type: String, default: '' },          // 'COD' | 'Prepaid' (as sent to Delhivery)
+      provider: { type: String, enum: ['manual', 'delhivery', 'shiprocket'], default: 'manual' },
+      waybill: { type: String, default: '' },           // AWB / tracking number
+      shipmentId: { type: String, default: '' },        // Shiprocket shipment id (for label/pickup)
+      srOrderId: { type: String, default: '' },         // Shiprocket internal order id (for cancel)
+      courierName: { type: String, default: '' },       // assigned courier (Shiprocket)
+      trackingUrl: { type: String, default: '' },       // public track URL (provider-specific)
+      mode: { type: String, default: '' },          // 'COD' | 'Prepaid' (as sent to the courier)
       codAmount: { type: Number, default: 0 },        // amount to collect on delivery
       weightGrams: { type: Number, default: 0 },      // weight declared to the courier
       status: { type: String, default: '' },          // latest courier status

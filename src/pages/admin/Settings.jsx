@@ -81,12 +81,25 @@ export function AdminSettings() {
   const [tab, setTab] = useState('brand')
   const [tgTest, setTgTest] = useState(null) // { ok, msg } after a test send
   const [dlTest, setDlTest] = useState(null) // Delhivery connection test result
+  const [srTest, setSrTest] = useState(null) // Shiprocket connection test result
 
   // Admin endpoint returns secrets (Telegram + Delhivery tokens) the public GET strips.
   useEffect(() => { api.get('/settings/admin', { auth: true }).then(setS) }, [])
 
   const setTg = (k, v) => setS((p) => ({ ...p, notifications: { ...p.notifications, telegram: { ...p.notifications?.telegram, [k]: v } } }))
   const setDel = (k, v) => setS((p) => ({ ...p, delhivery: { ...p.delhivery, [k]: v } }))
+  const setSr = (k, v) => setS((p) => ({ ...p, shiprocket: { ...p.shiprocket, [k]: v } }))
+
+  const testShiprocket = async () => {
+    setSrTest({ loading: true })
+    try {
+      await api.patch('/settings', { shiprocket: s.shiprocket }, { auth: true }) // save first so the test uses current values
+      await api.post('/settings/test-shiprocket', {}, { auth: true })
+      setSrTest({ ok: true, msg: 'Connected ✓  Shiprocket login works.' })
+    } catch (e) {
+      setSrTest({ ok: false, msg: e.message || 'Login failed. Check the email and API password.' })
+    }
+  }
 
   const testDelhivery = async () => {
     setDlTest({ loading: true })
@@ -135,6 +148,13 @@ export function AdminSettings() {
           codAdvance: { ...(pay.codAdvance || {}), percent: Number(pay.codAdvance?.percent) || 0 },
         },
         ...(s.delhivery ? { delhivery: { ...s.delhivery, defaultWeightGrams: Number(s.delhivery.defaultWeightGrams) || 100 } } : {}),
+        ...(s.shiprocket ? { shiprocket: {
+          ...s.shiprocket,
+          defaultWeightKg: Number(s.shiprocket.defaultWeightKg) || 0.3,
+          length: Number(s.shiprocket.length) || 12,
+          breadth: Number(s.shiprocket.breadth) || 10,
+          height: Number(s.shiprocket.height) || 5,
+        } } : {}),
       }
       await api.patch('/settings', payload, { auth: true })
       await refresh()
@@ -327,6 +347,65 @@ export function AdminSettings() {
                 </Btn>
                 {dlTest && !dlTest.loading && (
                   <span className="text-sm font-medium" style={{ color: dlTest.ok ? '#15803d' : '#b91c1c' }}>{dlTest.msg}</span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>
+            </>
+          )}
+        </div>
+      </Section>
+      )}
+
+      {tab === 'payments' && (
+      <Section title="Shiprocket Shipping (automated)" subtitle="Book couriers through Shiprocket (Delhivery, Bluedart, Xpressbees & more under one account). Credentials are private and never shown on the website.">
+        <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
+          <p className="font-semibold mb-1.5">One-time setup</p>
+          <ol className="list-decimal ml-5 space-y-1 text-zinc-600 text-[13px]">
+            <li>In Shiprocket → <b>Settings → API → Configure</b>, create an <b>API user</b> (a separate email + password just for the API).</li>
+            <li>Add a <b>Pickup Location</b> in Shiprocket (Settings → Pickup Addresses) and note its <b>nickname</b> + PIN.</li>
+            <li>Paste them below, pick a policy, and hit <b>Test connection</b>.</li>
+          </ol>
+          <p className="text-xs text-zinc-500 mt-2">Same policy meaning as Delhivery: all / COD only / prepaid only / manual. If both couriers are enabled, the ship dialog lets you pick per order.</p>
+        </div>
+
+        <div className="space-y-4">
+          <Field field={{ label: 'Enable Shiprocket integration', type: 'toggle' }} value={!!s.shiprocket?.enabled} onChange={(v) => setSr('enabled', v)} />
+
+          {s.shiprocket?.enabled && (
+            <>
+              <Field field={{ label: 'Automation policy', type: 'select', options: [
+                { value: 'manual', label: 'Manual — I press the button per order' },
+                { value: 'all', label: 'All orders' },
+                { value: 'cod', label: 'COD orders only' },
+                { value: 'prepaid', label: 'Prepaid orders only' },
+              ] }} value={s.shiprocket?.policy || 'manual'} onChange={(v) => setSr('policy', v)} />
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Field field={{ label: 'API user email', placeholder: 'api-user@…', help: 'The dedicated API user, not your main login. Kept private.' }} value={s.shiprocket?.email || ''} onChange={(v) => setSr('email', v.trim())} />
+                <Field field={{ label: 'API password', type: 'password', placeholder: '••••••••', help: 'The API user’s password. Stored privately, never shown on the site.' }} value={s.shiprocket?.password || ''} onChange={(v) => setSr('password', v)} />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Field field={{ label: 'Pickup location nickname', placeholder: 'e.g. Primary', help: 'Exactly as named in Shiprocket → Pickup Addresses.' }} value={s.shiprocket?.pickupLocation || ''} onChange={(v) => setSr('pickupLocation', v)} />
+                <Field field={{ label: 'Pickup PIN', placeholder: '302001', help: 'Your pickup pincode — used to check serviceability.' }} value={s.shiprocket?.pickupPin || ''} onChange={(v) => setSr('pickupPin', v)} />
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Default parcel</p>
+                <Field field={{ label: 'Default weight per item (kg)', type: 'number', placeholder: '0.3', help: 'Used when a product has no weight. Multiplied by total quantity.' }} value={s.shiprocket?.defaultWeightKg ?? ''} onChange={(v) => setSr('defaultWeightKg', v === '' ? '' : Number(v))} />
+                <div className="grid grid-cols-3 gap-3">
+                  <Field field={{ label: 'Length (cm)', type: 'number' }} value={s.shiprocket?.length ?? ''} onChange={(v) => setSr('length', v === '' ? '' : Number(v))} />
+                  <Field field={{ label: 'Breadth (cm)', type: 'number' }} value={s.shiprocket?.breadth ?? ''} onChange={(v) => setSr('breadth', v === '' ? '' : Number(v))} />
+                  <Field field={{ label: 'Height (cm)', type: 'number' }} value={s.shiprocket?.height ?? ''} onChange={(v) => setSr('height', v === '' ? '' : Number(v))} />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <Btn variant="outline" onClick={testShiprocket} disabled={srTest?.loading || !s.shiprocket?.email || !s.shiprocket?.password}>
+                  {srTest?.loading ? 'Checking…' : 'Test connection'}
+                </Btn>
+                {srTest && !srTest.loading && (
+                  <span className="text-sm font-medium" style={{ color: srTest.ok ? '#15803d' : '#b91c1c' }}>{srTest.msg}</span>
                 )}
               </div>
               <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>
