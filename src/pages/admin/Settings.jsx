@@ -278,6 +278,37 @@ export function AdminSettings() {
       )}
 
       {tab === 'payments' && (
+      <Section title="Shipping Routing" subtitle="How each order should be shipped. The ship dialog opens on the recommended option and tags it — you can always switch on any specific order.">
+        <div className="grid sm:grid-cols-2 gap-2.5">
+          {[
+            { v: 'all', title: 'Courier for everything', desc: 'Every order recommends Shiprocket.' },
+            { v: 'cod', title: 'Courier for COD only', desc: 'COD → Shiprocket. Prepaid → manual note.' },
+            { v: 'prepaid', title: 'Courier for prepaid only', desc: 'Prepaid → Shiprocket. COD → manual note.' },
+            { v: 'manual', title: 'No recommendation', desc: 'Ask on every order, nothing preselected.' },
+          ].map(({ v, title, desc }) => {
+            const on = (s.shippingRouting || s.shiprocket?.policy || 'manual') === v
+            return (
+              <button
+                key={v}
+                onClick={() => set('shippingRouting', v)}
+                className="text-left rounded-2xl p-4 cursor-pointer transition-all"
+                style={on
+                  ? { background: 'color-mix(in srgb, var(--maroon) 7%, white)', boxShadow: 'inset 0 0 0 2px var(--maroon)' }
+                  : { background: '#fff', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[14px] font-bold" style={{ color: on ? 'var(--maroon)' : '#3f3f46' }}>{title}</p>
+                  {on && <Check size={16} strokeWidth={3} style={{ color: 'var(--maroon)' }} className="shrink-0" />}
+                </div>
+                <p className="text-[12px] text-zinc-500 mt-1 leading-relaxed">{desc}</p>
+              </button>
+            )
+          })}
+        </div>
+      </Section>
+      )}
+
+      {tab === 'payments' && (
       <Section title="Shiprocket Shipping (automated)" subtitle="Book couriers through Shiprocket (Delhivery, Bluedart, Xpressbees & more under one account). Credentials are private and never shown on the website.">
         <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
           <p className="font-semibold mb-1.5">One-time setup</p>
@@ -286,7 +317,6 @@ export function AdminSettings() {
             <li>Add a <b>Pickup Location</b> in Shiprocket (Settings → Pickup Addresses) and note its <b>nickname</b> + PIN.</li>
             <li>Paste them below, pick a policy, and hit <b>Test connection</b>.</li>
           </ol>
-          <p className="text-xs text-zinc-500 mt-2">Policy: all / COD only / prepaid only / manual. Orders outside the policy (or with Shiprocket off) still ship via a manual tracking note.</p>
         </div>
 
         <div className="space-y-4">
@@ -294,13 +324,6 @@ export function AdminSettings() {
 
           {s.shiprocket?.enabled && (
             <>
-              <Field field={{ label: 'Routing policy', type: 'select', help: 'Which ship option opens first when you press Mark Shipped. You can always switch tabs on a specific order.', options: [
-                { value: 'all', label: 'Shiprocket for all orders' },
-                { value: 'cod', label: 'Shiprocket for COD · manual for prepaid' },
-                { value: 'prepaid', label: 'Shiprocket for prepaid · manual for COD' },
-                { value: 'manual', label: 'Manual note first — I pick per order' },
-              ] }} value={s.shiprocket?.policy || 'manual'} onChange={(v) => setSr('policy', v)} />
-
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field field={{ label: 'API user email', placeholder: 'api-user@…', help: 'The dedicated API user, not your main login. Kept private.' }} value={s.shiprocket?.email || ''} onChange={(v) => setSr('email', v.trim())} />
                 <Field field={{ label: 'API password', type: 'password', placeholder: '••••••••', help: 'The API user’s password. Stored privately, never shown on the site.' }} value={s.shiprocket?.password || ''} onChange={(v) => setSr('password', v)} />

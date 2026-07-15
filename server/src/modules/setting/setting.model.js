@@ -130,6 +130,13 @@ const settingSchema = new mongoose.Schema(
       prepaidFreeShipping: { type: Boolean, default: false },
     },
 
+    // Generic shipping routing — which ship option the admin's ship dialog
+    // RECOMMENDS per order (they can always switch on a specific order):
+    //   all = courier for everything · cod = courier for COD, manual for prepaid
+    //   prepaid = the reverse · manual = no recommendation, ask every time.
+    // '' = unset (falls back to shiprocket.policy, then 'manual').
+    shippingRouting: { type: String, enum: ['', 'all', 'cod', 'prepaid', 'manual'], default: '' },
+
     // Shiprocket courier aggregator. `email`/`password` are SECRET (used to mint
     // the JWT via the login API; stripped from the public GET /settings). `token`
     // + `tokenExpiry` cache that JWT (~10-day life). `policy` decides which orders

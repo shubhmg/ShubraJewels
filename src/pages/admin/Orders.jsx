@@ -124,6 +124,7 @@ export function AdminOrders() {
           hasPin: !!r.pickupPin,
           ready: !!(r.enabled && r.email && r.password && r.pickupLocation),
           defaultWeightKg: Number(r.defaultWeightKg) || 0.3,
+          routing: s?.shippingRouting || r.policy || 'manual',
         })
       })
       .catch(() => setSrCfg({ enabled: false, ready: false }))
@@ -935,18 +936,19 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
   if (!alreadyShipped && srCfg?.enabled) tabs.push({ v: 'shiprocket', label: 'Shiprocket' })
   tabs.push({ v: 'manual', label: 'Manual note' })
 
-  // The admin's routing policy decides which tab opens by default (they can
-  // always tap the other): all → Shiprocket for everything; cod → Shiprocket
-  // for COD, manual for prepaid; prepaid → the reverse; manual → manual first.
-  const policyRoutes = (() => {
-    if (!srReady) return false
-    const pol = srCfg?.policy || 'manual'
-    if (pol === 'all') return true
-    if (pol === 'cod') return mode === 'COD'
-    if (pol === 'prepaid') return mode === 'Prepaid'
-    return false
+  // The store's shipping-routing preference RECOMMENDS a tab for this order
+  // (badge + preselect); the admin can always tap the other one.
+  //   all → Shiprocket for everything · cod → Shiprocket for COD, manual for
+  //   prepaid · prepaid → the reverse · manual → no recommendation.
+  const recommended = (() => {
+    const pol = srCfg?.routing || 'manual'
+    if (!srReady || pol === 'manual') return null
+    if (pol === 'all') return 'shiprocket'
+    if (pol === 'cod') return mode === 'COD' ? 'shiprocket' : 'manual'
+    if (pol === 'prepaid') return mode === 'Prepaid' ? 'shiprocket' : 'manual'
+    return null
   })()
-  const [method, setMethod] = useState(!alreadyShipped && policyRoutes ? 'shiprocket' : 'manual')
+  const [method, setMethod] = useState(!alreadyShipped && recommended ? recommended : 'manual')
 
   // Sheet entrance/exit + Esc + scroll lock (restores the drawer's lock state).
   const [show, setShow] = useState(false)
@@ -1031,16 +1033,18 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
               <div className="grid grid-cols-2 gap-1.5 mt-3.5">
                 {tabs.map(({ v, label }) => {
                   const on = method === v
+                  const rec = recommended === v && !alreadyShipped
                   return (
                     <button
                       key={v}
                       onClick={() => { setMethod(v); setErr('') }}
-                      className="py-2.5 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-colors"
+                      className="py-2 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-colors"
                       style={on
                         ? { background: 'color-mix(in srgb, var(--maroon) 10%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
                         : { background: '#fff', color: '#71717a', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
                     >
                       {label}
+                      {rec && <span className="block text-[9px] font-extrabold uppercase tracking-wider mt-0.5" style={{ color: '#b8922e' }}>★ Recommended</span>}
                     </button>
                   )
                 })}
