@@ -33,7 +33,7 @@ export function shiprocketReady(cfg) {
   return cfg.enabled && !!cfg.email && !!cfg.password && !!cfg.pickupLocation;
 }
 
-// Prepaid vs COD (mirrors delhivery.js::orderPaymentMode).
+// Prepaid vs COD from the order's payment method/status.
 export function orderPaymentMode(order) {
   const paid = order.paymentStatus === 'paid';
   const isCod = ['cod', 'cash'].includes(order.paymentMethod);

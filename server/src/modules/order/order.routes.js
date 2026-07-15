@@ -10,7 +10,6 @@ import { nextOrderNo } from '../../utils/sequence.js';
 import { sendTelegram, orderMessage, orderPhotos } from '../../utils/notify.js';
 import { sendOrderConfirmation, sendOrderShipped, sendOrderCancelled } from '../../utils/mailer.js';
 import { reconcileOrderStock, checkAvailability, reserveProducts, releaseProducts } from './orderStock.js';
-import * as delhivery from '../../utils/delhivery.js';
 import * as shiprocket from '../../utils/shiprocket.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
@@ -264,9 +263,8 @@ router.patch(
 );
 
 // Customer-facing tracking note auto-filled when a courier waybill is booked.
-function shipmentTrackingMessage(provider, waybill, url) {
-  const label = provider === 'shiprocket' ? 'Shiprocket' : 'Delhivery';
-  return `Shipped via ${label}. Tracking ID: ${waybill}\nTrack your parcel: ${url}`;
+function shipmentTrackingMessage(_provider, waybill, url) {
+  return `Shipped via Shiprocket. Tracking ID: ${waybill}\nTrack your parcel: ${url}`;
 }
 
 // Book with a courier, retrying with a fresh order reference when the courier
@@ -303,48 +301,6 @@ async function applyBooking(order, settings, shipment, wasShipped) {
       .catch((e) => console.error('[mailer] unexpected error:', e.message));
   }
 }
-
-// ADMIN — book a Delhivery shipment for an order, then mark it Shipped.
-router.post(
-  '/:id/ship-delhivery',
-  requireAdmin,
-  validate({
-    params: Joi.object({ id: objectId.required() }),
-    body: Joi.object({ weight: Joi.number().min(1).max(50000).optional() }).default({}),
-  }),
-  asyncHandler(async (req, res) => {
-    const order = await Order.findById(req.params.id);
-    if (!order) throw ApiError.notFound('Order not found');
-    if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
-    if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
-
-    const settings = await getSettings();
-    if (!delhivery.delhiveryReady(delhivery.delhiveryConfig(settings))) {
-      throw ApiError.badRequest('Delhivery is not fully configured. Add the API token and pickup warehouse in Settings.');
-    }
-    const { result, attempt } = await bookWithRetry(order, (ref) =>
-      delhivery.createShipment(settings, order.toObject(), { weight: req.body.weight, orderRef: ref }));
-    if (!result.ok) throw ApiError.badRequest(result.error || 'Delhivery could not book this shipment.');
-
-    const wasShipped = order.status === 'shipped';
-    order.shipmentAttempts = attempt;
-    await applyBooking(order, settings, {
-      provider: 'delhivery',
-      waybill: result.waybill,
-      trackingUrl: delhivery.trackingUrl(result.waybill),
-      mode: result.mode,
-      codAmount: result.codAmount || 0,
-      weightGrams: result.weight || 0,
-    }, wasShipped);
-
-    // Fetch the label link in the background (may not be ready instantly).
-    delhivery.labelLink(settings, result.waybill)
-      .then((l) => { if (l.ok) Order.updateOne({ _id: order._id }, { 'shipment.labelUrl': l.url }).catch(() => {}); })
-      .catch(() => {});
-
-    res.json({ success: true, data: order });
-  })
-);
 
 // ADMIN — book a Shiprocket shipment (create order → assign AWB), then mark Shipped.
 router.post(
@@ -399,20 +355,11 @@ router.post(
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
     const settings = await getSettings();
-    let t, l;
-    if (sh.provider === 'shiprocket') {
-      [t, l] = await Promise.all([
-        shiprocket.trackShipment(settings, sh.waybill),
-        sh.labelUrl ? Promise.resolve({ ok: false }) : shiprocket.labelLink(settings, sh.shipmentId),
-      ]);
-      if (t.ok) { order.shipment.status = t.status || sh.status; order.shipment.statusDetail = t.statusDetail || ''; }
-    } else {
-      [t, l] = await Promise.all([
-        delhivery.trackShipment(settings, sh.waybill),
-        sh.labelUrl ? Promise.resolve({ ok: false }) : delhivery.labelLink(settings, sh.waybill),
-      ]);
-      if (t.ok) { order.shipment.status = t.status || sh.status; order.shipment.statusDetail = [t.statusType, t.location].filter(Boolean).join(' · '); }
-    }
+    const [t, l] = await Promise.all([
+      shiprocket.trackShipment(settings, sh.waybill),
+      sh.labelUrl ? Promise.resolve({ ok: false }) : shiprocket.labelLink(settings, sh.shipmentId),
+    ]);
+    if (t.ok) { order.shipment.status = t.status || sh.status; order.shipment.statusDetail = t.statusDetail || ''; }
     // Auto-advance to Delivered when the courier confirms delivery.
     if (t.ok && t.delivered && order.status === 'shipped') {
       order.status = 'delivered';
@@ -443,9 +390,7 @@ router.post(
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
     const settings = await getSettings();
-    const r = sh.provider === 'shiprocket'
-      ? await shiprocket.cancelShipment(settings, sh.srOrderId)
-      : await delhivery.cancelShipment(settings, sh.waybill);
+    const r = await shiprocket.cancelShipment(settings, sh.srOrderId);
     if (!r.ok) throw ApiError.badRequest(r.error || 'Courier could not cancel this shipment.');
 
     if (req.body.revert) {
@@ -479,25 +424,10 @@ router.get(
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
     const settings = await getSettings();
-    const r = sh.provider === 'shiprocket'
-      ? await shiprocket.labelLink(settings, sh.shipmentId)
-      : await delhivery.labelLink(settings, sh.waybill);
+    const r = await shiprocket.labelLink(settings, sh.shipmentId);
     if (!r.ok) throw ApiError.badRequest(r.error || 'Label not ready yet. Try again in a moment.');
     if (order.shipment.labelUrl !== r.url) { order.shipment.labelUrl = r.url; await order.save(); }
     res.json({ success: true, data: { url: r.url } });
-  })
-);
-
-// ADMIN — Delhivery PIN serviceability probe (for the ship form).
-router.get(
-  '/delhivery/serviceability',
-  requireAdmin,
-  validate({ query: Joi.object({ pin: Joi.string().pattern(/^\d{6}$/).required() }) }),
-  asyncHandler(async (req, res) => {
-    const settings = await getSettings();
-    const r = await delhivery.checkServiceability(settings, req.query.pin);
-    if (!r.ok) throw ApiError.badRequest(r.error || 'Could not check serviceability');
-    res.json({ success: true, data: r });
   })
 );
 

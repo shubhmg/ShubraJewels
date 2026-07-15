@@ -51,11 +51,10 @@ const orderSchema = new mongoose.Schema(
       shippedAt: { type: Date, default: null },
     },
     // Courier shipment. `provider: 'manual'` = the owner ships it themselves and
-    // pastes a tracking note (legacy flow). `provider: 'delhivery'` = a Delhivery
-    // waybill was booked via the API; `waybill` + `status` + `labelUrl` are set
-    // from Delhivery and refreshed by the sync action.
+    // pastes a tracking note. `provider: 'shiprocket'` = a waybill was booked via
+    // the Shiprocket API; status/label refresh via sync + the status webhook.
     shipment: {
-      provider: { type: String, enum: ['manual', 'delhivery', 'shiprocket'], default: 'manual' },
+      provider: { type: String, enum: ['manual', 'shiprocket'], default: 'manual' },
       waybill: { type: String, default: '' },           // AWB / tracking number
       shipmentId: { type: String, default: '' },        // Shiprocket shipment id (for label/pickup)
       srOrderId: { type: String, default: '' },         // Shiprocket internal order id (for cancel)

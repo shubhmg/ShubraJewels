@@ -3,20 +3,18 @@ import requireAdmin from '../../middleware/auth.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 import { getSettings } from './setting.model.js';
 import { sendTelegram } from '../../utils/notify.js';
-import { checkServiceability } from '../../utils/delhivery.js';
 import { ensureToken as ensureShiprocketToken } from '../../utils/shiprocket.js';
 
 const router = express.Router();
 
-// Public: current settings. SECRETS (the Telegram bot token, the Delhivery API
-// token) are stripped so they never reach the storefront.
+// Public: current settings. SECRETS (the Telegram bot token, the Shiprocket
+// credentials) are stripped so they never reach the storefront.
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
     const doc = await getSettings();
     const obj = doc.toObject();
     delete obj.notifications;
-    delete obj.delhivery;  // courier config incl. API token — admin-only
     delete obj.shiprocket; // courier config incl. email/password/JWT — admin-only
     res.json({ success: true, data: obj });
   })
@@ -38,7 +36,7 @@ router.patch(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const doc = await getSettings();
-    const { theme, homepage, shipping, about, content, notifications, delhivery, shiprocket, ...rest } = req.body || {};
+    const { theme, homepage, shipping, about, content, notifications, shiprocket, ...rest } = req.body || {};
     Object.assign(doc, rest);
     if (about && typeof about === 'object') {
       doc.about = about; // admin sends the full object (eyebrow, heading, image, paragraphs[], values[])
@@ -64,12 +62,6 @@ router.patch(
       };
       doc.markModified('notifications');
     }
-    if (delhivery && typeof delhivery === 'object') {
-      // Deep-merge so a partial update (e.g. toggling the policy) keeps the token.
-      const cur = doc.delhivery?.toObject?.() || doc.delhivery || {};
-      doc.delhivery = { ...cur, ...delhivery };
-      doc.markModified('delhivery');
-    }
     if (shiprocket && typeof shiprocket === 'object') {
       const cur = doc.shiprocket?.toObject?.() || doc.shiprocket || {};
       const next = { ...cur, ...shiprocket };
@@ -88,7 +80,6 @@ router.patch(
     await doc.save();
     const obj = doc.toObject();
     delete obj.notifications;
-    delete obj.delhivery;
     delete obj.shiprocket;
     res.json({ success: true, data: obj });
   })
@@ -103,20 +94,6 @@ router.post(
     const r = await sendTelegram(doc, '✅ Test alert from Shubra Jewels — order notifications are working.');
     if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Could not send. Check the token and chat id.' });
     res.json({ success: true, data: { sent: true } });
-  })
-);
-
-// Admin: verify the Delhivery token by hitting the serviceability endpoint with
-// a known PIN (defaults to the pickup PIN, else 110001 New Delhi).
-router.post(
-  '/test-delhivery',
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const doc = await getSettings();
-    const pin = String(req.body?.pin || doc.delhivery?.pickupPin || '110001').trim();
-    const r = await checkServiceability(doc, pin);
-    if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Delhivery check failed. Verify the API token.' });
-    res.json({ success: true, data: { pin, ...r } });
   })
 );
 

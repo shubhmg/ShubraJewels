@@ -130,30 +130,10 @@ const settingSchema = new mongoose.Schema(
       prepaidFreeShipping: { type: Boolean, default: false },
     },
 
-    // Delhivery courier integration. `token` is SECRET (stripped from the public
-    // GET /settings, read via GET /settings/admin). `policy` decides which orders
-    // are booked with Delhivery automatically when marked Shipped:
-    //   all | cod | prepaid | manual (push each order by hand).
-    delhivery: {
-      enabled: { type: Boolean, default: false },
-      token: { type: String, default: '' },          // Delhivery API token (secret)
-      staging: { type: Boolean, default: false },      // hit the staging endpoint
-      policy: { type: String, enum: ['all', 'cod', 'prepaid', 'manual'], default: 'manual' },
-      pickupName: { type: String, default: '' },       // registered warehouse name (exact)
-      pickupPhone: { type: String, default: '' },
-      pickupAddress: { type: String, default: '' },
-      pickupCity: { type: String, default: '' },
-      pickupState: { type: String, default: '' },
-      pickupPin: { type: String, default: '' },
-      defaultWeightGrams: { type: Number, default: 100 }, // per-unit weight fallback
-      sellerName: { type: String, default: '' },
-      productDesc: { type: String, default: 'Imitation jewellery (jhumka)' },
-    },
-
     // Shiprocket courier aggregator. `email`/`password` are SECRET (used to mint
     // the JWT via the login API; stripped from the public GET /settings). `token`
-    // + `tokenExpiry` cache that JWT (~10-day life). `policy` mirrors Delhivery:
-    //   all | cod | prepaid | manual.
+    // + `tokenExpiry` cache that JWT (~10-day life). `policy` decides which orders
+    //   auto-route through Shiprocket: all | cod | prepaid | manual.
     shiprocket: {
       enabled: { type: Boolean, default: false },
       email: { type: String, default: '' },            // Shiprocket account email (secret)
