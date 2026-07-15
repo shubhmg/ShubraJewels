@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox, MessageCircle, Mail, Copy } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
@@ -415,6 +415,22 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
   const [show, setShow] = useState(false)
   const [preview, setPreview] = useState(null) // item image opened full-screen
   const [moreMethods, setMoreMethods] = useState(false) // reveal Cash/UPI/Bank chips
+  const [copied, setCopied] = useState(false) // address copied feedback
+
+  // Copy name + phone + full address — exactly what a courier form wants.
+  const copyAddress = () => {
+    const text = [
+      o.customer?.name,
+      o.customer?.phone,
+      o.address?.line1,
+      o.address?.line2,
+      o.address?.landmark && `Near ${o.address.landmark}`,
+      [o.address?.city, o.address?.state, o.address?.pincode].filter(Boolean).join(', '),
+    ].filter(Boolean).join('\n')
+    navigator.clipboard?.writeText(text)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })
+      .catch(() => {})
+  }
   const close = () => { setShow(false); setTimeout(onClose, 200) }
 
   useEffect(() => {
@@ -560,21 +576,67 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
             </div>
           </div>
 
-          {/* Customer */}
+          {/* Customer — identity, one-tap contact actions, copyable address */}
           <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
-            <p className="text-[11px] uppercase tracking-wider text-zinc-400 mb-2.5 font-bold">Customer</p>
-            <p className="font-bold text-[15px] text-zinc-900">{o.customer?.name}</p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <a href={`tel:${o.customer?.phone}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 transition" style={{ color: 'var(--maroon)' }}><Phone size={13} />{o.customer?.phone}</a>
-              {o.customer?.email && <a href={`mailto:${o.customer.email}`} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-zinc-500 ring-1 ring-zinc-200 hover:bg-zinc-50 transition max-w-full truncate">{o.customer.email}</a>}
+            <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Customer</p>
+
+            <div className="flex items-center gap-3 mt-2.5">
+              <div className="w-10 h-10 rounded-xl grid place-items-center text-[15px] font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark, #5a121c))' }}>
+                {(o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'}
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-[15px] text-zinc-900 leading-snug">{o.customer?.name}</p>
+                <p className="text-[12.5px] text-zinc-400" style={{ fontVariantNumeric: 'tabular-nums' }}>{o.customer?.phone}</p>
+              </div>
             </div>
+
+            {/* One-tap contact actions */}
+            <div className={`grid gap-1.5 mt-3 ${o.customer?.email ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <a href={`tel:${o.customer?.phone}`} className="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 transition-colors cursor-pointer">
+                <Phone size={16} style={{ color: 'var(--maroon)' }} />
+                <span className="text-[11px] font-bold text-zinc-600">Call</span>
+              </a>
+              <a href={`https://wa.me/91${String(o.customer?.phone || '').replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 transition-colors cursor-pointer">
+                <MessageCircle size={16} className="text-emerald-600" />
+                <span className="text-[11px] font-bold text-zinc-600">WhatsApp</span>
+              </a>
+              {o.customer?.email && (
+                <a href={`mailto:${o.customer.email}`} className="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 transition-colors cursor-pointer">
+                  <Mail size={16} className="text-zinc-500" />
+                  <span className="text-[11px] font-bold text-zinc-600">Email</span>
+                </a>
+              )}
+            </div>
+
+            {/* Delivery address — formatted lines + one-tap copy for courier forms */}
             {(o.address?.line1 || o.address?.city) && (
-              <div className="mt-3 flex gap-2 text-[13px] text-zinc-600 leading-relaxed">
-                <MapPin size={14} className="shrink-0 mt-0.5 text-zinc-400" />
-                <span>{[o.address.line1, o.address.line2, o.address.landmark && `Near ${o.address.landmark}`, o.address.city, o.address.state, o.address.pincode].filter(Boolean).join(', ')}</span>
+              <div className="mt-3 rounded-xl bg-zinc-50 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold flex items-center gap-1"><MapPin size={11} /> Deliver to</p>
+                  <button
+                    onClick={copyAddress}
+                    className={`inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer transition-colors ${copied ? 'text-emerald-600' : 'text-zinc-400 hover:text-zinc-600'}`}
+                  >
+                    {copied ? <><Check size={12} strokeWidth={3} /> Copied</> : <><Copy size={12} /> Copy</>}
+                  </button>
+                </div>
+                <p className="text-[13.5px] text-zinc-700 leading-relaxed mt-1.5">
+                  {o.address.line1}
+                  {o.address.line2 && <><br />{o.address.line2}</>}
+                  {o.address.landmark && <><br />Near {o.address.landmark}</>}
+                  <br />{[o.address.city, o.address.state].filter(Boolean).join(', ')}
+                  {o.address.pincode && <> — <b className="text-zinc-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{o.address.pincode}</b></>}
+                </p>
               </div>
             )}
-            {o.notes && <p className="text-[13px] text-zinc-500 mt-3 pl-3 border-l-2 border-zinc-200 italic">“{o.notes}”</p>}
+
+            {/* Customer note */}
+            {o.notes && (
+              <div className="mt-3 rounded-xl px-3.5 py-3" style={{ background: 'color-mix(in srgb, #f59e0b 9%, white)' }}>
+                <p className="text-[11px] uppercase tracking-wider font-bold text-amber-600">Customer note</p>
+                <p className="text-[13px] text-zinc-700 mt-1 leading-relaxed">{o.notes}</p>
+              </div>
+            )}
           </div>
 
           {/* Payment — switch row + method chips (no dropdowns) */}
