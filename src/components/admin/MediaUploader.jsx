@@ -203,8 +203,8 @@ export function MultiImageUploader({ value = [], onChange, aspect = 4 / 5 }) {
                 <Maximize2 size={18} className="text-white opacity-0 group-hover:opacity-100 transition" />
               </span>
             </button>
-            <button type="button" onClick={() => removeAt(i)} className="absolute top-1 right-1 w-6 h-6 grid place-items-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition cursor-pointer" aria-label="Remove">
-              <X size={12} />
+            <button type="button" onClick={() => removeAt(i)} className="absolute top-1.5 right-1.5 w-7 h-7 grid place-items-center rounded-full bg-black/65 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition cursor-pointer active:bg-black/80" aria-label="Remove">
+              <X size={14} />
             </button>
           </div>
         ))}
