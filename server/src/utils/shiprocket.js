@@ -107,7 +107,9 @@ function codAmount(order) {
 }
 
 // Serviceability between the account's pickup PIN and a delivery PIN.
-// Returns { ok, serviceable, couriers: [{ name, rate, cod, etd }], cheapest }.
+// Returns { ok, serviceable, couriers: [{ id, name, rate, cod, etd, recommended }], cheapest }.
+// `id` is the courier_company_id — pass it back as `courierId` when booking to
+// force that courier instead of Shiprocket's recommended pick.
 export async function checkServiceability(settingDoc, { pickupPin, deliveryPin, weightKg, cod }) {
   const auth = await ensureToken(settingDoc);
   if (!auth.ok) return { ok: false, error: auth.error };
@@ -121,15 +123,25 @@ export async function checkServiceability(settingDoc, { pickupPin, deliveryPin, 
   if (r.error) return { ok: false, error: r.error };
   const list = r.data?.data?.available_courier_companies || [];
   if (!list.length) return { ok: true, serviceable: false, couriers: [] };
+  const recommendedId = r.data?.data?.shiprocket_recommended_courier_id || r.data?.data?.recommended_courier_company_id;
   const couriers = list
-    .map((c) => ({ name: c.courier_name, rate: c.rate, cod: c.cod === 1 || c.is_cod_available, etd: c.etd }))
+    .map((c) => ({
+      id: c.courier_company_id,
+      name: c.courier_name,
+      rate: c.rate,
+      cod: c.cod === 1 || c.is_cod_available,
+      etd: c.etd,
+      etdDays: c.estimated_delivery_days,
+      rating: c.rating,
+      recommended: recommendedId != null && c.courier_company_id === recommendedId,
+    }))
     .sort((a, b) => (a.rate || 0) - (b.rate || 0));
   return { ok: true, serviceable: true, couriers, cheapest: couriers[0] };
 }
 
 // Book a parcel: create order → assign AWB → (schedule pickup) → fetch label.
 // Returns { ok, awb, courierName, shipmentId, srOrderId, trackingUrl, mode, codAmount, weightKg, labelUrl, error }.
-export async function createShipment(settingDoc, order, { weightKg, orderRef, skipPickup } = {}) {
+export async function createShipment(settingDoc, order, { weightKg, orderRef, skipPickup, courierId } = {}) {
   const cfg = shiprocketConfig(settingDoc);
   if (!shiprocketReady(cfg)) return { ok: false, error: 'Shiprocket is not fully configured (email, password + pickup location required).' };
   const auth = await ensureToken(settingDoc);
@@ -182,8 +194,11 @@ export async function createShipment(settingDoc, order, { weightKg, orderRef, sk
     return { ok: false, error: typeof err === 'string' ? err : JSON.stringify(err), raw: cd };
   }
 
-  // Assign an AWB (Shiprocket picks the recommended courier).
-  const awbRes = await srFetch(auth.token, 'POST', '/courier/assign/awb', { shipment_id: shipmentId });
+  // Assign an AWB. With `courierId` (from the serviceability list) the admin's
+  // chosen courier is forced; otherwise Shiprocket picks the recommended one.
+  const awbBody = { shipment_id: shipmentId };
+  if (courierId) awbBody.courier_id = Number(courierId);
+  const awbRes = await srFetch(auth.token, 'POST', '/courier/assign/awb', awbBody);
   const awbData = awbRes.data?.response?.data || {};
   const awb = awbData.awb_code || awbRes.data?.awb_code;
   if (!awb) {

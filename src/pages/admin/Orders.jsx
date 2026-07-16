@@ -1184,20 +1184,25 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
 
   const [message, setMessage] = useState(order.tracking?.message || '')
   const [kWeight, setKWeight] = useState(String(((srCfg?.defaultWeightKg || 0.3) * totalQty).toFixed(2))) // kg
-  const [serv, setServ] = useState(null) // serviceability result
+  const [serv, setServ] = useState(null) // serviceability result (includes courier list + rates)
+  const [courierId, setCourierId] = useState(null) // null = let Shiprocket pick
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
-  // Check serviceability when the Shiprocket tab is active.
+  // Fetch the courier list (with rates) when the Shiprocket tab is active.
+  // Re-fetches (debounced) when the weight changes — rates depend on weight.
   useEffect(() => {
-    setServ(null)
-    if (method !== 'shiprocket' || !srReady || !pin) return
+    if (method !== 'shiprocket' || !srReady || !pin) { setServ(null); return }
     let live = true
-    api.get(`/orders/shiprocket/serviceability?pin=${encodeURIComponent(pin)}&weight=${encodeURIComponent(kWeight || 0.5)}&cod=${mode === 'COD'}`, { auth: true })
-      .then((r) => { if (live) setServ({ ok: true, ...r }) })
-      .catch((e) => { if (live) setServ({ ok: false, error: e.message }) })
-    return () => { live = false }
-  }, [method, pin]) // eslint-disable-line
+    const t = setTimeout(() => {
+      setServ(null)
+      setCourierId(null)
+      api.get(`/orders/shiprocket/serviceability?pin=${encodeURIComponent(pin)}&weight=${encodeURIComponent(kWeight || 0.5)}&cod=${mode === 'COD'}`, { auth: true })
+        .then((r) => { if (live) setServ({ ok: true, ...r }) })
+        .catch((e) => { if (live) setServ({ ok: false, error: e.message }) })
+    }, serv ? 600 : 0) // instant on open, debounced on weight edits
+    return () => { live = false; clearTimeout(t) }
+  }, [method, pin, kWeight]) // eslint-disable-line
 
   const submitManual = async () => {
     setSaving(true); setErr('')
@@ -1214,15 +1219,17 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
     try {
       const w = Number(kWeight)
       const body = w > 0 ? { weight: w } : {}
+      if (courierId) body.courierId = courierId
       const updated = await api.post(`/orders/${order._id}/ship-shiprocket`, body, { auth: true })
       onShipped(updated)
     } catch (e) { setErr(e.message || 'Could not book this shipment'); setSaving(false) }
   }
 
   const missingMsg = [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
+  const pickedCourier = courierId != null ? (serv?.couriers || []).find((c) => c.id === courierId) : null
   const primaryLabel = method === 'manual'
     ? (saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped'))
-    : (saving ? 'Booking…' : 'Book Shiprocket & Ship')
+    : (saving ? 'Booking…' : pickedCourier ? `Book ${pickedCourier.name} · ₹${Math.round(pickedCourier.rate || 0)}` : 'Book Shiprocket & Ship')
 
   return (
     <div id="ship-modal-root" className="fixed inset-0 z-[70]">
@@ -1292,22 +1299,61 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
                   The customer's tracking link is filled in automatically.
                 </p>
 
-                {/* Serviceability */}
+                {/* Weight — rates below re-quote when this changes */}
                 <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Delivery to PIN {pin || '—'}</p>
-                  <div className="mt-1.5 text-[13px] font-medium">
-                    {!pin ? <p className="text-red-600">No PIN on this order — add one before booking.</p>
-                      : !srReady ? <p className="text-zinc-400">Finish setup to check serviceability.</p>
-                      : !serv ? <p className="text-zinc-400 flex items-center gap-2"><RefreshCw size={13} className="animate-spin" /> Checking serviceability…</p>
-                      : !serv.ok ? <p className="text-amber-600">Couldn't verify ({serv.error}). You can still try to book.</p>
-                      : !serv.serviceable ? <p className="text-red-600">Not serviceable by Shiprocket. Ship manually instead.</p>
-                      : <p className="text-emerald-700">Serviceable · {serv.couriers?.length || 0} courier(s){serv.cheapest ? ` · from ₹${Math.round(serv.cheapest.rate || 0)} (${serv.cheapest.name})` : ''}. Shiprocket picks the recommended one.</p>}
-                  </div>
+                  <Field field={{ label: 'Package weight (kg)', type: 'number', help: `Default ${srCfg?.defaultWeightKg || 0.3} kg × ${totalQty} item(s). Courier rates update with the weight.` }} value={kWeight} onChange={setKWeight} />
                 </div>
 
-                {/* Weight */}
+                {/* Courier picker — every available courier with its freight rate */}
                 <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
-                  <Field field={{ label: 'Package weight (kg)', type: 'number', help: `Default ${srCfg?.defaultWeightKg || 0.3} kg × ${totalQty} item(s). Adjust if needed.` }} value={kWeight} onChange={setKWeight} />
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Courier · to PIN {pin || '—'}</p>
+                  <div className="mt-2">
+                    {!pin ? <p className="text-[13px] font-medium text-red-600">No PIN on this order — add one before booking.</p>
+                      : !srReady ? <p className="text-[13px] font-medium text-zinc-400">Finish setup to see couriers.</p>
+                      : !serv ? <p className="text-[13px] font-medium text-zinc-400 flex items-center gap-2"><RefreshCw size={13} className="animate-spin" /> Fetching couriers &amp; rates…</p>
+                      : !serv.ok ? <p className="text-[13px] font-medium text-amber-600">Couldn't fetch couriers ({serv.error}). You can still book — Shiprocket will pick one.</p>
+                      : !serv.serviceable ? <p className="text-[13px] font-medium text-red-600">Not serviceable by Shiprocket. Ship manually instead.</p>
+                      : (
+                        <div className="space-y-1.5">
+                          {/* Auto = let Shiprocket pick (its own recommendation engine) */}
+                          <button
+                            onClick={() => setCourierId(null)}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer transition-colors"
+                            style={courierId == null
+                              ? { background: 'color-mix(in srgb, var(--maroon) 8%, white)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                              : { boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                          >
+                            <span>
+                              <span className="block text-[13px] font-bold" style={{ color: courierId == null ? 'var(--maroon)' : '#3f3f46' }}>Auto — Shiprocket picks</span>
+                              <span className="block text-[11px] text-zinc-400 mt-0.5">Balances price, speed &amp; reliability</span>
+                            </span>
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider shrink-0" style={{ color: '#b8922e' }}>★ Default</span>
+                          </button>
+                          {(serv.couriers || []).map((c) => {
+                            const on = courierId === c.id
+                            return (
+                              <button
+                                key={c.id}
+                                onClick={() => setCourierId(c.id)}
+                                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer transition-colors"
+                                style={on
+                                  ? { background: 'color-mix(in srgb, var(--maroon) 8%, white)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                                  : { boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block text-[13px] font-bold truncate" style={{ color: on ? 'var(--maroon)' : '#3f3f46' }}>
+                                    {c.name}{c.recommended && <span className="ml-1.5 text-[9px] font-extrabold uppercase tracking-wider align-middle" style={{ color: '#b8922e' }}>★ SR pick</span>}
+                                  </span>
+                                  <span className="block text-[11px] text-zinc-400 mt-0.5">{c.etd ? `ETA ${c.etd}` : c.etdDays ? `~${c.etdDays} day(s)` : 'ETA —'}</span>
+                                </span>
+                                <span className="text-[14px] font-extrabold text-zinc-900 shrink-0">₹{Math.round(c.rate || 0)}</span>
+                              </button>
+                            )
+                          })}
+                          <p className="text-[11px] text-zinc-400 pt-1 px-1">Freight is charged to your Shiprocket wallet. Rates are for {kWeight || '0.5'} kg{mode === 'COD' ? ' incl. COD charges' : ''}.</p>
+                        </div>
+                      )}
+                  </div>
                 </div>
               </>
             )}

@@ -308,7 +308,10 @@ router.post(
   requireAdmin,
   validate({
     params: Joi.object({ id: objectId.required() }),
-    body: Joi.object({ weight: Joi.number().min(0.01).max(50).optional() }).default({}), // kg
+    body: Joi.object({
+      weight: Joi.number().min(0.01).max(50).optional(), // kg
+      courierId: Joi.number().integer().positive().optional(), // force a specific courier (from serviceability list)
+    }).default({}),
   }),
   asyncHandler(async (req, res) => {
     const order = await Order.findById(req.params.id);
@@ -321,7 +324,7 @@ router.post(
       throw ApiError.badRequest('Shiprocket is not fully configured. Add the email, API password and pickup location in Settings.');
     }
     const { result, attempt } = await bookWithRetry(order, (ref) =>
-      shiprocket.createShipment(settings, order.toObject(), { weightKg: req.body.weight, orderRef: ref }));
+      shiprocket.createShipment(settings, order.toObject(), { weightKg: req.body.weight, courierId: req.body.courierId, orderRef: ref }));
     if (!result.ok) throw ApiError.badRequest(result.error || 'Shiprocket could not book this shipment.');
 
     const wasShipped = order.status === 'shipped';
