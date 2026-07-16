@@ -145,7 +145,7 @@ export function Products() {
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6" style={{ display: 'grid' }}>
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="rounded-2xl overflow-hidden animate-pulse" style={{ background: 'color-mix(in srgb, var(--beige) 40%, white)' }}>
-                    <div className="aspect-[3/4]" style={{ background: 'color-mix(in srgb, var(--beige) 70%, white)' }} />
+                    <div className="aspect-[4/5]" style={{ background: 'color-mix(in srgb, var(--beige) 70%, white)' }} />
                     <div className="p-3 space-y-2">
                       <div className="h-3 rounded" style={{ background: 'color-mix(in srgb, var(--beige) 70%, white)' }} />
                       <div className="h-3 w-1/2 rounded" style={{ background: 'color-mix(in srgb, var(--beige) 70%, white)' }} />

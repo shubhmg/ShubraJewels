@@ -92,8 +92,8 @@ export function ProductDetail() {
                 style={{ scrollBehavior: 'smooth' }}
               >
                 {images.map((img, i) => (
-                  <div key={i} className="relative snap-center shrink-0 w-full aspect-square overflow-hidden" style={{ background: 'var(--beige)' }}>
-                    {/* Ambient fill — only shows for legacy non-square images; square-cropped uploads fill the frame exactly */}
+                  <div key={i} className="relative snap-center shrink-0 w-full aspect-[4/5] overflow-hidden" style={{ background: 'var(--beige)' }}>
+                    {/* Ambient fill — only shows for off-ratio legacy images; 4:5-cropped uploads fill the frame exactly */}
                     <img src={img} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60" />
                     {/* Foreground — whole image, aspect preserved, never cropped */}
                     <img src={img} alt={product.name} className="relative w-full h-full object-contain" loading={i === 0 ? 'eager' : 'lazy'} />

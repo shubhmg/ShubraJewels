@@ -119,9 +119,10 @@ export function MediaUploader({ value, onChange, accept = 'image', label }) {
 }
 
 // Multi-image uploader for product galleries. New images are framed to a fixed
-// aspect ratio (default square) before upload so tiles stay uniform in listings.
+// aspect ratio (default 4:5 portrait — the e-commerce standard, matches the
+// product detail gallery) before upload so tiles stay uniform in listings.
 // Click a set image to view it fullscreen and download / re-crop / edit it.
-export function MultiImageUploader({ value = [], onChange, aspect = 1 }) {
+export function MultiImageUploader({ value = [], onChange, aspect = 4 / 5 }) {
   const [busy, setBusy] = useState(false)
   const [queue, setQueue] = useState([]) // File[] awaiting crop on upload
   const [viewer, setViewer] = useState(null) // index of the image being viewed
@@ -195,7 +196,7 @@ export function MultiImageUploader({ value = [], onChange, aspect = 1 }) {
       <p className="text-xs font-medium text-stone-500 mb-1.5">Images</p>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {value.map((url, i) => (
-          <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 group">
+          <div key={i} className="relative aspect-[4/5] rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 group">
             <button type="button" onClick={() => setViewer(i)} className="block w-full h-full cursor-zoom-in" aria-label="View image">
               <img src={url} alt="" className="w-full h-full object-cover" />
               <span className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition grid place-items-center">

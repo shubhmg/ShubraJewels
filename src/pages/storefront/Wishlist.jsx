@@ -41,7 +41,7 @@ export function Wishlist() {
               const img = product.images?.[0]
               return (
                 <div key={pid} className="group relative rounded-2xl overflow-hidden bg-white shadow-card">
-                  <div className="aspect-[3/4] overflow-hidden">
+                  <div className="aspect-[4/5] overflow-hidden">
                     <Link to={`/products/${pid}`}><img src={img} alt={product.name} className="w-full h-full object-cover" /></Link>
                   </div>
                   <button onClick={() => toggle(product)} className="absolute top-2 right-2 w-7 h-7 md:w-8 md:h-8 grid place-items-center rounded-full bg-white/85 backdrop-blur-sm shadow-sm hover:bg-rose-50 transition cursor-pointer" aria-label="Remove">

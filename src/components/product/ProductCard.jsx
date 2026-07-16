@@ -34,7 +34,7 @@ export function ProductCard({ product }) {
 
       {/* Image */}
       <Link to={`/products/${f.id}`} className="block">
-        <div className="product-img-wrap relative aspect-[3/4] overflow-hidden">
+        <div className="product-img-wrap relative aspect-[4/5] overflow-hidden">
           <img src={f.images[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         </div>
       </Link>
