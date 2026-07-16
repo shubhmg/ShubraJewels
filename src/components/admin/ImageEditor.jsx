@@ -80,6 +80,15 @@ export function ImageEditor({ image, aspect = 1, mode = 'crop', onSave, onSkip, 
 
   const onCropComplete = useCallback((_area, areaPixels) => setPixels(areaPixels), [])
 
+  // Esc to close + lock background scroll while open.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [busy, onClose])
+
   const dirty = zoom !== 1 || rotation !== 0 || !isDefaultAdj(adj) || (crop.x !== 0 || crop.y !== 0)
   const reset = () => { setCrop({ x: 0, y: 0 }); setZoom(1); setRotation(0); setAdj(DEFAULT_ADJ) }
 
@@ -107,9 +116,11 @@ export function ImageEditor({ image, aspect = 1, mode = 'crop', onSave, onSkip, 
   )
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/75" onClick={busy ? undefined : onClose} />
-      <div className="relative w-full max-w-lg bg-white dark:bg-stone-900 rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col">
+      <div className="relative w-full sm:max-w-lg bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col">
+        {/* Grab handle (mobile sheet) */}
+        <div className="sm:hidden pt-2.5 pb-0.5 grid place-items-center shrink-0"><span className="w-10 h-1 rounded-full bg-stone-300 dark:bg-stone-600" /></div>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 dark:border-stone-800 shrink-0">
           <div>
@@ -159,7 +170,7 @@ export function ImageEditor({ image, aspect = 1, mode = 'crop', onSave, onSkip, 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-stone-100 dark:border-stone-800 shrink-0">
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-stone-100 dark:border-stone-800 shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           {onSkip && (
             <button type="button" onClick={onSkip} disabled={busy} className="px-3 py-2.5 rounded-xl text-sm font-semibold text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer disabled:opacity-40">Skip</button>
           )}

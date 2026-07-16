@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { UploadCloud, X, Loader2, Download, Crop, SlidersHorizontal, Maximize2 } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { ImageEditor } from './ImageEditor.jsx'
@@ -22,16 +22,33 @@ async function downloadImage(url) {
 // Fullscreen viewer for an already-uploaded image: preview + download / crop /
 // edit. Crop and Edit open the ImageEditor seeded with the existing image.
 function ImageViewer({ url, onClose, onCrop, onEdit }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-[105] flex flex-col bg-black/90" onClick={onClose}>
-      <div className="flex items-center justify-end gap-2 p-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-        <button type="button" onClick={() => downloadImage(url)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold cursor-pointer transition"><Download size={15} /> Download</button>
-        <button type="button" onClick={onCrop} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold cursor-pointer transition"><Crop size={15} /> Crop</button>
-        <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold cursor-pointer transition"><SlidersHorizontal size={15} /> Edit</button>
-        <button type="button" onClick={onClose} className="w-9 h-9 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 text-white cursor-pointer transition" aria-label="Close"><X size={18} /></button>
+      {/* Top: close only */}
+      <div className="flex items-center justify-end p-3 shrink-0" onClick={(e) => e.stopPropagation()} style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+        <button type="button" onClick={onClose} className="w-10 h-10 grid place-items-center rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer transition" aria-label="Close"><X size={20} /></button>
       </div>
-      <div className="flex-1 min-h-0 grid place-items-center p-4 pt-0" onClick={onClose}>
+
+      {/* Image */}
+      <div className="flex-1 min-h-0 grid place-items-center px-4" onClick={onClose}>
         <img src={url} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+      </div>
+
+      {/* Bottom action bar — thumb-reachable on mobile, centered on desktop */}
+      <div className="shrink-0 p-3" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="flex items-stretch gap-2 w-full max-w-sm mx-auto">
+          <button type="button" onClick={() => downloadImage(url)} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/10 active:bg-white/25 hover:bg-white/20 text-white text-[12px] font-semibold cursor-pointer transition"><Download size={19} /> Download</button>
+          <button type="button" onClick={onCrop} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/10 active:bg-white/25 hover:bg-white/20 text-white text-[12px] font-semibold cursor-pointer transition"><Crop size={19} /> Crop</button>
+          <button type="button" onClick={onEdit} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/10 active:bg-white/25 hover:bg-white/20 text-white text-[12px] font-semibold cursor-pointer transition"><SlidersHorizontal size={19} /> Edit</button>
+        </div>
       </div>
     </div>
   )
