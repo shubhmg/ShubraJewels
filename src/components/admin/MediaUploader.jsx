@@ -31,23 +31,26 @@ function ImageViewer({ url, onClose, onCrop, onEdit }) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[105] flex flex-col bg-black/90" onClick={onClose}>
-      {/* Top: close only */}
-      <div className="flex items-center justify-end p-3 shrink-0" onClick={(e) => e.stopPropagation()} style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
-        <button type="button" onClick={onClose} className="w-10 h-10 grid place-items-center rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer transition" aria-label="Close"><X size={20} /></button>
+    <div className="fixed inset-0 z-[105] bg-black/95" onClick={onClose}>
+      {/* Image — contained within the viewport, inset so it never touches the edges */}
+      <img
+        src={url} alt="" draggable={false}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute inset-0 w-full h-full object-contain select-none"
+        style={{ padding: 'max(56px, env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom))' }}
+      />
+
+      {/* Top scrim + close */}
+      <div className="absolute top-0 inset-x-0 flex justify-end p-3 bg-gradient-to-b from-black/70 to-transparent pointer-events-none" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+        <button type="button" onClick={onClose} className="pointer-events-auto w-10 h-10 grid place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white cursor-pointer transition" aria-label="Close"><X size={20} /></button>
       </div>
 
-      {/* Image */}
-      <div className="flex-1 min-h-0 grid place-items-center px-4" onClick={onClose}>
-        <img src={url} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
-      </div>
-
-      {/* Bottom action bar — thumb-reachable on mobile, centered on desktop */}
-      <div className="shrink-0 p-3" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      {/* Bottom scrim + actions */}
+      <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/80 via-black/50 to-transparent" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom))' }}>
         <div className="flex items-stretch gap-2 w-full max-w-sm mx-auto">
-          <button type="button" onClick={() => downloadImage(url)} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/10 active:bg-white/25 hover:bg-white/20 text-white text-[12px] font-semibold cursor-pointer transition"><Download size={19} /> Download</button>
-          <button type="button" onClick={onCrop} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/10 active:bg-white/25 hover:bg-white/20 text-white text-[12px] font-semibold cursor-pointer transition"><Crop size={19} /> Crop</button>
-          <button type="button" onClick={onEdit} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/10 active:bg-white/25 hover:bg-white/20 text-white text-[12px] font-semibold cursor-pointer transition"><SlidersHorizontal size={19} /> Edit</button>
+          <button type="button" onClick={() => downloadImage(url)} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/15 active:bg-white/30 hover:bg-white/25 text-white text-[12px] font-semibold cursor-pointer transition"><Download size={19} /> Download</button>
+          <button type="button" onClick={onCrop} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/15 active:bg-white/30 hover:bg-white/25 text-white text-[12px] font-semibold cursor-pointer transition"><Crop size={19} /> Crop</button>
+          <button type="button" onClick={onEdit} className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white/15 active:bg-white/30 hover:bg-white/25 text-white text-[12px] font-semibold cursor-pointer transition"><SlidersHorizontal size={19} /> Edit</button>
         </div>
       </div>
     </div>
