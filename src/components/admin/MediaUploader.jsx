@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { UploadCloud, X, Loader2 } from 'lucide-react'
 import { api } from '../../lib/api.js'
+import { ImageCropper } from './ImageCropper.jsx'
 
 // Drag-drop / click uploader. Uploads to /api/upload and returns the URL via onChange.
 export function MediaUploader({ value, onChange, accept = 'image', label }) {
@@ -63,17 +64,28 @@ export function MediaUploader({ value, onChange, accept = 'image', label }) {
   )
 }
 
-// Multi-image uploader for product galleries.
-export function MultiImageUploader({ value = [], onChange }) {
+// Multi-image uploader for product galleries. Every selected image is framed
+// to a fixed aspect ratio (default square) in a cropper before upload, so the
+// stored images tile cleanly in listings. Files are queued and processed one
+// at a time through the same modal.
+export function MultiImageUploader({ value = [], onChange, aspect = 1 }) {
   const [busy, setBusy] = useState(false)
+  const [queue, setQueue] = useState([]) // File[] awaiting crop
   const inputRef = useRef(null)
 
-  const handleFiles = async (files) => {
-    if (!files?.length) return
+  const handleFiles = (files) => {
+    const imgs = Array.from(files || []).filter((f) => f.type.startsWith('image/'))
+    if (imgs.length) setQueue((q) => [...q, ...imgs])
+  }
+
+  const dequeue = () => setQueue((q) => q.slice(1))
+
+  const onCropped = async (file) => {
     setBusy(true)
     try {
-      const res = await api.uploadMany(files)
-      onChange([...(value || []), ...res.map((r) => r.url)])
+      const res = await api.upload(file)
+      onChange([...(value || []), res.url])
+      dequeue()
     } finally {
       setBusy(false)
     }
@@ -83,6 +95,19 @@ export function MultiImageUploader({ value = [], onChange }) {
 
   return (
     <div>
+      {queue.length > 0 && (
+        <ImageCropper
+          key={`${queue[0].name}-${queue[0].size}-${queue[0].lastModified}`}
+          file={queue[0]}
+          aspect={aspect}
+          busy={busy}
+          index={0}
+          total={queue.length}
+          onCropped={onCropped}
+          onSkip={busy ? undefined : dequeue}
+          onClose={busy ? undefined : () => setQueue([])}
+        />
+      )}
       <p className="text-xs font-medium text-stone-500 mb-1.5">Images</p>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {value.map((url, i) => (
@@ -101,7 +126,7 @@ export function MultiImageUploader({ value = [], onChange }) {
           {busy ? <Loader2 size={18} className="animate-spin text-gold-500" /> : <UploadCloud size={18} className="text-stone-400" />}
         </button>
       </div>
-      <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+      <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }} />
     </div>
   )
 }
