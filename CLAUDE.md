@@ -53,7 +53,7 @@ Setting (singleton: slogan, taglines, whatsappNumber, freeShippingCity, socials 
 - **Pages (all storefront pages are API-driven + royal):**
   - `Home.jsx` — hero video + slogan, offer strip, categories, featured jhumkas, story spotlight, royal collections, under ₹599, videos, reviews, customer gallery, slogan band.
   - `Products.jsx` — reads `?category=`/`?collection=`/`?under599=1` from URL, dynamic filter chips from categories/collections, client-side sort, royal header.
-  - `ProductDetail.jsx` — `useProduct(id)` (id or slug), story-forward block, material/weight/sku, add-to-cart + `WhatsAppButton`, related by category. Gallery slide = `object-contain` foreground (whole image, never cropped) over a blurred `object-cover scale-110 blur-2xl` copy of the same photo (ambient fill) so non-square images show fully instead of being center-cropped or leaving flat bars.
+  - `ProductDetail.jsx` — `useProduct(id)` (id or slug), story-forward block, material/weight/sku, add-to-cart + `WhatsAppButton`, related by category. Gallery slide is `aspect-square` (matches the square upload crop, so cropped images fill it with no bands) = `object-contain` foreground (whole image, never cropped) over a blurred `object-cover scale-110 blur-2xl` copy of the same photo (ambient fill) — the blur only shows for legacy non-square images.
   - `Collections.jsx` — alternating royal-collection features + new arrivals.
   - `Wishlist.jsx`, `About.jsx` (settings brand story), `Contact.jsx` (WhatsApp-first composer + settings contact/socials).
   - `Navbar` (brand/logo from settings) + `Footer` (settings-driven: socials, contact, category links) + `SearchModal` (live products).
