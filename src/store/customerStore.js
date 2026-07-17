@@ -21,6 +21,14 @@ export const useCustomerStore = create((set, get) => ({
     catch (e) { set({ error: e.message, loading: false }); return false }
   },
 
+  // Does this email already have an account? Drives the unified auth form
+  // (password step vs create-account step). Never throws — a lookup failure
+  // just falls back to null so the UI can degrade to the classic form.
+  async checkEmail(email) {
+    try { return await api.post('/customer/check-email', { email }) }
+    catch { return null }
+  },
+
   async login(email, password) {
     set({ loading: true, error: null })
     try { return get()._finish(await api.post('/customer/login', { email, password })) }

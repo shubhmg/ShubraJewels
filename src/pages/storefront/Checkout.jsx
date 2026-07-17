@@ -96,6 +96,8 @@ export function Checkout() {
   const [error, setError] = useState(null)
   const [placed, setPlaced] = useState(null)
   const [authOpen, setAuthOpen] = useState(false)
+  const [accountModal, setAccountModal] = useState(false) // one-tap account offer at pay time
+  const [skipAccount, setSkipAccount] = useState(false)    // guest chose to skip — don't nag again
 
   const [couponInput, setCouponInput] = useState('')
   const [coupon, setCoupon] = useState(null)
@@ -298,7 +300,9 @@ export function Checkout() {
 
   // Persist a newly-typed address to the account (fire-and-forget).
   const persistAddress = async () => {
-    if (!signedIn || usingSaved || !saveAddr) return
+    // isAuthed() (not the render-time `signedIn`) so an account just created at
+    // pay-time still gets this order's address saved to it.
+    if (!isAuthed() || usingSaved || !saveAddr) return
     try { await addAddress({ ...addr, name: contact.name.trim(), phone: contact.phone.replace(/\D/g, '') }) } catch { /* non-blocking */ }
   }
 
@@ -424,8 +428,8 @@ export function Checkout() {
   // is placed plainly.
   const codAdvanceOnline = advanceActive && razorpayEnabled
 
-  // Single primary CTA — runs the flow for the selected payment method.
-  const primary = async () => {
+  // Runs the flow for the selected payment method (stock check → pay/place).
+  const runOrder = async () => {
     if (!gate()) return
     setPlacing(true)
     const ok = await preflight() // hard stock check before any payment UI opens
@@ -434,6 +438,20 @@ export function Checkout() {
     if (choice === 'online') return payOnline()
     if (codAdvanceOnline) return payCodAdvance()
     return placeCodOrder()
+  }
+
+  // Single primary CTA. For a first-time guest we already have their email
+  // (it's required above), so we offer a one-tap account before charging —
+  // set a password and this order links to it. Fully skippable; guests still
+  // get email order updates. Signed-in users (or once skipped) go straight
+  // through. The account modal, on success or skip, continues into runOrder.
+  const primary = async () => {
+    if (!gate()) return
+    if (!signedIn && !skipAccount && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim())) {
+      setAccountModal(true)
+      return
+    }
+    runOrder()
   }
   const primaryLabel = placing ? 'Processing…'
     : choice === 'online' ? `Pay Online · ${fmt(total)}`
@@ -707,7 +725,23 @@ export function Checkout() {
           </aside>
         </div>
       </div>
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      {/* Header "Sign in" link */}
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onSuccess={() => fetchMe()} />
+
+      {/* One-tap account offer at pay time (guests only) */}
+      <AuthModal
+        open={accountModal}
+        prefillEmail={contact.email}
+        prefillName={contact.name}
+        prefillPhone={contact.phone.replace(/\D/g, '')}
+        lockEmail
+        title="Create your account"
+        subtitle="You'll still get order updates by email if you skip."
+        benefits={['Track this order in real time', 'Save your address for next time', 'See your full order history']}
+        onSuccess={() => { setAccountModal(false); runOrder() }}
+        onSkip={() => { setSkipAccount(true); setAccountModal(false); runOrder() }}
+        onClose={() => { setSkipAccount(true); setAccountModal(false) }}
+      />
       <StockConflictModal issues={stockIssues} onClose={() => setStockIssues(null)} />
     </div>
   )

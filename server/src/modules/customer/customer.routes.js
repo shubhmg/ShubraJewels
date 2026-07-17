@@ -45,6 +45,31 @@ router.post(
   })
 );
 
+/* ── Email lookup (drives the unified sign-in / sign-up form) ─────────
+   One field, one answer: does this email already have an account? The
+   storefront uses it to branch to the password step (existing account) or
+   the create-password step (new) in a single flow — no dead-end "wrong
+   password" vs "no account here" guessing, in either direction.
+   This does reveal whether an email is registered (email enumeration). That
+   is an accepted trade-off for this checkout UX, and the reason the route
+   sits behind the same login rate-limiter as /login and /register. */
+router.post(
+  '/check-email',
+  validate({ body: Joi.object({ email: Joi.string().email().required() }) }),
+  asyncHandler(async (req, res) => {
+    const email = req.body.email.toLowerCase().trim();
+    const customer = await Customer.findOne({ email }).select('passwordHash googleId').lean();
+    res.json({
+      success: true,
+      data: {
+        exists: !!customer,
+        hasPassword: !!customer?.passwordHash,
+        hasGoogle: !!customer?.googleId,
+      },
+    });
+  })
+);
+
 /* ── Google sign-in ───────────────────────────────────────────────── */
 router.post(
   '/google',

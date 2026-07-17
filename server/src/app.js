@@ -108,6 +108,7 @@ app.use('/api', apiLimiter);
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/customer/login', loginLimiter);
 app.use('/api/customer/register', loginLimiter);
+app.use('/api/customer/check-email', loginLimiter);
 app.use('/api/analytics/track', postOnly(writeLimiter));
 app.use('/api/coupons/validate', writeLimiter);
 app.use('/api/orders', postOnly(writeLimiter));
