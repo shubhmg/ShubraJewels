@@ -25,6 +25,52 @@ function loadGsi() {
 // re-rendered (renderButton) as often as needed.
 let gsiInited = false
 
+// Google's own rendered sign-in button, light/outline theme — the familiar
+// white "Continue with Google" pill. Rendered directly (no custom overlay) and
+// sized to fill its container; re-drawn on resize so it always spans the modal.
+function GoogleSignInButton({ onCredential, disabled }) {
+  const wrap = useRef(null)
+  const holder = useRef(null)
+  const cb = useRef(onCredential)
+  cb.current = onCredential
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return
+    let cancelled = false
+    const render = () => {
+      if (cancelled || !holder.current || !window.google) return
+      const w = Math.min(400, Math.max(240, Math.round(wrap.current?.offsetWidth) || 320))
+      holder.current.innerHTML = ''
+      window.google.accounts.id.renderButton(holder.current, {
+        type: 'standard', theme: 'outline', size: 'large',
+        text: 'continue_with', shape: 'pill', logo_alignment: 'center', width: w,
+      })
+    }
+    const setup = () => {
+      if (cancelled || !window.google) return
+      if (!gsiInited) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (resp) => cb.current?.(resp.credential),
+        })
+        gsiInited = true
+      }
+      render()
+    }
+    loadGsi().then(setup)
+    window.addEventListener('resize', render)
+    return () => { cancelled = true; window.removeEventListener('resize', render) }
+  }, [])
+
+  if (!GOOGLE_CLIENT_ID) return null
+
+  return (
+    <div ref={wrap} className={`w-full ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
+      <div ref={holder} className="flex justify-center min-h-[44px] [color-scheme:light]" />
+    </div>
+  )
+}
+
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 
 // Unified sign-in / sign-up. The customer enters their email FIRST; a lookup
@@ -47,13 +93,15 @@ export function AuthModal({
   const [checking, setChecking] = useState(false)
   const [localErr, setLocalErr] = useState('')
   const { login, register, google, checkEmail, loading, error } = useCustomerStore()
-  const googleBtn = useRef(null)
-  // Latest sign-in handlers, so the one-time GSI callback always uses them.
-  const cbRef = useRef({ google, onSuccess, onClose })
-  cbRef.current = { google, onSuccess, onClose }
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const busy = checking || loading
+
+  // Verify a Google credential, then sign in + close.
+  const handleGoogleCredential = async (credential) => {
+    if (!credential) return
+    if (await google(credential)) { onSuccess?.(); onClose() }
+  }
 
   // Look the email up and branch to the right step.
   const runLookup = async (value) => {
@@ -79,47 +127,6 @@ export function AuthModal({
     setStep('email')
     if (lockEmail && isEmail(seed)) runLookup(seed)
   }, [open]) // eslint-disable-line
-
-  // Render Google's button on steps that offer it. Styled to match the rest of
-  // the form: pill shape, solid theme, and sized to fill its container (not a
-  // fixed 320px), re-rendering on resize so it always spans the modal width.
-  const showGoogle = GOOGLE_CLIENT_ID && (step === 'email' || step === 'googleOnly')
-  useEffect(() => {
-    if (!open || !showGoogle) return
-    let cancelled = false
-    // Draw (or redraw) the button at the container's current width.
-    const renderButton = () => {
-      if (cancelled || !googleBtn.current || !window.google) return
-      const w = Math.min(400, Math.max(240, Math.round(googleBtn.current.offsetWidth) || 320))
-      googleBtn.current.innerHTML = ''
-      window.google.accounts.id.renderButton(googleBtn.current, {
-        type: 'standard',
-        theme: 'filled_black',
-        size: 'large',
-        text: 'continue_with',
-        shape: 'pill',
-        logo_alignment: 'center',
-        width: w,
-      })
-    }
-    const setup = () => {
-      if (cancelled || !window.google) return
-      if (!gsiInited) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: async (resp) => {
-            const { google: g, onSuccess: ok, onClose: close } = cbRef.current
-            if (await g(resp.credential)) { ok?.(); close?.() }
-          },
-        })
-        gsiInited = true
-      }
-      renderButton()
-    }
-    loadGsi().then(setup)
-    window.addEventListener('resize', renderButton)
-    return () => { cancelled = true; window.removeEventListener('resize', renderButton) }
-  }, [open, step]) // eslint-disable-line
 
   if (!open) return null
 
@@ -225,10 +232,10 @@ export function AuthModal({
         {/* ── Step 1: email ── */}
         {step === 'email' && !autoChecking && (
           <>
-            {showGoogle && (
+            {GOOGLE_CLIENT_ID && (
               <>
-                <div ref={googleBtn} className="flex justify-center mb-4 min-h-[44px] [color-scheme:light]" />
-                <div className="flex items-center gap-3 mb-4 text-xs text-stone-400">
+                <GoogleSignInButton onCredential={handleGoogleCredential} disabled={busy} />
+                <div className="flex items-center gap-3 my-4 text-xs text-stone-400">
                   <span className="flex-1 h-px bg-stone-200" /> or <span className="flex-1 h-px bg-stone-200" />
                 </div>
               </>
@@ -287,7 +294,7 @@ export function AuthModal({
         {step === 'googleOnly' && (
           <div className="space-y-3">
             <p className="text-sm text-stone-600 text-center">You created this account with Google. Continue with Google to sign in.</p>
-            <div ref={googleBtn} className="flex justify-center min-h-[44px] [color-scheme:light]" />
+            <GoogleSignInButton onCredential={handleGoogleCredential} disabled={busy} />
             {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             {skipBtn}
           </div>
