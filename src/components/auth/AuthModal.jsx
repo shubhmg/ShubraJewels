@@ -72,13 +72,16 @@ export function AuthModal({
     if (lockEmail && isEmail(seed)) runLookup(seed)
   }, [open]) // eslint-disable-line
 
-  // Render the Google button on steps that offer it.
+  // Render Google's button on steps that offer it. Styled to match the rest of
+  // the form: pill shape, solid theme, and sized to fill its container (not a
+  // fixed 320px), re-rendering on resize so it always spans the modal width.
   const showGoogle = GOOGLE_CLIENT_ID && (step === 'email' || step === 'googleOnly')
   useEffect(() => {
     if (!open || !showGoogle) return
     let cancelled = false
-    loadGsi().then(() => {
+    const render = () => {
       if (cancelled || !googleBtn.current || !window.google) return
+      const w = Math.min(400, Math.max(240, Math.round(googleBtn.current.offsetWidth) || 320))
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: async (resp) => {
@@ -87,9 +90,19 @@ export function AuthModal({
         },
       })
       googleBtn.current.innerHTML = ''
-      window.google.accounts.id.renderButton(googleBtn.current, { theme: 'outline', size: 'large', width: 320, text: 'continue_with' })
-    })
-    return () => { cancelled = true }
+      window.google.accounts.id.renderButton(googleBtn.current, {
+        type: 'standard',
+        theme: 'filled_black',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'pill',
+        logo_alignment: 'center',
+        width: w,
+      })
+    }
+    loadGsi().then(render)
+    window.addEventListener('resize', render)
+    return () => { cancelled = true; window.removeEventListener('resize', render) }
   }, [open, step]) // eslint-disable-line
 
   if (!open) return null
@@ -198,7 +211,7 @@ export function AuthModal({
           <>
             {showGoogle && (
               <>
-                <div ref={googleBtn} className="flex justify-center mb-4 min-h-[40px]" />
+                <div ref={googleBtn} className="flex justify-center mb-4 min-h-[44px] [color-scheme:light]" />
                 <div className="flex items-center gap-3 mb-4 text-xs text-stone-400">
                   <span className="flex-1 h-px bg-stone-200" /> or <span className="flex-1 h-px bg-stone-200" />
                 </div>
@@ -258,7 +271,7 @@ export function AuthModal({
         {step === 'googleOnly' && (
           <div className="space-y-3">
             <p className="text-sm text-stone-600 text-center">You created this account with Google. Continue with Google to sign in.</p>
-            <div ref={googleBtn} className="flex justify-center min-h-[40px]" />
+            <div ref={googleBtn} className="flex justify-center min-h-[44px] [color-scheme:light]" />
             {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             {skipBtn}
           </div>

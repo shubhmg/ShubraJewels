@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Home as HomeIcon, Package, Boxes, Tags, Crown, Megaphone, Video, Star, Image as ImageIcon,
-  ShoppingCart, Settings, ChevronLeft, ChevronRight, ExternalLink, LogOut, Menu, X, Eye, Ticket, BarChart3,
+  ShoppingCart, Settings, ChevronLeft, ChevronRight, ExternalLink, LogOut, Menu, X, Eye, Ticket, BarChart3, Users,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
@@ -14,6 +14,7 @@ const NAV = [
   { to: '/admin/product-views', icon: Eye, label: 'Product Views' },
   { to: '/admin/homepage', icon: HomeIcon, label: 'Homepage' },
   { to: '/admin/orders', icon: ShoppingCart, label: 'Orders' },
+  { to: '/admin/customers', icon: Users, label: 'Customers' },
   { to: '/admin/reports', icon: BarChart3, label: 'Sales Report' },
   { to: '/admin/coupons', icon: Ticket, label: 'Coupons' },
   { section: 'Catalog' },

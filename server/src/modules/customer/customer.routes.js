@@ -6,6 +6,7 @@ import validate from '../../middleware/validate.js';
 import asyncHandler from '../../utils/asyncHandler.js';
 import ApiError from '../../utils/ApiError.js';
 import { requireCustomer, signCustomer } from '../../middleware/customerAuth.js';
+import requireAdmin from '../../middleware/auth.js';
 import Customer from './customer.model.js';
 import Order from '../order/order.model.js';
 import Review from '../review/review.model.js';
@@ -232,6 +233,68 @@ router.put(
   asyncHandler(async (req, res) => {
     await Customer.findByIdAndUpdate(req.customer.id, { cart: req.body.cart });
     res.json({ success: true });
+  })
+);
+
+/* ── Admin: list customer accounts ────────────────────────────────────
+   Paginated + searchable (name / email / phone). Joins order stats so the
+   admin sees orders placed, lifetime spend, and last order per account. */
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+router.get(
+  '/admin/list',
+  requireAdmin,
+  validate({
+    query: Joi.object({
+      search: Joi.string().allow('').max(120).default(''),
+      page: Joi.number().min(1).default(1),
+      limit: Joi.number().min(1).max(100).default(20),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const { search, page, limit } = req.query;
+    const q = {};
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      q.$or = [{ name: rx }, { email: rx }, { phone: rx }];
+    }
+
+    const total = await Customer.countDocuments(q);
+    const customers = await Customer.find(q)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    // Order stats per listed customer (one grouped query).
+    const ids = customers.map((c) => c._id);
+    const stats = ids.length
+      ? await Order.aggregate([
+          { $match: { customerId: { $in: ids } } },
+          { $group: { _id: '$customerId', orders: { $sum: 1 }, spent: { $sum: '$total' }, lastOrderAt: { $max: '$createdAt' } } },
+        ])
+      : [];
+    const statMap = Object.fromEntries(stats.map((s) => [String(s._id), s]));
+
+    const data = customers.map((c) => {
+      const s = statMap[String(c._id)] || {};
+      return {
+        id: c._id,
+        name: c.name || '',
+        email: c.email,
+        phone: c.phone || '',
+        avatar: c.avatar || '',
+        // How they sign in — drives a badge in the UI.
+        provider: c.googleId ? (c.passwordHash ? 'password + Google' : 'Google') : (c.passwordHash ? 'password' : 'none'),
+        addresses: (c.addresses || []).length,
+        createdAt: c.createdAt,
+        orders: s.orders || 0,
+        spent: s.spent || 0,
+        lastOrderAt: s.lastOrderAt || null,
+      };
+    });
+
+    res.json({ success: true, data: { customers: data, total, page, limit } });
   })
 );
 
