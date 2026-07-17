@@ -161,6 +161,28 @@ const settingSchema = new mongoose.Schema(
       height: { type: Number, default: 5 },
     },
 
+    // Delhivery direct integration. `token` is SECRET (the Delhivery API token;
+    // stripped from the public GET /settings and only ever read server-side).
+    // A parallel courier to Shiprocket — the admin books an order through
+    // whichever provider is enabled. `policy` mirrors Shiprocket's (manual by
+    // default; booking is always an explicit admin action either way).
+    delhivery: {
+      enabled: { type: Boolean, default: false },
+      token: { type: String, default: '' },            // Delhivery API token (secret)
+      staging: { type: Boolean, default: false },       // hit the staging API instead of prod
+      policy: { type: String, enum: ['all', 'cod', 'prepaid', 'manual'], default: 'manual' },
+      // Pickup warehouse — must match a warehouse registered in the Delhivery panel.
+      pickupName: { type: String, default: '' },
+      pickupPhone: { type: String, default: '' },
+      pickupAddress: { type: String, default: '' },
+      pickupCity: { type: String, default: '' },
+      pickupState: { type: String, default: '' },
+      pickupPin: { type: String, default: '' },
+      defaultWeightGrams: { type: Number, default: 100 }, // per-unit weight (g), × qty
+      sellerName: { type: String, default: '' },          // falls back to brandName
+      productDesc: { type: String, default: 'Imitation jewellery (jhumka)' },
+    },
+
     // Order notifications. SECRET — the Telegram bot token must never be sent to
     // the public storefront; the /settings GET strips `notifications` and the
     // admin panel reads it via GET /settings/admin.

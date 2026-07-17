@@ -132,6 +132,7 @@ export function AdminOrders() {
   const [selected, setSelected] = useState([])  // order ids picked for bulk shipping (To Ship tab)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [srCfg, setSrCfg] = useState(null)     // Shiprocket config (enabled/policy/ready)
+  const [delCfg, setDelCfg] = useState(null)   // Delhivery config (enabled/policy/ready)
 
   // Courier config drives the ship flow (auto-book vs manual). Read from the
   // admin settings endpoint (the tokens/passwords stay server-side).
@@ -149,8 +150,17 @@ export function AdminOrders() {
           defaultWeightKg: Number(r.defaultWeightKg) || 0.3,
           routing: s?.shippingRouting || r.policy || 'manual',
         })
+        const d = s?.delhivery || {}
+        setDelCfg({
+          enabled: !!d.enabled,
+          policy: d.policy || 'manual',
+          hasToken: !!d.token,
+          hasPickup: !!d.pickupName,
+          ready: !!(d.enabled && d.token && d.pickupName),
+          defaultWeightGrams: Number(d.defaultWeightGrams) || 100,
+        })
       })
-      .catch(() => setSrCfg({ enabled: false, ready: false }))
+      .catch(() => { setSrCfg({ enabled: false, ready: false }); setDelCfg({ enabled: false, ready: false }) })
   }, [])
 
   // Debounced search; reset to page 1 on new query/filter.
@@ -255,7 +265,7 @@ export function AdminOrders() {
         </button>
       </div>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
-      {shipFor && <ShipModal order={shipFor} srCfg={srCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
+      {shipFor && <ShipModal order={shipFor} srCfg={srCfg} delCfg={delCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
 
       {/* ── Pipeline — live work gets the big cards; Delivered/Cancelled are
              quiet archive pills so they never pull focus ─────── */}
@@ -407,7 +417,7 @@ export function AdminOrders() {
                     <span className="font-bold text-[13px] sm:text-[14px] text-zinc-900 tracking-tight truncate">{o.orderNo}</span>
                     <span className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
                     {o.shipment?.waybill && o.shipment.provider !== 'manual' && (
-                      <span className="hidden sm:inline shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">Shiprocket</span>
+                      <span className="hidden sm:inline shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">{o.shipment.provider === 'delhivery' ? 'Delhivery' : 'Shiprocket'}</span>
                     )}
                   </div>
                   <p className="text-[12px] sm:text-[13px] text-zinc-500 truncate mt-0.5">
@@ -601,7 +611,7 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
           {sh?.provider && sh.provider !== 'manual' && sh?.waybill && (
             <div className="rounded-2xl px-4 py-3.5 text-sm" style={{ background: 'color-mix(in srgb, #6366f1 9%, white)' }}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="font-semibold text-indigo-700 flex items-center gap-1.5"><Package size={14} /> Shiprocket{sh.courierName ? ` · ${sh.courierName}` : ''} {sh.mode && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold uppercase">{sh.mode}</span>}</p>
+                <p className="font-semibold text-indigo-700 flex items-center gap-1.5"><Package size={14} /> {sh.provider === 'delhivery' ? 'Delhivery' : 'Shiprocket'}{sh.courierName ? ` · ${sh.courierName}` : ''} {sh.mode && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold uppercase">{sh.mode}</span>}</p>
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-indigo-700 font-bold">{sh.status || 'Booked'}</span>
               </div>
               <p className="text-zinc-600 mt-1.5">AWB <a href={sh.trackingUrl || trackUrl(sh.waybill)} target="_blank" rel="noopener noreferrer" className="font-mono font-semibold text-indigo-700 hover:underline">{sh.waybill}</a>
@@ -1139,21 +1149,23 @@ function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
 // Ship an order. When Shiprocket is configured, book a waybill via its API
 // (auto-fills the customer tracking message); otherwise (or by choice) paste a
 // manual tracking note the customer will see.
-function ShipModal({ order, srCfg, onClose, onShipped }) {
+function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
   const alreadyShipped = order.status === 'shipped' || order.status === 'delivered'
   const mode = paymentMode(order)
   const totalQty = (order.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1
   const pin = order.address?.pincode
   const srReady = !!srCfg?.ready
+  const delReady = !!delCfg?.ready
 
-  // Tabs: Shiprocket whenever enabled (incomplete setup shows what's missing)
-  // + a Manual note fallback.
+  // Tabs: each enabled courier (incomplete setup shows what's missing) + a
+  // Manual note fallback.
   const tabs = []
   if (!alreadyShipped && srCfg?.enabled) tabs.push({ v: 'shiprocket', label: 'Shiprocket' })
+  if (!alreadyShipped && delCfg?.enabled) tabs.push({ v: 'delhivery', label: 'Delhivery' })
   tabs.push({ v: 'manual', label: 'Manual note' })
 
-  // The store's shipping-routing preference RECOMMENDS a tab for this order
-  // (badge + preselect); the admin can always tap the other one.
+  // The store's shipping-routing preference RECOMMENDS Shiprocket for this order
+  // (badge + preselect); the admin can always tap another tab.
   //   all → Shiprocket for everything · cod → Shiprocket for COD, manual for
   //   prepaid · prepaid → the reverse · manual → no recommendation.
   const recommended = (() => {
@@ -1164,7 +1176,11 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
     if (pol === 'prepaid') return mode === 'Prepaid' ? 'shiprocket' : 'manual'
     return null
   })()
-  const [method, setMethod] = useState(!alreadyShipped && recommended ? recommended : 'manual')
+  // Default tab: routing recommendation → first ready courier → manual.
+  const defaultMethod = !alreadyShipped
+    ? (recommended || (srReady ? 'shiprocket' : delReady ? 'delhivery' : 'manual'))
+    : 'manual'
+  const [method, setMethod] = useState(defaultMethod)
 
   // Sheet entrance/exit + Esc + scroll lock (restores the drawer's lock state).
   const [show, setShow] = useState(false)
@@ -1183,8 +1199,9 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
   }, []) // eslint-disable-line
 
   const [message, setMessage] = useState(order.tracking?.message || '')
-  const [kWeight, setKWeight] = useState(String(((srCfg?.defaultWeightKg || 0.3) * totalQty).toFixed(2))) // kg
-  const [serv, setServ] = useState(null) // serviceability result (includes courier list + rates)
+  const [kWeight, setKWeight] = useState(String(((srCfg?.defaultWeightKg || 0.3) * totalQty).toFixed(2))) // kg (Shiprocket)
+  const [gWeight, setGWeight] = useState(String((delCfg?.defaultWeightGrams || 100) * totalQty)) // grams (Delhivery)
+  const [serv, setServ] = useState(null) // serviceability result (per active courier tab)
   const [courierId, setCourierId] = useState(null) // null = let Shiprocket pick
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -1204,6 +1221,17 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
     return () => { live = false; clearTimeout(t) }
   }, [method, pin, kWeight]) // eslint-disable-line
 
+  // Delhivery pincode serviceability (COD/prepaid availability). Weight-agnostic.
+  useEffect(() => {
+    if (method !== 'delhivery' || !delReady || !pin) return
+    let live = true
+    setServ(null)
+    api.get(`/orders/delhivery/serviceability?pin=${encodeURIComponent(pin)}`, { auth: true })
+      .then((r) => { if (live) setServ({ ok: true, ...r }) })
+      .catch((e) => { if (live) setServ({ ok: false, error: e.message }) })
+    return () => { live = false }
+  }, [method, pin]) // eslint-disable-line
+
   const submitManual = async () => {
     setSaving(true); setErr('')
     try {
@@ -1217,19 +1245,30 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
   const submitCourier = async () => {
     setSaving(true); setErr('')
     try {
-      const w = Number(kWeight)
-      const body = w > 0 ? { weight: w } : {}
-      if (courierId) body.courierId = courierId
-      const updated = await api.post(`/orders/${order._id}/ship-shiprocket`, body, { auth: true })
+      let updated
+      if (method === 'delhivery') {
+        const g = Math.round(Number(gWeight))
+        const body = g > 0 ? { weight: g } : {}
+        updated = await api.post(`/orders/${order._id}/ship-delhivery`, body, { auth: true })
+      } else {
+        const w = Number(kWeight)
+        const body = w > 0 ? { weight: w } : {}
+        if (courierId) body.courierId = courierId
+        updated = await api.post(`/orders/${order._id}/ship-shiprocket`, body, { auth: true })
+      }
       onShipped(updated)
     } catch (e) { setErr(e.message || 'Could not book this shipment'); setSaving(false) }
   }
 
-  const missingMsg = [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
+  const activeReady = method === 'delhivery' ? delReady : method === 'shiprocket' ? srReady : true
+  const missingMsg = method === 'delhivery'
+    ? [!delCfg?.hasToken && 'API token', !delCfg?.hasPickup && 'pickup warehouse name'].filter(Boolean).join(' & ')
+    : [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
+  const courierLabel = method === 'delhivery' ? 'Delhivery' : 'Shiprocket'
   const pickedCourier = courierId != null ? (serv?.couriers || []).find((c) => c.id === courierId) : null
   const primaryLabel = method === 'manual'
     ? (saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped'))
-    : (saving ? 'Booking…' : pickedCourier ? `Book ${pickedCourier.name} · ₹${Math.round(pickedCourier.rate || 0)}` : 'Book Shiprocket & Ship')
+    : (saving ? 'Booking…' : pickedCourier ? `Book ${pickedCourier.name} · ₹${Math.round(pickedCourier.rate || 0)}` : `Book ${courierLabel} & Ship`)
 
   return (
     <div id="ship-modal-root" className="fixed inset-0 z-[70]">
@@ -1253,7 +1292,7 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
             </div>
 
             {tabs.length > 1 && (
-              <div className="grid grid-cols-2 gap-1.5 mt-3.5">
+              <div className={`grid gap-1.5 mt-3.5 ${tabs.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {tabs.map(({ v, label }) => {
                   const on = method === v
                   const rec = recommended === v && !alreadyShipped
@@ -1282,6 +1321,41 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
                 <Field field={{ label: 'Tracking message', type: 'textarea', placeholder: 'e.g. Shipped via India Post. Tracking: 1234567890 — https://…' }} value={message} onChange={setMessage} />
                 <p className="text-[12px] text-zinc-400 mt-2">Paste the courier's note (tracking id + link). It's shown to the customer exactly as typed.</p>
               </div>
+            ) : method === 'delhivery' ? (
+              <>
+                {!delReady && (
+                  <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
+                    <p className="font-semibold text-amber-700">Finish Delhivery setup first</p>
+                    <p className="text-amber-700/90 text-xs mt-0.5">
+                      Missing {missingMsg}. Go to <b>Settings → Payments &amp; Shipping → Delhivery</b>, fill them in, and hit <b>Save Changes</b>.
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[13px] text-zinc-500 px-1">
+                  Books a Delhivery waybill as <b className="text-zinc-700">{mode}</b>
+                  {mode === 'COD' && <> — collect <b className="text-zinc-700">{fmt(Math.max(0, (order.total || 0) - (order.advancePaid || 0)))}</b> on delivery</>}.
+                  The customer's tracking link is filled in automatically.
+                </p>
+
+                {/* Weight (grams) */}
+                <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                  <Field field={{ label: 'Package weight (grams)', type: 'number', help: `Default ${delCfg?.defaultWeightGrams || 100} g × ${totalQty} item(s). Adjust if needed.` }} value={gWeight} onChange={setGWeight} />
+                </div>
+
+                {/* Serviceability — COD / prepaid availability at the PIN */}
+                <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Delivery to PIN {pin || '—'}</p>
+                  <div className="mt-1.5 text-[13px] font-medium">
+                    {!pin ? <p className="text-red-600">No PIN on this order — add one before booking.</p>
+                      : !delReady ? <p className="text-zinc-400">Finish setup to check serviceability.</p>
+                      : !serv ? <p className="text-zinc-400 flex items-center gap-2"><RefreshCw size={13} className="animate-spin" /> Checking serviceability…</p>
+                      : !serv.ok ? <p className="text-amber-600">Couldn't verify ({serv.error}). You can still try to book.</p>
+                      : !serv.serviceable ? <p className="text-red-600">Not serviceable by Delhivery. Try Shiprocket or ship manually.</p>
+                      : <p className="text-emerald-700">Serviceable{serv.city ? ` · ${serv.city}, ${serv.state}` : ''} · COD {serv.cod ? '✓' : '✗'} · Prepaid {serv.prepaid ? '✓' : '✗'}{mode === 'COD' && !serv.cod ? ' — COD not available here!' : ''}</p>}
+                  </div>
+                </div>
+              </>
             ) : (
               <>
                 {!srReady && (
@@ -1364,7 +1438,7 @@ function ShipModal({ order, srCfg, onClose, onShipped }) {
           <div className="bg-white border-t border-zinc-100 p-4 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
             <button
               onClick={method === 'manual' ? submitManual : submitCourier}
-              disabled={saving || (method !== 'manual' && !srReady)}
+              disabled={saving || (method !== 'manual' && !activeReady)}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-default"
               style={{ background: 'var(--maroon)' }}
             >

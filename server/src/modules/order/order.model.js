@@ -54,7 +54,7 @@ const orderSchema = new mongoose.Schema(
     // pastes a tracking note. `provider: 'shiprocket'` = a waybill was booked via
     // the Shiprocket API; status/label refresh via sync + the status webhook.
     shipment: {
-      provider: { type: String, enum: ['manual', 'shiprocket'], default: 'manual' },
+      provider: { type: String, enum: ['manual', 'shiprocket', 'delhivery'], default: 'manual' },
       waybill: { type: String, default: '' },           // AWB / tracking number
       shipmentId: { type: String, default: '' },        // Shiprocket shipment id (for label/pickup)
       srOrderId: { type: String, default: '' },         // Shiprocket internal order id (for cancel)
