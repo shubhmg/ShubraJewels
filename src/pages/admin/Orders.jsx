@@ -388,7 +388,7 @@ export function AdminOrders() {
             const a = nextAction(o.status)
             const firstImg = (o.items || []).find((it) => it.image)?.image
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
-            const canBulk = filter === 'confirmed' && srCfg?.enabled && !o.shipment?.waybill
+            const canBulk = filter === 'confirmed' && (srCfg?.enabled || delCfg?.enabled) && !o.shipment?.waybill
             const isSel = selected.includes(o._id)
             return (
               <div
@@ -474,7 +474,7 @@ export function AdminOrders() {
             className="flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] whitespace-nowrap"
             style={{ background: 'var(--maroon)' }}
           >
-            <Package size={14} /> Book {selected.length}<span className="hidden sm:inline">&nbsp;via Shiprocket</span>
+            <Package size={14} /> Book {selected.length}<span className="hidden sm:inline">&nbsp;& Ship</span>
           </button>
         </div>
       )}
@@ -482,6 +482,7 @@ export function AdminOrders() {
         <BulkShipSheet
           orders={orders.filter((o) => selected.includes(o._id))}
           srCfg={srCfg}
+          delCfg={delCfg}
           onClose={() => setBulkOpen(false)}
           onDone={() => { setBulkOpen(false); setSelected([]); load() }}
         />
@@ -999,16 +1000,24 @@ function CancelSheet({ o, onClose, onConfirm }) {
   )
 }
 
-// Bulk-book Shiprocket for the selected orders using default weights
-// (defaultWeightKg × items per order). One request books everything
-// sequentially server-side and clubs a single pickup; partial failures stay
-// in To Ship with their reasons shown here.
-function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
+// Bulk-book a courier (Shiprocket or Delhivery) for the selected orders using
+// default weights per order. One request books everything sequentially
+// server-side (Shiprocket also clubs a single pickup); partial failures stay in
+// To Ship with their reasons shown here. When both couriers are enabled the
+// admin picks which one at the top of the sheet.
+function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
   const [show, setShow] = useState(false)
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null) // { booked, failed, pickupScheduled }
   const [err, setErr] = useState('')
   const srReady = !!srCfg?.ready
+  const delReady = !!delCfg?.ready
+  const providers = []
+  if (srCfg?.enabled) providers.push('shiprocket')
+  if (delCfg?.enabled) providers.push('delhivery')
+  const [provider, setProvider] = useState(srReady ? 'shiprocket' : delReady ? 'delhivery' : (providers[0] || 'shiprocket'))
+  const isDel = provider === 'delhivery'
+  const activeReady = isDel ? delReady : srReady
   const close = () => { setShow(false); setTimeout(result ? onDone : onClose, 200) }
 
   useEffect(() => {
@@ -1024,12 +1033,15 @@ function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
     }
   }, [saving, result]) // eslint-disable-line
 
-  const wKg = (o) => (((srCfg?.defaultWeightKg || 0.3) * ((o.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1))).toFixed(2)
+  const qtyOf = (o) => (o.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1
+  const wKg = (o) => (((srCfg?.defaultWeightKg || 0.3) * qtyOf(o))).toFixed(2)
+  const wG = (o) => Math.round((delCfg?.defaultWeightGrams || 100) * qtyOf(o))
+  const weightLabel = (o) => (isDel ? `${wG(o)} g` : `${wKg(o)} kg`)
 
   const submit = async () => {
     setSaving(true); setErr('')
     try {
-      const r = await api.post('/orders/bulk-ship', { ids: orders.map((o) => o._id) }, { auth: true })
+      const r = await api.post('/orders/bulk-ship', { ids: orders.map((o) => o._id), provider }, { auth: true })
       setResult(r || { booked: [], failed: [] })
     } catch (e) {
       setErr(e?.message || 'Bulk booking failed')
@@ -1051,7 +1063,7 @@ function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Bulk ship</p>
-                <p className="font-extrabold text-[17px] text-zinc-900 tracking-tight mt-0.5">{result ? 'Booking results' : `${orders.length} order${orders.length === 1 ? '' : 's'} via Shiprocket`}</p>
+                <p className="font-extrabold text-[17px] text-zinc-900 tracking-tight mt-0.5">{result ? 'Booking results' : `${orders.length} order${orders.length === 1 ? '' : 's'} via ${isDel ? 'Delhivery' : 'Shiprocket'}`}</p>
               </div>
               <button onClick={close} disabled={saving} className="w-9 h-9 grid place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer transition shrink-0 disabled:opacity-40" aria-label="Close">
                 <X size={18} />
@@ -1090,20 +1102,44 @@ function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
                   </div>
                 )}
                 <p className="text-[12px] text-zinc-400 px-1">
-                  {result.pickupScheduled
-                    ? 'One clubbed pickup has been requested for the whole batch.'
-                    : 'Pickup not auto-scheduled — schedule it from the Shiprocket dashboard (or turn on auto-pickup in Settings).'}
+                  {isDel
+                    ? 'Delhivery manifests each parcel immediately — arrange the pickup from your Delhivery panel.'
+                    : result.pickupScheduled
+                      ? 'One clubbed pickup has been requested for the whole batch.'
+                      : 'Pickup not auto-scheduled — schedule it from the Shiprocket dashboard (or turn on auto-pickup in Settings).'}
                 </p>
               </>
             ) : (
               <>
-                {!srReady && (
-                  <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
-                    <p className="font-semibold text-amber-700">Finish Shiprocket setup first</p>
-                    <p className="text-amber-700/90 text-xs mt-0.5">Add the email, API password and pickup location in <b>Settings → Payments &amp; Shipping → Shiprocket</b>.</p>
+                {/* Courier picker — only when both couriers are enabled */}
+                {providers.length > 1 && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {providers.map((p) => {
+                      const on = provider === p
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setProvider(p)}
+                          className="py-2 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-colors"
+                          style={on
+                            ? { background: 'color-mix(in srgb, var(--maroon) 10%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                            : { background: '#fff', color: '#71717a', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                        >
+                          {p === 'delhivery' ? 'Delhivery' : 'Shiprocket'}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
-                <p className="text-[13px] text-zinc-500 px-1">Each order books with its <b className="text-zinc-700">default weight</b> ({srCfg?.defaultWeightKg || 0.3} kg × items). Shiprocket assigns the recommended courier per order and the pickup is clubbed. Odd-sized parcels? Ship them individually instead.</p>
+                {!activeReady && (
+                  <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
+                    <p className="font-semibold text-amber-700">Finish {isDel ? 'Delhivery' : 'Shiprocket'} setup first</p>
+                    <p className="text-amber-700/90 text-xs mt-0.5">{isDel
+                      ? <>Add the API token and pickup warehouse in <b>Settings → Payments &amp; Shipping → Delhivery</b>.</>
+                      : <>Add the email, API password and pickup location in <b>Settings → Payments &amp; Shipping → Shiprocket</b>.</>}</p>
+                  </div>
+                )}
+                <p className="text-[13px] text-zinc-500 px-1">Each order books with its <b className="text-zinc-700">default weight</b> ({isDel ? `${delCfg?.defaultWeightGrams || 100} g` : `${srCfg?.defaultWeightKg || 0.3} kg`} × items). {isDel ? 'Delhivery books a Surface waybill per order.' : 'Shiprocket assigns the recommended courier per order and the pickup is clubbed.'} Odd-sized parcels? Ship them individually instead.</p>
                 <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
                   <div className="divide-y divide-zinc-50">
                     {orders.map((o) => (
@@ -1113,7 +1149,7 @@ function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
                           <p className="text-zinc-400 truncate text-[12px]">{o.customer?.name}</p>
                         </div>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase ${paymentMode(o) === 'COD' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{paymentMode(o)}</span>
-                        <span className="text-zinc-500 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>{wKg(o)} kg</span>
+                        <span className="text-zinc-500 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>{weightLabel(o)}</span>
                       </div>
                     ))}
                   </div>
@@ -1132,7 +1168,7 @@ function BulkShipSheet({ orders, srCfg, onClose, onDone }) {
             ) : (
               <button
                 onClick={submit}
-                disabled={saving || !srReady || orders.length === 0}
+                disabled={saving || !activeReady || orders.length === 0}
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-default"
                 style={{ background: 'var(--maroon)' }}
               >
@@ -1221,16 +1257,21 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
     return () => { live = false; clearTimeout(t) }
   }, [method, pin, kWeight]) // eslint-disable-line
 
-  // Delhivery pincode serviceability (COD/prepaid availability). Weight-agnostic.
+  // Delhivery serviceability (COD/prepaid) + Surface freight estimate at the
+  // current weight. Re-quotes (debounced) when the grams weight changes.
   useEffect(() => {
     if (method !== 'delhivery' || !delReady || !pin) return
     let live = true
-    setServ(null)
-    api.get(`/orders/delhivery/serviceability?pin=${encodeURIComponent(pin)}`, { auth: true })
-      .then((r) => { if (live) setServ({ ok: true, ...r }) })
-      .catch((e) => { if (live) setServ({ ok: false, error: e.message }) })
-    return () => { live = false }
-  }, [method, pin]) // eslint-disable-line
+    const t = setTimeout(() => {
+      setServ(null)
+      const g = Math.round(Number(gWeight)) || 0
+      const wq = g > 0 ? `&weight=${g}&cod=${mode === 'COD'}` : ''
+      api.get(`/orders/delhivery/serviceability?pin=${encodeURIComponent(pin)}${wq}`, { auth: true })
+        .then((r) => { if (live) setServ({ ok: true, ...r }) })
+        .catch((e) => { if (live) setServ({ ok: false, error: e.message }) })
+    }, serv ? 600 : 0) // instant on open, debounced on weight edits
+    return () => { live = false; clearTimeout(t) }
+  }, [method, pin, gWeight]) // eslint-disable-line
 
   const submitManual = async () => {
     setSaving(true); setErr('')
@@ -1266,9 +1307,13 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
     : [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
   const courierLabel = method === 'delhivery' ? 'Delhivery' : 'Shiprocket'
   const pickedCourier = courierId != null ? (serv?.couriers || []).find((c) => c.id === courierId) : null
+  const delRate = method === 'delhivery' && serv?.ok && serv?.serviceable ? serv.rate : null
   const primaryLabel = method === 'manual'
     ? (saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped'))
-    : (saving ? 'Booking…' : pickedCourier ? `Book ${pickedCourier.name} · ₹${Math.round(pickedCourier.rate || 0)}` : `Book ${courierLabel} & Ship`)
+    : (saving ? 'Booking…'
+        : pickedCourier ? `Book ${pickedCourier.name} · ₹${Math.round(pickedCourier.rate || 0)}`
+        : delRate != null ? `Book Delhivery · ₹${delRate}`
+        : `Book ${courierLabel} & Ship`)
 
   return (
     <div id="ship-modal-root" className="fixed inset-0 z-[70]">
@@ -1352,8 +1397,11 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
                       : !serv ? <p className="text-zinc-400 flex items-center gap-2"><RefreshCw size={13} className="animate-spin" /> Checking serviceability…</p>
                       : !serv.ok ? <p className="text-amber-600">Couldn't verify ({serv.error}). You can still try to book.</p>
                       : !serv.serviceable ? <p className="text-red-600">Not serviceable by Delhivery. Try Shiprocket or ship manually.</p>
-                      : <p className="text-emerald-700">Serviceable{serv.city ? ` · ${serv.city}, ${serv.state}` : ''} · COD {serv.cod ? '✓' : '✗'} · Prepaid {serv.prepaid ? '✓' : '✗'}{mode === 'COD' && !serv.cod ? ' — COD not available here!' : ''}</p>}
+                      : <p className="text-emerald-700">Serviceable{serv.city ? ` · ${serv.city}, ${serv.state}` : ''} · COD {serv.cod ? '✓' : '✗'} · Prepaid {serv.prepaid ? '✓' : '✗'}{serv.rate != null ? <> · <b>~₹{serv.rate}</b></> : ''}{mode === 'COD' && !serv.cod ? ' — COD not available here!' : ''}</p>}
                   </div>
+                  {serv?.ok && serv?.serviceable && serv.rate != null && (
+                    <p className="text-[11px] text-zinc-400 pt-2">Estimated Surface freight for {gWeight || '0'} g{mode === 'COD' ? ' incl. COD' : ''}, charged to your Delhivery account.</p>
+                  )}
                 </div>
               </>
             ) : (

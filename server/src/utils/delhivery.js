@@ -129,6 +129,32 @@ export async function checkServiceability(settings, pin) {
   };
 }
 
+// Estimate the Surface freight for a parcel (Delhivery is a single carrier, so
+// there's one rate — unlike Shiprocket's courier list). Uses the Invoice
+// Charges API. Returns { ok, amount, error }. `grams` = chargeable weight.
+export async function estimateRate(settings, { pin, grams, cod } = {}) {
+  const cfg = delhiveryConfig(settings);
+  if (!cfg.enabled || !cfg.token) return { ok: false, error: 'Delhivery not configured' };
+  const origin = cfg.pickup.pin;
+  if (!origin) return { ok: false, error: 'Set the Delhivery pickup PIN to estimate rates' };
+  if (!/^\d{6}$/.test(String(pin || '').trim())) return { ok: false, error: 'Enter a valid 6-digit PIN' };
+
+  const qs = new URLSearchParams({
+    md: 'S',              // Surface (matches createShipment's shipping_mode)
+    ss: 'Delivered',      // forward shipment
+    o_pin: String(origin),
+    d_pin: String(pin).trim(),
+    cgm: String(Math.max(1, Math.round(Number(grams) || 100))),
+    pt: cod ? 'COD' : 'Pre-paid',
+  }).toString();
+  const r = await dApi(cfg, 'GET', `/api/kinko/v1/invoice/charges/.json?${qs}`, { timeout: 9000 });
+  if (r.error) return { ok: false, error: r.error };
+  const row = Array.isArray(r.data) ? r.data[0] : r.data;
+  const amount = Number(row?.total_amount ?? row?.gross_amount);
+  if (!row || !isFinite(amount)) return { ok: false, error: 'No rate returned', raw: r.data };
+  return { ok: true, amount: Math.round(amount) };
+}
+
 // Create a forward shipment (CMU). Returns { ok, waybill, mode, error, raw }.
 // `orderRef` overrides the courier-side order id on re-books (must be unique).
 export async function createShipment(settings, order, { weight, orderRef } = {}) {

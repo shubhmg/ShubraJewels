@@ -387,19 +387,28 @@ router.post(
   })
 );
 
-// ADMIN — bulk-book Shiprocket for many orders at once. Uses the default
-// weight (defaultWeightKg × qty) per order, books sequentially (avoids courier
-// assignment races/rate limits), then clubs ONE pickup request for the whole
-// batch when auto-pickup is on. Partial success is normal: failures are
+// ADMIN — bulk-book a courier for many orders at once (provider = shiprocket |
+// delhivery, default shiprocket). Uses each order's default weight, books
+// sequentially (avoids assignment races/rate limits); Shiprocket then clubs ONE
+// pickup request for the batch when auto-pickup is on (Delhivery has no clubbed
+// pickup — arrange it from the panel). Partial success is normal: failures are
 // returned per order and those orders stay untouched in To Ship.
 router.post(
   '/bulk-ship',
   requireAdmin,
-  validate({ body: Joi.object({ ids: Joi.array().items(objectId).min(1).max(50).required() }) }),
+  validate({ body: Joi.object({
+    ids: Joi.array().items(objectId).min(1).max(50).required(),
+    provider: Joi.string().valid('shiprocket', 'delhivery').default('shiprocket'),
+  }) }),
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
-    const cfg = shiprocket.shiprocketConfig(settings);
-    if (!shiprocket.shiprocketReady(cfg)) {
+    const provider = req.body.provider;
+    const isDel = provider === 'delhivery';
+    if (isDel) {
+      if (!delhivery.delhiveryReady(delhivery.delhiveryConfig(settings))) {
+        throw ApiError.badRequest('Delhivery is not fully configured. Add the API token and pickup warehouse in Settings.');
+      }
+    } else if (!shiprocket.shiprocketReady(shiprocket.shiprocketConfig(settings))) {
       throw ApiError.badRequest('Shiprocket is not fully configured. Add the email, API password and pickup location in Settings.');
     }
 
@@ -414,30 +423,42 @@ router.post(
       if (order.shipment?.waybill) { failed.push({ orderNo: order.orderNo, error: `Already booked (AWB ${order.shipment.waybill})` }); continue; }
 
       const { result, attempt } = await bookWithRetry(order, (ref) =>
-        shiprocket.createShipment(settings, order.toObject(), { orderRef: ref, skipPickup: true }));
+        isDel
+          ? delhivery.createShipment(settings, order.toObject(), { orderRef: ref })
+          : shiprocket.createShipment(settings, order.toObject(), { orderRef: ref, skipPickup: true }));
       if (!result.ok) { failed.push({ orderNo: order.orderNo, error: result.error || 'Booking failed' }); continue; }
 
       const wasShipped = order.status === 'shipped';
       order.shipmentAttempts = attempt;
-      await applyBooking(order, settings, {
-        provider: 'shiprocket',
-        waybill: result.awb,
-        shipmentId: result.shipmentId,
-        srOrderId: result.srOrderId,
-        courierName: result.courierName,
-        trackingUrl: result.trackingUrl,
-        mode: result.mode,
-        codAmount: result.codAmount || 0,
-        weightGrams: Math.round((result.weightKg || 0) * 1000),
-        labelUrl: result.labelUrl || '',
-      }, wasShipped);
-      booked.push({ orderNo: order.orderNo, awb: result.awb, courierName: result.courierName });
-      if (result.shipmentId) shipmentIds.push(result.shipmentId);
+      const shipment = isDel
+        ? {
+            provider: 'delhivery',
+            waybill: result.waybill,
+            trackingUrl: delhivery.trackingUrl(result.waybill),
+            mode: result.mode,
+            codAmount: result.codAmount || 0,
+            weightGrams: result.weight || 0,
+          }
+        : {
+            provider: 'shiprocket',
+            waybill: result.awb,
+            shipmentId: result.shipmentId,
+            srOrderId: result.srOrderId,
+            courierName: result.courierName,
+            trackingUrl: result.trackingUrl,
+            mode: result.mode,
+            codAmount: result.codAmount || 0,
+            weightGrams: Math.round((result.weightKg || 0) * 1000),
+            labelUrl: result.labelUrl || '',
+          };
+      await applyBooking(order, settings, shipment, wasShipped);
+      booked.push({ orderNo: order.orderNo, awb: shipment.waybill, courierName: shipment.courierName || (isDel ? 'Delhivery' : '') });
+      if (!isDel && result.shipmentId) shipmentIds.push(result.shipmentId);
     }
 
-    // One clubbed pickup request for everything booked (auto-pickup only).
+    // One clubbed pickup request for everything booked (Shiprocket auto-pickup only).
     let pickupScheduled = false;
-    if (cfg.autoPickup && shipmentIds.length) {
+    if (!isDel && shiprocket.shiprocketConfig(settings).autoPickup && shipmentIds.length) {
       const p = await shiprocket.schedulePickup(settings, shipmentIds);
       pickupScheduled = !!p.ok;
     }
@@ -569,16 +590,26 @@ router.get(
   })
 );
 
-// ADMIN — Delhivery pincode serviceability (COD/prepaid availability at a PIN).
+// ADMIN — Delhivery pincode serviceability (COD/prepaid availability at a PIN),
+// plus a Surface freight estimate when a weight is supplied (needs pickup PIN).
 router.get(
   '/delhivery/serviceability',
   requireAdmin,
-  validate({ query: Joi.object({ pin: Joi.string().pattern(/^\d{6}$/).required() }) }),
+  validate({ query: Joi.object({
+    pin: Joi.string().pattern(/^\d{6}$/).required(),
+    weight: Joi.number().integer().min(1).max(50000).optional(), // grams
+    cod: Joi.boolean().default(false),
+  }) }),
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
     const r = await delhivery.checkServiceability(settings, req.query.pin);
     if (!r.ok) throw ApiError.badRequest(r.error || 'Could not check serviceability');
-    res.json({ success: true, data: r });
+    let rate = null;
+    if (req.query.weight) {
+      const rr = await delhivery.estimateRate(settings, { pin: req.query.pin, grams: req.query.weight, cod: req.query.cod });
+      if (rr.ok) rate = rr.amount;
+    }
+    res.json({ success: true, data: { ...r, rate } });
   })
 );
 
