@@ -52,8 +52,9 @@ app.use(
         'style-src': ["'self'", "'unsafe-inline'", 'https:'],
         'connect-src': ["'self'", 'https:'],
         'worker-src': ["'self'", 'blob:'],
-        // Razorpay Checkout + Google Identity Services need external scripts + frames.
-        'script-src': ["'self'", "'unsafe-inline'", 'https://checkout.razorpay.com', 'https://accounts.google.com', 'https://apis.google.com'],
+        // Razorpay Checkout + Google Identity Services need external scripts + frames;
+        // Cloudflare Web Analytics loads its beacon from static.cloudflareinsights.com.
+        'script-src': ["'self'", "'unsafe-inline'", 'https://checkout.razorpay.com', 'https://accounts.google.com', 'https://apis.google.com', 'https://static.cloudflareinsights.com'],
         'frame-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://accounts.google.com'],
         'child-src': ["'self'", 'https://checkout.razorpay.com'],
       },

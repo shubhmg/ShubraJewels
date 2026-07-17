@@ -20,6 +20,11 @@ function loadGsi() {
   return gsiPromise
 }
 
+// GSI's initialize() should run once per page — calling it repeatedly logs a
+// "called multiple times" warning. Track it globally; the button can still be
+// re-rendered (renderButton) as often as needed.
+let gsiInited = false
+
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 
 // Unified sign-in / sign-up. The customer enters their email FIRST; a lookup
@@ -43,6 +48,9 @@ export function AuthModal({
   const [localErr, setLocalErr] = useState('')
   const { login, register, google, checkEmail, loading, error } = useCustomerStore()
   const googleBtn = useRef(null)
+  // Latest sign-in handlers, so the one-time GSI callback always uses them.
+  const cbRef = useRef({ google, onSuccess, onClose })
+  cbRef.current = { google, onSuccess, onClose }
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const busy = checking || loading
@@ -79,16 +87,10 @@ export function AuthModal({
   useEffect(() => {
     if (!open || !showGoogle) return
     let cancelled = false
-    const render = () => {
+    // Draw (or redraw) the button at the container's current width.
+    const renderButton = () => {
       if (cancelled || !googleBtn.current || !window.google) return
       const w = Math.min(400, Math.max(240, Math.round(googleBtn.current.offsetWidth) || 320))
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: async (resp) => {
-          const ok = await google(resp.credential)
-          if (ok) { onSuccess?.(); onClose() }
-        },
-      })
       googleBtn.current.innerHTML = ''
       window.google.accounts.id.renderButton(googleBtn.current, {
         type: 'standard',
@@ -100,9 +102,23 @@ export function AuthModal({
         width: w,
       })
     }
-    loadGsi().then(render)
-    window.addEventListener('resize', render)
-    return () => { cancelled = true; window.removeEventListener('resize', render) }
+    const setup = () => {
+      if (cancelled || !window.google) return
+      if (!gsiInited) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (resp) => {
+            const { google: g, onSuccess: ok, onClose: close } = cbRef.current
+            if (await g(resp.credential)) { ok?.(); close?.() }
+          },
+        })
+        gsiInited = true
+      }
+      renderButton()
+    }
+    loadGsi().then(setup)
+    window.addEventListener('resize', renderButton)
+    return () => { cancelled = true; window.removeEventListener('resize', renderButton) }
   }, [open, step]) // eslint-disable-line
 
   if (!open) return null
