@@ -40,6 +40,11 @@ app.set('trust proxy', 1);
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
+    // Sign in with Google opens an auth popup that posts the result back to us
+    // via window.postMessage. Helmet's default COOP (`same-origin`) severs that
+    // opener link and blocks the message; `same-origin-allow-popups` keeps the
+    // rest of the isolation while letting the Google popup talk back.
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
     // Default CSP blocks external images/media (img-src 'self'). We use uploaded
     // media (/uploads) + external URLs (Unsplash placeholders, admin-pasted links)
     // + Google Fonts, so allow https/data/blob for images, media, fonts & styles.
