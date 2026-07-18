@@ -5,14 +5,19 @@ import { Motif } from '../decor/Decor.jsx'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
-// Load the Google Identity Services script once.
+// Resolve once the Google Identity Services script is ready. It's preloaded in
+// index.html (so the button renders instantly), so this usually just waits on
+// that existing tag rather than injecting its own.
+const GSI_SRC = 'https://accounts.google.com/gsi/client'
 let gsiPromise = null
 function loadGsi() {
   if (gsiPromise) return gsiPromise
   gsiPromise = new Promise((resolve) => {
     if (window.google?.accounts?.id) return resolve()
+    const existing = document.querySelector(`script[src="${GSI_SRC}"]`)
+    if (existing) { existing.addEventListener('load', () => resolve()); return }
     const s = document.createElement('script')
-    s.src = 'https://accounts.google.com/gsi/client'
+    s.src = GSI_SRC
     s.async = true
     s.onload = resolve
     document.head.appendChild(s)
