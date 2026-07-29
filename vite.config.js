@@ -8,7 +8,10 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': 'http://localhost:4200',
-      '/uploads': 'http://localhost:4200',
+      // Uploaded media lives on the PROD server's disk (not synced locally), so
+      // pull it from production during local dev. Proxied → same-origin to the
+      // browser, so the try-on bg-removal canvas stays untainted.
+      '/uploads': { target: 'https://shubrajewels.shop', changeOrigin: true, secure: true },
     },
   },
 })
