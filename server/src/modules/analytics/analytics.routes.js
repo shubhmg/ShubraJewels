@@ -19,34 +19,6 @@ const dayStr = (d) => new Date(new Date(d).getTime() + IST_MS).toISOString().sli
 // Bots/crawlers/monitors that shouldn't count as real visitors.
 const BOT_RE = /bot|crawl|spider|slurp|facebookexternalhit|bingpreview|whatsapp|telegram|preview|monitor|uptime|pingdom|curl|wget|python-requests|axios|node-fetch|headless|lighthouse|phantom|puppeteer/i;
 
-const PAGE_LABELS = {
-  '/': 'Home',
-  '/products': 'All Jhumkas',
-  '/collections': 'Collections',
-  '/checkout': 'Checkout',
-  '/about': 'Our Story',
-  '/contact': 'Contact',
-  '/wishlist': 'Wishlist',
-  '/cart': 'Cart',
-  '/account': 'Account',
-};
-
-// Turn raw paths into human labels — product detail pages become product names.
-async function labelPages(pages) {
-  const ids = pages
-    .map((p) => (p.path.match(/^\/products\/([a-f0-9]{24})$/i) || [])[1])
-    .filter(Boolean);
-  const products = ids.length
-    ? await Product.find({ _id: { $in: ids } }).select('name').lean()
-    : [];
-  const nameById = new Map(products.map((p) => [String(p._id), p.name]));
-  return pages.map((p) => {
-    const m = p.path.match(/^\/products\/([a-f0-9]{24})$/i);
-    const label = m ? (nameById.get(m[1]) || 'Product (deleted)') : (PAGE_LABELS[p.path] || p.path);
-    return { ...p, label };
-  });
-}
-
 // PUBLIC — record a page view (fire-and-forget beacon from the storefront).
 router.post(
   '/track',
@@ -105,38 +77,46 @@ router.get(
     const days = req.query.days || 30;
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const [totalViews, uniqueSessions, todayViews, series, topPages, deviceSplit, orderStats] =
+    const [uniqueSessions, todayVisitors, newReturning, series, deviceSplit, orderStats] =
       await Promise.all([
-        Visit.countDocuments({ createdAt: { $gte: since } }),
+        // Unique visitors in the window (distinct sessions).
         Visit.distinct('sessionId', { createdAt: { $gte: since }, sessionId: { $ne: '' } }).then(
           (a) => a.length
         ),
-        Visit.countDocuments({ day: dayStr(Date.now()) }),
+        // Unique visitors so far today (IST calendar day).
+        Visit.distinct('sessionId', { day: dayStr(Date.now()), sessionId: { $ne: '' } }).then(
+          (a) => a.length
+        ),
+        // New vs returning: bucket each session that was active in the window by
+        // whether its FIRST-EVER visit falls inside the window (new visitor) or
+        // before it (returning). Scans full history to know true first-seen.
         Visit.aggregate([
-          { $match: { createdAt: { $gte: since } } },
+          { $match: { sessionId: { $ne: '' } } },
+          { $group: { _id: '$sessionId', firstSeen: { $min: '$createdAt' }, lastSeen: { $max: '$createdAt' } } },
+          { $match: { lastSeen: { $gte: since } } },
           {
             $group: {
-              _id: '$day',
-              views: { $sum: 1 },
-              sessions: { $addToSet: '$sessionId' },
+              _id: null,
+              newVisitors: { $sum: { $cond: [{ $gte: ['$firstSeen', since] }, 1, 0] } },
+              returningVisitors: { $sum: { $cond: [{ $lt: ['$firstSeen', since] }, 1, 0] } },
             },
           },
-          { $project: { day: '$_id', _id: 0, views: 1, visitors: { $size: '$sessions' } } },
-          { $sort: { day: 1 } },
         ]),
+        // Daily unique-visitor series for the trend chart.
         Visit.aggregate([
           { $match: { createdAt: { $gte: since } } },
-          { $group: { _id: '$path', views: { $sum: 1 } } },
-          { $sort: { views: -1 } },
-          { $limit: 8 },
-          { $project: { path: '$_id', _id: 0, views: 1 } },
+          { $group: { _id: '$day', sessions: { $addToSet: '$sessionId' } } },
+          { $project: { day: '$_id', _id: 0, visitors: { $size: '$sessions' } } },
+          { $sort: { day: 1 } },
         ]),
         Visit.aggregate([
           { $match: { createdAt: { $gte: since } } },
           { $group: { _id: '$device', count: { $sum: 1 } } },
         ]),
+        // Exclude cancelled orders — they must not inflate order count or revenue
+        // (same convention as the /sales report).
         Order.aggregate([
-          { $match: { createdAt: { $gte: since } } },
+          { $match: { createdAt: { $gte: since }, status: { $ne: 'cancelled' } } },
           { $group: { _id: null, orders: { $sum: 1 }, revenue: { $sum: '$total' } } },
         ]),
       ]);
@@ -145,11 +125,11 @@ router.get(
       success: true,
       data: {
         days,
-        totalViews,
         uniqueSessions,
-        todayViews,
+        todayVisitors,
+        newVisitors: newReturning[0]?.newVisitors || 0,
+        returningVisitors: newReturning[0]?.returningVisitors || 0,
         series,
-        topPages: await labelPages(topPages),
         deviceSplit: deviceSplit.map((d) => ({ device: d._id || 'unknown', count: d.count })),
         orders: orderStats[0]?.orders || 0,
         revenue: orderStats[0]?.revenue || 0,
