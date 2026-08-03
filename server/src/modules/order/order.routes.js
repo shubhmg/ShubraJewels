@@ -568,6 +568,37 @@ router.get(
   })
 );
 
+// ADMIN — ONE merged PDF with the labels of many Shiprocket shipments (bulk
+// print after a batch booking). Delhivery labels are per-waybill files, so
+// Delhivery orders are skipped here — use the per-order Label button for those.
+router.post(
+  '/labels',
+  requireAdmin,
+  validate({ body: Joi.object({ ids: Joi.array().items(objectId).min(1).max(100).required() }) }),
+  asyncHandler(async (req, res) => {
+    const orders = await Order.find({ _id: { $in: req.body.ids } });
+    const shipmentIds = [];
+    const skipped = [];
+    for (const o of orders) {
+      const sh = o.shipment;
+      if (sh?.provider === 'shiprocket' && sh.shipmentId && sh.status !== 'Cancelled') {
+        shipmentIds.push(sh.shipmentId);
+      } else {
+        skipped.push({
+          orderNo: o.orderNo,
+          reason: sh?.provider === 'delhivery' ? 'Delhivery — open its label from the order' : 'No Shiprocket shipment',
+        });
+      }
+    }
+    if (!shipmentIds.length) throw ApiError.badRequest('None of the selected orders has a Shiprocket shipment to print.');
+
+    const settings = await getSettings();
+    const r = await shiprocket.labelLink(settings, shipmentIds);
+    if (!r.ok) throw ApiError.badRequest(r.error || 'Labels not ready yet. Try again in a moment.');
+    res.json({ success: true, data: { url: r.url, count: shipmentIds.length, skipped } });
+  })
+);
+
 // ADMIN — Shiprocket serviceability + courier options (pickup PIN → delivery PIN).
 router.get(
   '/shiprocket/serviceability',

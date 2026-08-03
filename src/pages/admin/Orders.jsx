@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox, MessageCircle, Mail, Copy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox, MessageCircle, Mail, Copy, Printer } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
@@ -228,6 +228,20 @@ export function AdminOrders() {
       setBusy(null)
     }
   }
+  // One merged PDF with every selected order's Shiprocket label (bulk print).
+  const printLabels = async (ids) => {
+    setBusy('bulk:labels')
+    try {
+      const r = await api.post('/orders/labels', { ids }, { auth: true })
+      if (r?.url) window.open(r.url, '_blank', 'noopener')
+      if (r?.skipped?.length) window.alert(`Skipped ${r.skipped.length} order${r.skipped.length === 1 ? '' : 's'}:\n${r.skipped.map((s) => `${s.orderNo} — ${s.reason}`).join('\n')}`)
+      setSelected([])
+    } catch (e) {
+      window.alert(e?.message || 'Labels not ready yet. Try again in a moment.')
+    } finally {
+      setBusy(null)
+    }
+  }
 
   // Run an order's next step. "Mark Shipped" opens the tracking form first.
   const advance = (o) => {
@@ -388,7 +402,9 @@ export function AdminOrders() {
             const a = nextAction(o.status)
             const firstImg = (o.items || []).find((it) => it.image)?.image
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
-            const canBulk = filter === 'confirmed' && (srCfg?.enabled || delCfg?.enabled) && !o.shipment?.waybill
+            // Selectable for bulk booking (To Ship) or bulk label printing (In Transit).
+            const canLabel = filter === 'shipped' && o.shipment?.provider === 'shiprocket' && o.shipment?.shipmentId && o.shipment?.status !== 'Cancelled'
+            const canBulk = (filter === 'confirmed' && (srCfg?.enabled || delCfg?.enabled) && !o.shipment?.waybill) || canLabel
             const isSel = selected.includes(o._id)
             return (
               <div
@@ -465,17 +481,33 @@ export function AdminOrders() {
         <div className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 bg-white rounded-2xl shadow-[0_14px_44px_-10px_rgba(0,0,0,0.35)] ring-1 ring-zinc-200 pl-3.5 sm:pl-4 pr-2 py-2"
           style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
           <span className="text-[13px] font-bold text-zinc-800 whitespace-nowrap shrink-0">{selected.length} selected</span>
-          <button onClick={() => setSelected(orders.filter((o) => !o.shipment?.waybill).map((o) => o._id))} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer whitespace-nowrap shrink-0">
+          <button
+            onClick={() => setSelected(orders.filter((o) => (filter === 'shipped'
+              ? o.shipment?.provider === 'shiprocket' && o.shipment?.shipmentId && o.shipment?.status !== 'Cancelled'
+              : !o.shipment?.waybill)).map((o) => o._id))}
+            className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer whitespace-nowrap shrink-0"
+          >
             <span className="sm:hidden">All</span><span className="hidden sm:inline">All on page</span>
           </button>
           <button onClick={() => setSelected([])} className="text-[12px] font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer shrink-0">Clear</button>
-          <button
-            onClick={() => setBulkOpen(true)}
-            className="flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] whitespace-nowrap"
-            style={{ background: 'var(--maroon)' }}
-          >
-            <Package size={14} /> Book {selected.length}<span className="hidden sm:inline">&nbsp;& Ship</span>
-          </button>
+          {filter === 'shipped' ? (
+            <button
+              onClick={() => printLabels(selected)}
+              disabled={busy === 'bulk:labels'}
+              className="flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] whitespace-nowrap disabled:opacity-60"
+              style={{ background: 'var(--maroon)' }}
+            >
+              {busy === 'bulk:labels' ? <RefreshCw size={14} className="animate-spin" /> : <Printer size={14} />} Print {selected.length} label{selected.length === 1 ? '' : 's'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setBulkOpen(true)}
+              className="flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-[13px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.98] whitespace-nowrap"
+              style={{ background: 'var(--maroon)' }}
+            >
+              <Package size={14} /> Book {selected.length}<span className="hidden sm:inline">&nbsp;& Ship</span>
+            </button>
+          )}
         </div>
       )}
       {bulkOpen && (
@@ -1050,6 +1082,23 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
     }
   }
 
+  // After a Shiprocket batch: one merged PDF with every booked order's label.
+  const [printing, setPrinting] = useState(false)
+  const bookedIds = (result?.booked || [])
+    .map((b) => orders.find((o) => o.orderNo === b.orderNo)?._id)
+    .filter(Boolean)
+  const printAllLabels = async () => {
+    setPrinting(true)
+    try {
+      const r = await api.post('/orders/labels', { ids: bookedIds }, { auth: true })
+      if (r?.url) window.open(r.url, '_blank', 'noopener')
+    } catch (e) {
+      window.alert(e?.message || 'Labels not ready yet. Sync the orders and print from In Transit.')
+    } finally {
+      setPrinting(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[70]">
       <div className={`absolute inset-0 bg-zinc-900/50 transition-opacity duration-200 ${show ? 'opacity-100' : 'opacity-0'}`} onClick={() => !saving && close()} />
@@ -1162,9 +1211,20 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
           {/* Footer */}
           <div className="bg-white border-t border-zinc-100 p-4 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
             {result ? (
-              <button onClick={close} className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: 'var(--maroon)' }}>
-                <Check size={16} strokeWidth={3} /> Done
-              </button>
+              <div className="space-y-2">
+                {!isDel && bookedIds.length > 0 && (
+                  <button
+                    onClick={printAllLabels}
+                    disabled={printing}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold cursor-pointer transition-all active:scale-[0.99] disabled:opacity-60 bg-white text-[var(--maroon)] ring-1 ring-[color-mix(in_srgb,var(--maroon)_28%,transparent)] hover:bg-[color-mix(in_srgb,var(--maroon)_6%,white)]"
+                  >
+                    {printing ? <RefreshCw size={15} className="animate-spin" /> : <Printer size={16} />} Print {bookedIds.length} label{bookedIds.length === 1 ? '' : 's'}
+                  </button>
+                )}
+                <button onClick={close} className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[14px] font-bold text-white cursor-pointer transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: 'var(--maroon)' }}>
+                  <Check size={16} strokeWidth={3} /> Done
+                </button>
+              </div>
             ) : (
               <button
                 onClick={submit}

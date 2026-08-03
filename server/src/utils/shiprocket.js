@@ -250,11 +250,13 @@ export async function trackShipment(settingDoc, awb) {
   };
 }
 
-// Regenerate / fetch the label for an existing shipment.
+// Regenerate / fetch the label for one shipment — or, given an array of
+// shipment ids, ONE merged PDF with every label (bulk print).
 export async function labelLink(settingDoc, shipmentId) {
   const auth = await ensureToken(settingDoc);
   if (!auth.ok) return { ok: false, error: auth.error };
-  const r = await srFetch(auth.token, 'POST', '/courier/generate/label', { shipment_id: [Number(shipmentId)] });
+  const ids = (Array.isArray(shipmentId) ? shipmentId : [shipmentId]).map(Number);
+  const r = await srFetch(auth.token, 'POST', '/courier/generate/label', { shipment_id: ids }, 25000);
   const url = r.data?.label_url;
   if (!url) return { ok: false, error: r.data?.message || 'Label not ready yet', raw: r.data };
   return { ok: true, url };
