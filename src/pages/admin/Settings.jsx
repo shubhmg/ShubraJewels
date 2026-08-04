@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Loader2, Check, Palette, X } from 'lucide-react'
+import { Loader2, Check, Palette, X, ChevronDown } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { AdminHeader, Btn, Field } from '../../components/admin/AdminUI.jsx'
 import { MediaUploader } from '../../components/admin/MediaUploader.jsx'
@@ -12,6 +12,7 @@ const TABS = [
   { id: 'brand', label: 'Brand' },
   { id: 'contact', label: 'Contact & Social' },
   { id: 'payments', label: 'Payments & Shipping' },
+  { id: 'couriers', label: 'Couriers' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'story', label: 'Our Story' },
   { id: 'content', label: 'Text & Content' },
@@ -83,6 +84,7 @@ export function AdminSettings() {
   const [srTest, setSrTest] = useState(null) // Shiprocket connection test result
   const [dlTest, setDlTest] = useState(null) // Delhivery connection test result
   const [xbTest, setXbTest] = useState(null) // Xpressbees connection test result
+  const [openCourier, setOpenCourier] = useState(null) // which courier card is expanded
 
   // Admin endpoint returns secrets (Telegram + Shiprocket + Delhivery) the public GET strips.
   useEffect(() => { api.get('/settings/admin', { auth: true }).then(setS) }, [])
@@ -312,7 +314,7 @@ export function AdminSettings() {
       </Section>
       )}
 
-      {tab === 'payments' && (
+      {tab === 'couriers' && (
       <Section title="Shipping Routing" subtitle="How each order should be shipped. The ship dialog opens on the recommended option and tags it — you can always switch on any specific order.">
         <div className="grid sm:grid-cols-2 gap-2.5">
           {[
@@ -343,8 +345,16 @@ export function AdminSettings() {
       </Section>
       )}
 
-      {tab === 'payments' && (
-      <Section title="Delhivery Shipping (direct)" subtitle="Book Delhivery waybills directly with your own Delhivery B2C API token. A separate option from Shiprocket — if both are on, the ship dialog lets you pick per order. The API token is private and never shown on the website.">
+      {tab === 'couriers' && (
+      <CourierCard
+        id="delhivery"
+        title="Delhivery"
+        tagline="Direct — your own B2C API token, Surface waybills"
+        enabled={!!s.delhivery?.enabled}
+        ready={!!(s.delhivery?.enabled && s.delhivery?.token && s.delhivery?.pickupName)}
+        open={openCourier === 'delhivery'}
+        onOpen={setOpenCourier}
+      >
         <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
           <p className="font-semibold mb-1.5">How the policy works</p>
           <ul className="list-disc ml-5 space-y-1 text-zinc-600 text-[13px]">
@@ -404,11 +414,19 @@ export function AdminSettings() {
             </>
           )}
         </div>
-      </Section>
+      </CourierCard>
       )}
 
-      {tab === 'payments' && (
-      <Section title="Xpressbees Shipping (direct)" subtitle="Book Xpressbees waybills directly with your Xpressbees account. One call books the order and returns the label PDF instantly. Credentials are private and never shown on the website.">
+      {tab === 'couriers' && (
+      <CourierCard
+        id="xpressbees"
+        title="Xpressbees"
+        tagline="Direct — one call books the order and returns the label PDF"
+        enabled={!!s.xpressbees?.enabled}
+        ready={!!(s.xpressbees?.enabled && s.xpressbees?.email && s.xpressbees?.password && s.xpressbees?.pickupAddress && s.xpressbees?.pickupPin && s.xpressbees?.pickupPhone)}
+        open={openCourier === 'xpressbees'}
+        onOpen={setOpenCourier}
+      >
         <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
           <p className="font-semibold mb-1.5">How it works</p>
           <ul className="list-disc ml-5 space-y-1 text-zinc-600 text-[13px]">
@@ -489,11 +507,19 @@ export function AdminSettings() {
             </>
           )}
         </div>
-      </Section>
+      </CourierCard>
       )}
 
-      {tab === 'payments' && (
-      <Section title="Shiprocket Shipping (automated)" subtitle="Book couriers through Shiprocket (Delhivery, Bluedart, Xpressbees & more under one account). Credentials are private and never shown on the website.">
+      {tab === 'couriers' && (
+      <CourierCard
+        id="shiprocket"
+        title="Shiprocket"
+        tagline="Aggregator — Delhivery, Bluedart, Xpressbees & more under one account"
+        enabled={!!s.shiprocket?.enabled}
+        ready={!!(s.shiprocket?.enabled && s.shiprocket?.email && s.shiprocket?.password && s.shiprocket?.pickupLocation)}
+        open={openCourier === 'shiprocket'}
+        onOpen={setOpenCourier}
+      >
         <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
           <p className="font-semibold mb-1.5">One-time setup</p>
           <ol className="list-decimal ml-5 space-y-1 text-zinc-600 text-[13px]">
@@ -555,7 +581,7 @@ export function AdminSettings() {
             </>
           )}
         </div>
-      </Section>
+      </CourierCard>
       )}
 
       {tab === 'notifications' && (
@@ -705,6 +731,28 @@ function ColorPicker({ label, value, onChange }) {
           maxLength={7}
         />
       </div>
+    </div>
+  )
+}
+
+// One courier provider as a collapsed card — name + live status at a glance,
+// the full config form only when expanded. Keeps the Couriers tab scannable
+// with three integrations instead of three walls of fields.
+function CourierCard({ id, title, tagline, enabled, ready, open, onOpen, children }) {
+  const status = !enabled ? { label: 'Off', cls: 'bg-zinc-100 text-zinc-500' }
+    : ready ? { label: 'Ready', cls: 'bg-emerald-100 text-emerald-700' }
+      : { label: 'Setup incomplete', cls: 'bg-amber-100 text-amber-700' }
+  return (
+    <div className="admin-card mb-3 overflow-hidden">
+      <button onClick={() => onOpen(open ? null : id)} className="w-full flex items-center gap-3 p-5 text-left cursor-pointer hover:bg-zinc-50/60 transition-colors">
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-[15px] text-zinc-900">{title}</p>
+          <p className="text-xs text-stone-400 mt-0.5 truncate">{tagline}</p>
+        </div>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide shrink-0 ${status.cls}`}>{status.label}</span>
+        <ChevronDown size={16} className={`text-zinc-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="px-6 pb-6 border-t border-zinc-100 pt-5">{children}</div>}
     </div>
   )
 }

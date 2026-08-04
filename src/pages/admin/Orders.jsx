@@ -1202,10 +1202,10 @@ function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, onClose, onDone }) {
                   <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
                     <p className="font-semibold text-amber-700">Finish {PROVIDER_LABEL[provider]} setup first</p>
                     <p className="text-amber-700/90 text-xs mt-0.5">{isDel
-                      ? <>Add the API token and pickup warehouse in <b>Settings → Payments &amp; Shipping → Delhivery</b>.</>
+                      ? <>Add the API token and pickup warehouse in <b>Settings → Couriers → Delhivery</b>.</>
                       : isXb
-                        ? <>Add the email, password and pickup details in <b>Settings → Payments &amp; Shipping → Xpressbees</b>.</>
-                        : <>Add the email, API password and pickup location in <b>Settings → Payments &amp; Shipping → Shiprocket</b>.</>}</p>
+                        ? <>Add the email, password and pickup details in <b>Settings → Couriers → Xpressbees</b>.</>
+                        : <>Add the email, API password and pickup location in <b>Settings → Couriers → Shiprocket</b>.</>}</p>
                   </div>
                 )}
                 <p className="text-[13px] text-zinc-500 px-1">Each order books with its <b className="text-zinc-700">default weight</b> ({isDel || isXb ? `${(isXb ? xbCfg?.defaultWeightGrams : delCfg?.defaultWeightGrams) || 100} g` : `${srCfg?.defaultWeightKg || 0.3} kg`} × items). {isDel ? 'Delhivery books a Surface waybill per order.' : isXb ? 'Xpressbees books each order and returns its label instantly.' : 'Shiprocket assigns the recommended courier per order and the pickup is clubbed.'} Odd-sized parcels? Ship them individually instead.</p>
@@ -1480,7 +1480,7 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, onClose, onShipped }) {
                   <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
                     <p className="font-semibold text-amber-700">Finish Delhivery setup first</p>
                     <p className="text-amber-700/90 text-xs mt-0.5">
-                      Missing {missingMsg}. Go to <b>Settings → Payments &amp; Shipping → Delhivery</b>, fill them in, and hit <b>Save Changes</b>.
+                      Missing {missingMsg}. Go to <b>Settings → Couriers → Delhivery</b>, fill them in, and hit <b>Save Changes</b>.
                     </p>
                   </div>
                 )}
@@ -1518,7 +1518,7 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, onClose, onShipped }) {
                   <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
                     <p className="font-semibold text-amber-700">Finish Xpressbees setup first</p>
                     <p className="text-amber-700/90 text-xs mt-0.5">
-                      Missing {missingMsg}. Go to <b>Settings → Payments &amp; Shipping → Xpressbees</b>, fill them in, and hit <b>Save Changes</b>.
+                      Missing {missingMsg}. Go to <b>Settings → Couriers → Xpressbees</b>, fill them in, and hit <b>Save Changes</b>.
                     </p>
                   </div>
                 )}
@@ -1590,7 +1590,7 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, onClose, onShipped }) {
                   <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
                     <p className="font-semibold text-amber-700">Finish Shiprocket setup first</p>
                     <p className="text-amber-700/90 text-xs mt-0.5">
-                      Missing {missingMsg}. Go to <b>Settings → Payments &amp; Shipping → Shiprocket</b>, fill them in, and hit <b>Save Changes</b>.
+                      Missing {missingMsg}. Go to <b>Settings → Couriers → Shiprocket</b>, fill them in, and hit <b>Save Changes</b>.
                     </p>
                   </div>
                 )}
