@@ -92,13 +92,10 @@ export function Footer() {
               <Link key={l.to} to={l.to} className="hover:text-[var(--gold-light)] transition-colors">{l.label}</Link>
             ))}
           </nav>
-          <div className="text-center pt-1 border-t space-y-1" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-            {settings.legalName && (
-              <p style={{ color: 'rgba(255,255,255,0.55)' }}>
-                {settings.brandName} is a {settings.businessType || 'sole proprietorship'} owned and operated by {settings.legalName}.
-                {settings.businessAddress ? ` ${settings.businessAddress}.` : ''}
-              </p>
-            )}
+          {/* The legal-entity + address line lives on the Contact page and the
+              policy pages (payment-gateway requirement) — the footer keeps only
+              the copyright, credited to the legal name. */}
+          <div className="text-center pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
             <p>© {new Date().getFullYear()} {settings.legalName || settings.brandName}. All rights reserved.</p>
           </div>
         </div>
