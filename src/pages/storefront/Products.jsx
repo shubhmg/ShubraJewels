@@ -4,7 +4,7 @@ import { SlidersHorizontal, X } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
-import { useProducts, useCategories, useCollections } from '../../hooks/useApi.js'
+import { useProducts, useCategories, useCollections, useFetch } from '../../hooks/useApi.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
 import { resolveContent } from '../../lib/siteContent.js'
 
@@ -80,7 +80,39 @@ export function Products() {
   // How many filters differ from the defaults — drives the badge on the pill
   // and the "Clear all" affordance.
   const activeCount = (categoryParam !== 'all' ? 1 : 0) + (collectionParam !== 'all' ? 1 : 0) + (under599 ? 1 : 0) + (inStockOnly ? 1 : 0)
-  const clearAll = () => { patchParams({ category: 'all', collection: 'all', under599: '' }); setInStockOnly(false) }
+
+  // MOBILE sheet stages its selections in a DRAFT — nothing applies until the
+  // "Show N pieces" button. Desktop's sidebar stays instant (draft === null).
+  const [draft, setDraft] = useState(null)
+  const openFilters = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setDraft({ category: categoryParam, collection: collectionParam, under599, inStock: inStockOnly })
+    }
+    setShowFilter(true)
+  }
+  const closeFilters = () => { setShowFilter(false); setDraft(null) } // discard staged changes
+  const applyDraft = () => {
+    if (draft) {
+      patchParams({ category: draft.category, collection: draft.collection, under599: draft.under599 ? '1' : '' })
+      setInStockOnly(draft.inStock)
+    }
+    setShowFilter(false)
+    setDraft(null)
+  }
+
+  // Live count for the STAGED selection — fetched only while the sheet is open
+  // (null path = no request), so the button can say "Show 23 pieces" truthfully.
+  const draftPath = useMemo(() => {
+    if (!draft) return null
+    const q = new URLSearchParams()
+    if (draft.category !== 'all') q.set('category', draft.category)
+    if (draft.collection !== 'all') q.set('collection', draft.collection)
+    if (draft.under599) q.set('under599', '1')
+    const s = q.toString()
+    return `/products${s ? `?${s}` : ''}`
+  }, [draft])
+  const { data: draftProducts, loading: draftLoading } = useFetch(draftPath)
+  const draftCount = draft ? (draftProducts || []).filter((p) => !draft.inStock || p.inStock !== false).length : 0
 
   // Lock the page behind the mobile filter sheet (desktop sidebar must NOT lock).
   useEffect(() => {
@@ -119,7 +151,7 @@ export function Products() {
             flips to maroon while the panel is open so its state is visible. */}
         <div className="grid grid-cols-2 gap-2.5 md:flex md:items-center md:justify-between mb-6">
           <button
-            onClick={() => setShowFilter((f) => !f)}
+            onClick={() => (showFilter ? closeFilters() : openFilters())}
             className="flex items-center justify-center md:justify-start gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold transition-all cursor-pointer active:scale-[0.98]"
             style={showFilter
               ? { background: 'var(--maroon)', color: '#fff', boxShadow: '0 10px 28px -12px color-mix(in srgb, var(--maroon) 60%, transparent)' }
@@ -134,26 +166,37 @@ export function Products() {
         </div>
 
         {(() => {
-          // Shared filter body — rendered inside the desktop sidebar AND the
-          // mobile bottom sheet (filters apply instantly in both).
+          // Shared filter body. The sheet (mobile) works on the DRAFT — nothing
+          // applies until "Show"; the sidebar (desktop, draft === null) applies
+          // instantly as before.
+          const cur = draft || { category: categoryParam, collection: collectionParam, under599, inStock: inStockOnly }
+          const pick = (patch) => {
+            if (draft) { setDraft((d) => ({ ...d, ...patch })); return }
+            if ('inStock' in patch) setInStockOnly(patch.inStock)
+            const q = {}
+            if ('category' in patch) q.category = patch.category
+            if ('collection' in patch) q.collection = patch.collection
+            if ('under599' in patch) q.under599 = patch.under599 ? '1' : ''
+            if (Object.keys(q).length) patchParams(q)
+          }
           const filterContent = (
             <>
               <FilterGroup title="Category">
-                <Chip active={categoryParam === 'all' && !under599} onClick={() => patchParams({ category: 'all', under599: '' })}>All</Chip>
+                <Chip active={cur.category === 'all' && !cur.under599} onClick={() => pick({ category: 'all', under599: false })}>All</Chip>
                 {(categories || []).map((c) => (
-                  <Chip key={c._id} active={c.slug === categoryParam || c._id === categoryParam} onClick={() => setParam('category', c.slug || c._id)}>{c.name}</Chip>
+                  <Chip key={c._id} active={c.slug === cur.category || c._id === cur.category} onClick={() => pick({ category: c.slug || c._id })}>{c.name}</Chip>
                 ))}
               </FilterGroup>
               {collections?.length > 0 && (
                 <FilterGroup title="Royal Collection">
-                  <Chip active={collectionParam === 'all'} onClick={() => setParam('collection', 'all')}>All</Chip>
+                  <Chip active={cur.collection === 'all'} onClick={() => pick({ collection: 'all' })}>All</Chip>
                   {collections.map((c) => (
-                    <Chip key={c._id} active={c.slug === collectionParam || c._id === collectionParam} onClick={() => setParam('collection', c.slug || c._id)}>{c.name}</Chip>
+                    <Chip key={c._id} active={c.slug === cur.collection || c._id === cur.collection} onClick={() => pick({ collection: c.slug || c._id })}>{c.name}</Chip>
                   ))}
                 </FilterGroup>
               )}
               <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer" style={{ color: 'var(--ink)' }}>
-                <input type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} className="w-4 h-4 accent-[var(--maroon)]" />
+                <input type="checkbox" checked={cur.inStock} onChange={(e) => pick({ inStock: e.target.checked })} className="w-4 h-4 accent-[var(--maroon)]" />
                 In stock only
               </label>
             </>
@@ -170,26 +213,24 @@ export function Products() {
           {/* Mobile — bottom sheet: backdrop, drag handle, Clear all, live-count CTA */}
           {showFilter && (
             <div className="md:hidden fixed inset-0 z-[90]">
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowFilter(false)} />
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={closeFilters} />
               <div className="absolute inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl animate-slide-up flex flex-col max-h-[82dvh]">
                 <div className="pt-3 grid place-items-center"><span className="w-10 h-1 rounded-full bg-stone-200" /></div>
                 <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b" style={{ borderColor: 'color-mix(in srgb, var(--gold) 20%, transparent)' }}>
                   <span className="font-display text-xl" style={{ color: 'var(--ink)' }}>Filters</span>
                   <div className="flex items-center gap-4">
-                    {activeCount > 0 && (
-                      <button onClick={clearAll} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--maroon)' }}>Clear all</button>
-                    )}
-                    <button onClick={() => setShowFilter(false)} className="w-8 h-8 grid place-items-center rounded-full text-stone-400 hover:bg-stone-100 cursor-pointer" aria-label="Close filters"><X size={18} /></button>
+                    <button onClick={() => setDraft({ category: 'all', collection: 'all', under599: false, inStock: false })} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--maroon)' }}>Clear all</button>
+                    <button onClick={closeFilters} className="w-8 h-8 grid place-items-center rounded-full text-stone-400 hover:bg-stone-100 cursor-pointer" aria-label="Close filters"><X size={18} /></button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">{filterContent}</div>
                 <div className="px-5 pt-3 border-t" style={{ borderColor: 'color-mix(in srgb, var(--gold) 20%, transparent)', paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
                   <button
-                    onClick={() => setShowFilter(false)}
+                    onClick={applyDraft}
                     className="w-full py-3.5 rounded-full text-sm font-bold text-white cursor-pointer transition-all active:scale-[0.99]"
                     style={{ background: 'var(--maroon)', boxShadow: '0 12px 30px -12px color-mix(in srgb, var(--maroon) 70%, transparent)' }}
                   >
-                    Show {list.length} piece{list.length === 1 ? '' : 's'}
+                    {draftLoading ? 'Show …' : `Show ${draftCount} piece${draftCount === 1 ? '' : 's'}`}
                   </button>
                 </div>
               </div>
@@ -250,7 +291,7 @@ function Chip({ active, onClick, children }) {
       style={
         active
           ? { background: 'var(--maroon)', color: 'var(--cream)', boxShadow: '0 6px 16px -8px color-mix(in srgb, var(--maroon) 60%, transparent)' }
-          : { background: 'color-mix(in srgb, var(--cream) 60%, white)', color: 'var(--ink)' }
+          : { background: 'color-mix(in srgb, var(--gold) 16%, white)', color: 'var(--ink)' }
       }
     >
       {children}
