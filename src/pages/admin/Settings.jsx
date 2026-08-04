@@ -456,14 +456,14 @@ export function AdminSettings() {
 
               <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
                 <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Status webhook (auto-deliver)</p>
-                <p className="text-xs text-zinc-500 -mt-1">Ask your Xpressbees account manager to push tracking updates to the URL below with the <b>x-api-key</b> header set to your token — orders then mark themselves Delivered (and COD flips to paid) automatically.</p>
+                <p className="text-xs text-zinc-500 -mt-1">In the Xpressbees panel, open <b>Create Webhook</b>: paste the URL below as the Delivery URL, set the same <b>Secret</b> as here, status <b>Active</b>. Each push is verified via its HMAC signature — orders then mark themselves Delivered (and COD flips to paid) automatically.</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 min-w-0 truncate text-[12px] bg-zinc-50 rounded-lg px-3 py-2 text-zinc-600">{`${window.location.origin}/api/orders/courier-webhook`}</code>
                   <Btn variant="outline" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/api/orders/courier-webhook`)}>Copy</Btn>
                 </div>
-                <Field field={{ label: 'Webhook token (x-api-key)', type: 'password', placeholder: 'Any long random string', help: 'Must match the token Xpressbees sends. Leave empty to keep the webhook disabled.' }} value={s.xpressbees?.webhookToken || ''} onChange={(v) => setXb('webhookToken', v.trim())} />
+                <Field field={{ label: 'Shared secret', type: 'password', placeholder: 'Any long random string', help: 'Must match the Secret you set in the Xpressbees Create Webhook form. Leave empty to keep the webhook disabled.' }} value={s.xpressbees?.webhookToken || ''} onChange={(v) => setXb('webhookToken', v.trim())} />
                 {!s.xpressbees?.webhookToken && (
-                  <Btn variant="outline" onClick={() => setXb('webhookToken', (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)))}>Generate token</Btn>
+                  <Btn variant="outline" onClick={() => setXb('webhookToken', (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)))}>Generate secret</Btn>
                 )}
               </div>
 

@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import Joi from 'joi';
 import Order from './order.model.js';
 import Coupon from '../coupon/coupon.model.js';
@@ -757,24 +758,37 @@ router.get(
 // possibly without custom headers) and refuses the URL on any non-200 — so
 // this endpoint always answers 200. Unauthorized calls are silently IGNORED
 // (nothing is updated), which keeps spoofing harmless.
-// The same endpoint also serves the Xpressbees status webhook: share
-// settings.xpressbees.webhookToken with Xpressbees when they configure your push
-// URL — the matched token decides which provider's shipments the push may touch,
-// so one courier's token can never update another courier's orders.
+// The same endpoint also serves the Xpressbees status webhook — configured
+// self-serve in their panel (Settings → Webhooks: name + this URL + a shared
+// secret, status 0 = active). Xpressbees SIGNS each push instead of sending the
+// secret: the `X-Hmac-SHA256` header is base64(HMAC-SHA256(raw body, secret)).
+// We verify that signature against settings.xpressbees.webhookToken (the shared
+// secret). Whichever auth matches decides which provider's shipments the push
+// may touch, so one courier's credentials can never update another's orders.
+// Payload: { awb_number, status, event_time, location, message, rto_awb }.
+// They time out at 5s and auto-disable after 100 consecutive non-2xx — another
+// reason this endpoint always answers 200 fast.
 router.get('/courier-webhook', (_req, res) => res.json({ success: true }));
 router.post(
   '/courier-webhook',
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
     const got = req.headers['x-api-key'] || req.headers['x-webhook-token'] || '';
+    const hmacSig = String(req.headers['x-hmac-sha256'] || '');
     const srToken = settings.shiprocket?.webhookToken || '';
     const xbToken = settings.xpressbees?.webhookToken || '';
-    // No token configured = webhook disabled; wrong/missing token = ACK but
-    // ignore. Never process unauthenticated status pushes.
-    const provider = (srToken && got === srToken) ? 'shiprocket'
-      : (xbToken && got === xbToken) ? 'xpressbees'
+    // No auth configured = webhook disabled; bad/missing auth = ACK but ignore.
+    // Never process unauthenticated status pushes.
+    let provider = (srToken && got && got === srToken) ? 'shiprocket'
+      : (xbToken && got && got === xbToken) ? 'xpressbees'
         : null;
-    if (!got || !provider) return res.json({ success: true, data: { ignored: true } });
+    if (!provider && xbToken && hmacSig && req.rawBody) {
+      const expected = crypto.createHmac('sha256', xbToken).update(req.rawBody).digest('base64');
+      const a = Buffer.from(hmacSig);
+      const b = Buffer.from(expected);
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) provider = 'xpressbees';
+    }
+    if (!provider) return res.json({ success: true, data: { ignored: true } });
 
     const b = req.body || {};
     const awb = String(b.awb || b.awb_code || b.awb_number || '').trim();
