@@ -5,6 +5,7 @@ import { getSettings } from './setting.model.js';
 import { sendTelegram } from '../../utils/notify.js';
 import { ensureToken as ensureShiprocketToken } from '../../utils/shiprocket.js';
 import { checkServiceability as delhiveryServiceability } from '../../utils/delhivery.js';
+import { ensureToken as ensureXpressbeesToken } from '../../utils/xpressbees.js';
 
 const router = express.Router();
 
@@ -17,8 +18,9 @@ router.get(
     const doc = await getSettings();
     const obj = doc.toObject();
     delete obj.notifications;
-    delete obj.shiprocket; // courier config incl. email/password/JWT — admin-only
-    delete obj.delhivery;  // courier config incl. API token — admin-only
+    delete obj.shiprocket;  // courier config incl. email/password/JWT — admin-only
+    delete obj.delhivery;   // courier config incl. API token — admin-only
+    delete obj.xpressbees;  // courier config incl. email/password/JWT — admin-only
     res.json({ success: true, data: obj });
   })
 );
@@ -39,7 +41,7 @@ router.patch(
   requireAdmin,
   asyncHandler(async (req, res) => {
     const doc = await getSettings();
-    const { theme, homepage, shipping, about, content, notifications, shiprocket, delhivery, ...rest } = req.body || {};
+    const { theme, homepage, shipping, about, content, notifications, shiprocket, delhivery, xpressbees, ...rest } = req.body || {};
     Object.assign(doc, rest);
     if (about && typeof about === 'object') {
       doc.about = about; // admin sends the full object (eyebrow, heading, image, paragraphs[], values[])
@@ -82,6 +84,17 @@ router.patch(
       doc.delhivery = { ...cur, ...delhivery };
       doc.markModified('delhivery');
     }
+    if (xpressbees && typeof xpressbees === 'object') {
+      const cur = doc.xpressbees?.toObject?.() || doc.xpressbees || {};
+      const next = { ...cur, ...xpressbees };
+      // If the login credentials changed, drop the cached JWT so it re-logs in.
+      if ((xpressbees.email && xpressbees.email !== cur.email) || (xpressbees.password && xpressbees.password !== cur.password)) {
+        next.token = '';
+        next.tokenExpiry = null;
+      }
+      doc.xpressbees = next;
+      doc.markModified('xpressbees');
+    }
     if (homepage && typeof homepage === 'object') {
       doc.homepage = homepage; // admin editor sends the full object (hero + ordered sections)
       doc.markModified('homepage');
@@ -91,6 +104,7 @@ router.patch(
     delete obj.notifications;
     delete obj.shiprocket;
     delete obj.delhivery;
+    delete obj.xpressbees;
     res.json({ success: true, data: obj });
   })
 );
@@ -118,6 +132,18 @@ router.post(
     const r = await delhiveryServiceability(doc, pin);
     if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Delhivery check failed. Verify the API token.' });
     res.json({ success: true, data: { pin, ...r } });
+  })
+);
+
+// Admin: verify Xpressbees credentials by logging in (mints + caches the JWT).
+router.post(
+  '/test-xpressbees',
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const doc = await getSettings();
+    const r = await ensureXpressbeesToken(doc);
+    if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Xpressbees login failed. Check the email and password.' });
+    res.json({ success: true, data: { loggedIn: true } });
   })
 );
 

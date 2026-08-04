@@ -183,6 +183,36 @@ const settingSchema = new mongoose.Schema(
       productDesc: { type: String, default: 'Imitation jewellery (jhumka)' },
     },
 
+    // Xpressbees direct integration. `email`/`password` are SECRET (used to mint
+    // the ~3h JWT via the login API; stripped from the public GET /settings).
+    // Booking is a single call that returns the AWB + label PDF; the pickup
+    // warehouse is sent inline (no pre-registration in their panel needed).
+    // Weights are in GRAMS, dims in cm. A parallel courier to Shiprocket/Delhivery.
+    xpressbees: {
+      enabled: { type: Boolean, default: false },
+      email: { type: String, default: '' },            // Xpressbees account email (secret)
+      password: { type: String, default: '' },         // Xpressbees password (secret)
+      token: { type: String, default: '' },            // cached JWT (secret)
+      tokenExpiry: { type: Date, default: null },
+      policy: { type: String, enum: ['all', 'cod', 'prepaid', 'manual'], default: 'manual' },
+      autoPickup: { type: Boolean, default: false },   // request_auto_pickup on booking
+      // Secret expected in the x-api-key header of Xpressbees webhook calls
+      // (share the same value with Xpressbees when they configure your webhook URL).
+      webhookToken: { type: String, default: '' },
+      // Pickup warehouse — sent inline with every booking.
+      warehouseName: { type: String, default: 'Primary' },
+      pickupName: { type: String, default: '' },
+      pickupPhone: { type: String, default: '' },
+      pickupAddress: { type: String, default: '' },
+      pickupCity: { type: String, default: '' },
+      pickupState: { type: String, default: '' },
+      pickupPin: { type: String, default: '' },
+      defaultWeightGrams: { type: Number, default: 100 }, // per-unit weight (g), × qty
+      length: { type: Number, default: 12 },              // parcel dims (cm)
+      breadth: { type: Number, default: 10 },
+      height: { type: Number, default: 5 },
+    },
+
     // Order notifications. SECRET — the Telegram bot token must never be sent to
     // the public storefront; the /settings GET strips `notifications` and the
     // admin panel reads it via GET /settings/admin.

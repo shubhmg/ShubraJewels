@@ -12,6 +12,8 @@ const PAY_METHODS = [
   { value: 'upi', label: 'UPI' }, { value: 'bank', label: 'Bank transfer' },
   { value: 'razorpay', label: 'Razorpay (online)' },
 ]
+const PROVIDER_LABEL = { shiprocket: 'Shiprocket', delhivery: 'Delhivery', xpressbees: 'Xpressbees' }
+
 // Compact labels for the drawer's method chips.
 const PAY_SHORT = { cod: 'COD', cash: 'Cash', upi: 'UPI', bank: 'Bank', razorpay: 'Razorpay' }
 
@@ -133,6 +135,7 @@ export function AdminOrders() {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [srCfg, setSrCfg] = useState(null)     // Shiprocket config (enabled/policy/ready)
   const [delCfg, setDelCfg] = useState(null)   // Delhivery config (enabled/policy/ready)
+  const [xbCfg, setXbCfg] = useState(null)     // Xpressbees config (enabled/policy/ready)
 
   // Courier config drives the ship flow (auto-book vs manual). Read from the
   // admin settings endpoint (the tokens/passwords stay server-side).
@@ -159,8 +162,17 @@ export function AdminOrders() {
           ready: !!(d.enabled && d.token && d.pickupName),
           defaultWeightGrams: Number(d.defaultWeightGrams) || 100,
         })
+        const x = s?.xpressbees || {}
+        setXbCfg({
+          enabled: !!x.enabled,
+          policy: x.policy || 'manual',
+          hasCreds: !!(x.email && x.password),
+          hasPickup: !!(x.pickupAddress && x.pickupPin && x.pickupPhone),
+          ready: !!(x.enabled && x.email && x.password && x.pickupAddress && x.pickupPin && x.pickupPhone),
+          defaultWeightGrams: Number(x.defaultWeightGrams) || 100,
+        })
       })
-      .catch(() => { setSrCfg({ enabled: false, ready: false }); setDelCfg({ enabled: false, ready: false }) })
+      .catch(() => { setSrCfg({ enabled: false, ready: false }); setDelCfg({ enabled: false, ready: false }); setXbCfg({ enabled: false, ready: false }) })
   }, [])
 
   // Debounced search; reset to page 1 on new query/filter.
@@ -279,7 +291,7 @@ export function AdminOrders() {
         </button>
       </div>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
-      {shipFor && <ShipModal order={shipFor} srCfg={srCfg} delCfg={delCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
+      {shipFor && <ShipModal order={shipFor} srCfg={srCfg} delCfg={delCfg} xbCfg={xbCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
 
       {/* ── Pipeline — live work gets the big cards; Delivered/Cancelled are
              quiet archive pills so they never pull focus ─────── */}
@@ -404,7 +416,7 @@ export function AdminOrders() {
             const initial = (o.customer?.name || '?').trim()[0]?.toUpperCase() || '?'
             // Selectable for bulk booking (To Ship) or bulk label printing (In Transit).
             const canLabel = filter === 'shipped' && o.shipment?.provider === 'shiprocket' && o.shipment?.shipmentId && o.shipment?.status !== 'Cancelled'
-            const canBulk = (filter === 'confirmed' && (srCfg?.enabled || delCfg?.enabled) && !o.shipment?.waybill) || canLabel
+            const canBulk = (filter === 'confirmed' && (srCfg?.enabled || delCfg?.enabled || xbCfg?.enabled) && !o.shipment?.waybill) || canLabel
             const isSel = selected.includes(o._id)
             return (
               <div
@@ -433,7 +445,7 @@ export function AdminOrders() {
                     <span className="font-bold text-[13px] sm:text-[14px] text-zinc-900 tracking-tight truncate">{o.orderNo}</span>
                     <span className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
                     {o.shipment?.waybill && o.shipment.provider !== 'manual' && (
-                      <span className="hidden sm:inline shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">{o.shipment.provider === 'delhivery' ? 'Delhivery' : 'Shiprocket'}</span>
+                      <span className="hidden sm:inline shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">{PROVIDER_LABEL[o.shipment.provider] || 'Courier'}</span>
                     )}
                   </div>
                   <p className="text-[12px] sm:text-[13px] text-zinc-500 truncate mt-0.5">
@@ -515,6 +527,7 @@ export function AdminOrders() {
           orders={orders.filter((o) => selected.includes(o._id))}
           srCfg={srCfg}
           delCfg={delCfg}
+          xbCfg={xbCfg}
           onClose={() => setBulkOpen(false)}
           onDone={() => { setBulkOpen(false); setSelected([]); load() }}
         />
@@ -644,7 +657,7 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
           {sh?.provider && sh.provider !== 'manual' && sh?.waybill && (
             <div className="rounded-2xl px-4 py-3.5 text-sm" style={{ background: 'color-mix(in srgb, #6366f1 9%, white)' }}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="font-semibold text-indigo-700 flex items-center gap-1.5"><Package size={14} /> {sh.provider === 'delhivery' ? 'Delhivery' : 'Shiprocket'}{sh.courierName ? ` · ${sh.courierName}` : ''} {sh.mode && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold uppercase">{sh.mode}</span>}</p>
+                <p className="font-semibold text-indigo-700 flex items-center gap-1.5"><Package size={14} /> {PROVIDER_LABEL[sh.provider] || 'Courier'}{sh.courierName ? ` · ${sh.courierName}` : ''} {sh.mode && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold uppercase">{sh.mode}</span>}</p>
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-indigo-700 font-bold">{sh.status || 'Booked'}</span>
               </div>
               <p className="text-zinc-600 mt-1.5">AWB <a href={sh.trackingUrl || trackUrl(sh.waybill)} target="_blank" rel="noopener noreferrer" className="font-mono font-semibold text-indigo-700 hover:underline">{sh.waybill}</a>
@@ -1037,19 +1050,22 @@ function CancelSheet({ o, onClose, onConfirm }) {
 // server-side (Shiprocket also clubs a single pickup); partial failures stay in
 // To Ship with their reasons shown here. When both couriers are enabled the
 // admin picks which one at the top of the sheet.
-function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
+function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, onClose, onDone }) {
   const [show, setShow] = useState(false)
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null) // { booked, failed, pickupScheduled }
   const [err, setErr] = useState('')
   const srReady = !!srCfg?.ready
   const delReady = !!delCfg?.ready
+  const xbReady = !!xbCfg?.ready
   const providers = []
   if (srCfg?.enabled) providers.push('shiprocket')
   if (delCfg?.enabled) providers.push('delhivery')
-  const [provider, setProvider] = useState(srReady ? 'shiprocket' : delReady ? 'delhivery' : (providers[0] || 'shiprocket'))
+  if (xbCfg?.enabled) providers.push('xpressbees')
+  const [provider, setProvider] = useState(srReady ? 'shiprocket' : delReady ? 'delhivery' : xbReady ? 'xpressbees' : (providers[0] || 'shiprocket'))
   const isDel = provider === 'delhivery'
-  const activeReady = isDel ? delReady : srReady
+  const isXb = provider === 'xpressbees'
+  const activeReady = isDel ? delReady : isXb ? xbReady : srReady
   const close = () => { setShow(false); setTimeout(result ? onDone : onClose, 200) }
 
   useEffect(() => {
@@ -1067,8 +1083,8 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
 
   const qtyOf = (o) => (o.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1
   const wKg = (o) => (((srCfg?.defaultWeightKg || 0.3) * qtyOf(o))).toFixed(2)
-  const wG = (o) => Math.round((delCfg?.defaultWeightGrams || 100) * qtyOf(o))
-  const weightLabel = (o) => (isDel ? `${wG(o)} g` : `${wKg(o)} kg`)
+  const wG = (o) => Math.round(((isXb ? xbCfg?.defaultWeightGrams : delCfg?.defaultWeightGrams) || 100) * qtyOf(o))
+  const weightLabel = (o) => (isDel || isXb ? `${wG(o)} g` : `${wKg(o)} kg`)
 
   const submit = async () => {
     setSaving(true); setErr('')
@@ -1112,7 +1128,7 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Bulk ship</p>
-                <p className="font-extrabold text-[17px] text-zinc-900 tracking-tight mt-0.5">{result ? 'Booking results' : `${orders.length} order${orders.length === 1 ? '' : 's'} via ${isDel ? 'Delhivery' : 'Shiprocket'}`}</p>
+                <p className="font-extrabold text-[17px] text-zinc-900 tracking-tight mt-0.5">{result ? 'Booking results' : `${orders.length} order${orders.length === 1 ? '' : 's'} via ${PROVIDER_LABEL[provider] || provider}`}</p>
               </div>
               <button onClick={close} disabled={saving} className="w-9 h-9 grid place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer transition shrink-0 disabled:opacity-40" aria-label="Close">
                 <X size={18} />
@@ -1153,16 +1169,18 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
                 <p className="text-[12px] text-zinc-400 px-1">
                   {isDel
                     ? 'Delhivery manifests each parcel immediately — arrange the pickup from your Delhivery panel.'
-                    : result.pickupScheduled
-                      ? 'One clubbed pickup has been requested for the whole batch.'
-                      : 'Pickup not auto-scheduled — schedule it from the Shiprocket dashboard (or turn on auto-pickup in Settings).'}
+                    : isXb
+                      ? 'Xpressbees pickups follow your auto-pickup setting — otherwise arrange them from the Xpressbees panel. Labels are on each order.'
+                      : result.pickupScheduled
+                        ? 'One clubbed pickup has been requested for the whole batch.'
+                        : 'Pickup not auto-scheduled — schedule it from the Shiprocket dashboard (or turn on auto-pickup in Settings).'}
                 </p>
               </>
             ) : (
               <>
                 {/* Courier picker — only when both couriers are enabled */}
                 {providers.length > 1 && (
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className={`grid gap-1.5 ${providers.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                     {providers.map((p) => {
                       const on = provider === p
                       return (
@@ -1174,7 +1192,7 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
                             ? { background: 'color-mix(in srgb, var(--maroon) 10%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
                             : { background: '#fff', color: '#71717a', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
                         >
-                          {p === 'delhivery' ? 'Delhivery' : 'Shiprocket'}
+                          {PROVIDER_LABEL[p] || p}
                         </button>
                       )
                     })}
@@ -1182,13 +1200,15 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
                 )}
                 {!activeReady && (
                   <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
-                    <p className="font-semibold text-amber-700">Finish {isDel ? 'Delhivery' : 'Shiprocket'} setup first</p>
+                    <p className="font-semibold text-amber-700">Finish {PROVIDER_LABEL[provider]} setup first</p>
                     <p className="text-amber-700/90 text-xs mt-0.5">{isDel
                       ? <>Add the API token and pickup warehouse in <b>Settings → Payments &amp; Shipping → Delhivery</b>.</>
-                      : <>Add the email, API password and pickup location in <b>Settings → Payments &amp; Shipping → Shiprocket</b>.</>}</p>
+                      : isXb
+                        ? <>Add the email, password and pickup details in <b>Settings → Payments &amp; Shipping → Xpressbees</b>.</>
+                        : <>Add the email, API password and pickup location in <b>Settings → Payments &amp; Shipping → Shiprocket</b>.</>}</p>
                   </div>
                 )}
-                <p className="text-[13px] text-zinc-500 px-1">Each order books with its <b className="text-zinc-700">default weight</b> ({isDel ? `${delCfg?.defaultWeightGrams || 100} g` : `${srCfg?.defaultWeightKg || 0.3} kg`} × items). {isDel ? 'Delhivery books a Surface waybill per order.' : 'Shiprocket assigns the recommended courier per order and the pickup is clubbed.'} Odd-sized parcels? Ship them individually instead.</p>
+                <p className="text-[13px] text-zinc-500 px-1">Each order books with its <b className="text-zinc-700">default weight</b> ({isDel || isXb ? `${(isXb ? xbCfg?.defaultWeightGrams : delCfg?.defaultWeightGrams) || 100} g` : `${srCfg?.defaultWeightKg || 0.3} kg`} × items). {isDel ? 'Delhivery books a Surface waybill per order.' : isXb ? 'Xpressbees books each order and returns its label instantly.' : 'Shiprocket assigns the recommended courier per order and the pickup is clubbed.'} Odd-sized parcels? Ship them individually instead.</p>
                 <div className="bg-white rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
                   <div className="divide-y divide-zinc-50">
                     {orders.map((o) => (
@@ -1212,7 +1232,7 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
           <div className="bg-white border-t border-zinc-100 p-4 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
             {result ? (
               <div className="space-y-2">
-                {!isDel && bookedIds.length > 0 && (
+                {provider === 'shiprocket' && bookedIds.length > 0 && (
                   <button
                     onClick={printAllLabels}
                     disabled={printing}
@@ -1245,19 +1265,21 @@ function BulkShipSheet({ orders, srCfg, delCfg, onClose, onDone }) {
 // Ship an order. When Shiprocket is configured, book a waybill via its API
 // (auto-fills the customer tracking message); otherwise (or by choice) paste a
 // manual tracking note the customer will see.
-function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
+function ShipModal({ order, srCfg, delCfg, xbCfg, onClose, onShipped }) {
   const alreadyShipped = order.status === 'shipped' || order.status === 'delivered'
   const mode = paymentMode(order)
   const totalQty = (order.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1
   const pin = order.address?.pincode
   const srReady = !!srCfg?.ready
   const delReady = !!delCfg?.ready
+  const xbReady = !!xbCfg?.ready
 
   // Tabs: each enabled courier (incomplete setup shows what's missing) + a
   // Manual note fallback.
   const tabs = []
   if (!alreadyShipped && srCfg?.enabled) tabs.push({ v: 'shiprocket', label: 'Shiprocket' })
   if (!alreadyShipped && delCfg?.enabled) tabs.push({ v: 'delhivery', label: 'Delhivery' })
+  if (!alreadyShipped && xbCfg?.enabled) tabs.push({ v: 'xpressbees', label: 'Xpressbees' })
   tabs.push({ v: 'manual', label: 'Manual note' })
 
   // The store's shipping-routing preference RECOMMENDS Shiprocket for this order
@@ -1274,7 +1296,7 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
   })()
   // Default tab: routing recommendation → first ready courier → manual.
   const defaultMethod = !alreadyShipped
-    ? (recommended || (srReady ? 'shiprocket' : delReady ? 'delhivery' : 'manual'))
+    ? (recommended || (srReady ? 'shiprocket' : delReady ? 'delhivery' : xbReady ? 'xpressbees' : 'manual'))
     : 'manual'
   const [method, setMethod] = useState(defaultMethod)
 
@@ -1297,8 +1319,9 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
   const [message, setMessage] = useState(order.tracking?.message || '')
   const [kWeight, setKWeight] = useState(String(((srCfg?.defaultWeightKg || 0.3) * totalQty).toFixed(2))) // kg (Shiprocket)
   const [gWeight, setGWeight] = useState(String((delCfg?.defaultWeightGrams || 100) * totalQty)) // grams (Delhivery)
+  const [xWeight, setXWeight] = useState(String((xbCfg?.defaultWeightGrams || 100) * totalQty)) // grams (Xpressbees)
   const [serv, setServ] = useState(null) // serviceability result (per active courier tab)
-  const [courierId, setCourierId] = useState(null) // null = let Shiprocket pick
+  const [courierId, setCourierId] = useState(null) // null = let the courier pick
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -1333,6 +1356,22 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
     return () => { live = false; clearTimeout(t) }
   }, [method, pin, gWeight]) // eslint-disable-line
 
+  // Xpressbees serviceability — their service list with rates at the current
+  // weight. Re-quotes (debounced) when the grams weight changes.
+  useEffect(() => {
+    if (method !== 'xpressbees' || !xbReady || !pin) return
+    let live = true
+    const t = setTimeout(() => {
+      setServ(null)
+      setCourierId(null)
+      const g = Math.round(Number(xWeight)) || xbCfg?.defaultWeightGrams || 100
+      api.get(`/orders/xpressbees/serviceability?pin=${encodeURIComponent(pin)}&weight=${g}&cod=${mode === 'COD'}&amount=${Math.round(order.total || 0)}`, { auth: true })
+        .then((r) => { if (live) setServ({ ok: true, ...r }) })
+        .catch((e) => { if (live) setServ({ ok: false, error: e.message }) })
+    }, serv ? 600 : 0) // instant on open, debounced on weight edits
+    return () => { live = false; clearTimeout(t) }
+  }, [method, pin, xWeight]) // eslint-disable-line
+
   const submitManual = async () => {
     setSaving(true); setErr('')
     try {
@@ -1351,6 +1390,11 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
         const g = Math.round(Number(gWeight))
         const body = g > 0 ? { weight: g } : {}
         updated = await api.post(`/orders/${order._id}/ship-delhivery`, body, { auth: true })
+      } else if (method === 'xpressbees') {
+        const g = Math.round(Number(xWeight))
+        const body = g > 0 ? { weight: g } : {}
+        if (courierId) body.courierId = courierId
+        updated = await api.post(`/orders/${order._id}/ship-xpressbees`, body, { auth: true })
       } else {
         const w = Number(kWeight)
         const body = w > 0 ? { weight: w } : {}
@@ -1361,18 +1405,22 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
     } catch (e) { setErr(e.message || 'Could not book this shipment'); setSaving(false) }
   }
 
-  const activeReady = method === 'delhivery' ? delReady : method === 'shiprocket' ? srReady : true
+  const activeReady = method === 'delhivery' ? delReady : method === 'xpressbees' ? xbReady : method === 'shiprocket' ? srReady : true
   const missingMsg = method === 'delhivery'
     ? [!delCfg?.hasToken && 'API token', !delCfg?.hasPickup && 'pickup warehouse name'].filter(Boolean).join(' & ')
-    : [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
-  const courierLabel = method === 'delhivery' ? 'Delhivery' : 'Shiprocket'
+    : method === 'xpressbees'
+      ? [!xbCfg?.hasCreds && 'email + password', !xbCfg?.hasPickup && 'pickup address/PIN/phone'].filter(Boolean).join(' & ')
+      : [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
+  const courierLabel = PROVIDER_LABEL[method] || 'Shiprocket'
   const pickedCourier = courierId != null ? (serv?.couriers || []).find((c) => c.id === courierId) : null
   const delRate = method === 'delhivery' && serv?.ok && serv?.serviceable ? serv.rate : null
+  const xbCheapest = method === 'xpressbees' && serv?.ok && serv?.serviceable ? serv.cheapest : null
   const primaryLabel = method === 'manual'
     ? (saving ? 'Saving…' : (alreadyShipped ? 'Save message' : 'Mark Shipped'))
     : (saving ? 'Booking…'
         : pickedCourier ? `Book ${pickedCourier.name} · ₹${Math.round(pickedCourier.rate || 0)}`
         : delRate != null ? `Book Delhivery · ₹${delRate}`
+        : xbCheapest ? `Book Xpressbees · ~₹${Math.round(xbCheapest.rate || 0)}`
         : `Book ${courierLabel} & Ship`)
 
   return (
@@ -1397,7 +1445,7 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
             </div>
 
             {tabs.length > 1 && (
-              <div className={`grid gap-1.5 mt-3.5 ${tabs.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <div className={`grid gap-1.5 mt-3.5 ${tabs.length >= 4 ? 'grid-cols-2' : tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 {tabs.map(({ v, label }) => {
                   const on = method === v
                   const rec = recommended === v && !alreadyShipped
@@ -1462,6 +1510,78 @@ function ShipModal({ order, srCfg, delCfg, onClose, onShipped }) {
                   {serv?.ok && serv?.serviceable && serv.rate != null && (
                     <p className="text-[11px] text-zinc-400 pt-2">Estimated Surface freight for {gWeight || '0'} g{mode === 'COD' ? ' incl. COD' : ''}, charged to your Delhivery account.</p>
                   )}
+                </div>
+              </>
+            ) : method === 'xpressbees' ? (
+              <>
+                {!xbReady && (
+                  <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'color-mix(in srgb, #f59e0b 12%, white)' }}>
+                    <p className="font-semibold text-amber-700">Finish Xpressbees setup first</p>
+                    <p className="text-amber-700/90 text-xs mt-0.5">
+                      Missing {missingMsg}. Go to <b>Settings → Payments &amp; Shipping → Xpressbees</b>, fill them in, and hit <b>Save Changes</b>.
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[13px] text-zinc-500 px-1">
+                  Books an Xpressbees waybill as <b className="text-zinc-700">{mode}</b>
+                  {mode === 'COD' && <> — collect <b className="text-zinc-700">{fmt(Math.max(0, (order.total || 0) - (order.advancePaid || 0)))}</b> on delivery</>}.
+                  The label PDF and the customer's tracking link arrive with the booking.
+                </p>
+
+                {/* Weight (grams) — rates below re-quote when this changes */}
+                <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                  <Field field={{ label: 'Package weight (grams)', type: 'number', help: `Default ${xbCfg?.defaultWeightGrams || 100} g × ${totalQty} item(s). Service rates update with the weight.` }} value={xWeight} onChange={setXWeight} />
+                </div>
+
+                {/* Service picker — every Xpressbees service with its rate */}
+                <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Service · to PIN {pin || '—'}</p>
+                  <div className="mt-2">
+                    {!pin ? <p className="text-[13px] font-medium text-red-600">No PIN on this order — add one before booking.</p>
+                      : !xbReady ? <p className="text-[13px] font-medium text-zinc-400">Finish setup to see services.</p>
+                      : !serv ? <p className="text-[13px] font-medium text-zinc-400 flex items-center gap-2"><RefreshCw size={13} className="animate-spin" /> Fetching services &amp; rates…</p>
+                      : !serv.ok ? <p className="text-[13px] font-medium text-amber-600">Couldn't fetch services ({serv.error}). You can still book — Xpressbees will pick one.</p>
+                      : !serv.serviceable ? <p className="text-[13px] font-medium text-red-600">Not serviceable by Xpressbees. Try another courier or ship manually.</p>
+                      : (
+                        <div className="space-y-1.5">
+                          <button
+                            onClick={() => setCourierId(null)}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer transition-colors"
+                            style={courierId == null
+                              ? { background: 'color-mix(in srgb, var(--maroon) 8%, white)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                              : { boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                          >
+                            <span>
+                              <span className="block text-[13px] font-bold" style={{ color: courierId == null ? 'var(--maroon)' : '#3f3f46' }}>Auto — Xpressbees picks</span>
+                              <span className="block text-[11px] text-zinc-400 mt-0.5">Their default service for this lane</span>
+                            </span>
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider shrink-0" style={{ color: '#b8922e' }}>★ Default</span>
+                          </button>
+                          {(serv.couriers || []).map((c) => {
+                            const on = courierId === c.id
+                            return (
+                              <button
+                                key={c.id}
+                                onClick={() => setCourierId(c.id)}
+                                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left cursor-pointer transition-colors"
+                                style={on
+                                  ? { background: 'color-mix(in srgb, var(--maroon) 8%, white)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                                  : { boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block text-[13px] font-bold truncate" style={{ color: on ? 'var(--maroon)' : '#3f3f46' }}>{c.name}</span>
+                                  <span className="block text-[11px] text-zinc-400 mt-0.5">
+                                    Chargeable {c.chargeableWeightGrams ? `${c.chargeableWeightGrams} g` : '—'}{c.codCharges ? ` · COD ₹${c.codCharges}` : ''}
+                                  </span>
+                                </span>
+                                <span className="text-[13px] font-extrabold shrink-0" style={{ color: on ? 'var(--maroon)' : '#3f3f46', fontVariantNumeric: 'tabular-nums' }}>₹{Math.round(c.rate || 0)}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                  </div>
                 </div>
               </>
             ) : (

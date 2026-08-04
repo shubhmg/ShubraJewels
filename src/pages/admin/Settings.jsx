@@ -82,6 +82,7 @@ export function AdminSettings() {
   const [tgTest, setTgTest] = useState(null) // { ok, msg } after a test send
   const [srTest, setSrTest] = useState(null) // Shiprocket connection test result
   const [dlTest, setDlTest] = useState(null) // Delhivery connection test result
+  const [xbTest, setXbTest] = useState(null) // Xpressbees connection test result
 
   // Admin endpoint returns secrets (Telegram + Shiprocket + Delhivery) the public GET strips.
   useEffect(() => { api.get('/settings/admin', { auth: true }).then(setS) }, [])
@@ -89,6 +90,7 @@ export function AdminSettings() {
   const setTg = (k, v) => setS((p) => ({ ...p, notifications: { ...p.notifications, telegram: { ...p.notifications?.telegram, [k]: v } } }))
   const setSr = (k, v) => setS((p) => ({ ...p, shiprocket: { ...p.shiprocket, [k]: v } }))
   const setDel = (k, v) => setS((p) => ({ ...p, delhivery: { ...p.delhivery, [k]: v } }))
+  const setXb = (k, v) => setS((p) => ({ ...p, xpressbees: { ...p.xpressbees, [k]: v } }))
 
   const testShiprocket = async () => {
     setSrTest({ loading: true })
@@ -110,6 +112,17 @@ export function AdminSettings() {
       setDlTest({ ok: true, msg: `Connected ✓  PIN ${d.pin}: ${d.serviceable ? `serviceable · COD ${d.cod ? 'yes' : 'no'} · Prepaid ${d.prepaid ? 'yes' : 'no'}` : 'not serviceable'}` })
     } catch (e) {
       setDlTest({ ok: false, msg: e.message || 'Could not reach Delhivery. Check the API token.' })
+    }
+  }
+
+  const testXpressbees = async () => {
+    setXbTest({ loading: true })
+    try {
+      await api.patch('/settings', { xpressbees: s.xpressbees }, { auth: true }) // save first so the test uses current values
+      await api.post('/settings/test-xpressbees', {}, { auth: true })
+      setXbTest({ ok: true, msg: 'Connected ✓  Xpressbees login works.' })
+    } catch (e) {
+      setXbTest({ ok: false, msg: e.message || 'Login failed. Check the email and password.' })
     }
   }
 
@@ -155,6 +168,13 @@ export function AdminSettings() {
           height: Number(s.shiprocket.height) || 5,
         } } : {}),
         ...(s.delhivery ? { delhivery: { ...s.delhivery, defaultWeightGrams: Number(s.delhivery.defaultWeightGrams) || 100 } } : {}),
+        ...(s.xpressbees ? { xpressbees: {
+          ...s.xpressbees,
+          defaultWeightGrams: Number(s.xpressbees.defaultWeightGrams) || 100,
+          length: Number(s.xpressbees.length) || 12,
+          breadth: Number(s.xpressbees.breadth) || 10,
+          height: Number(s.xpressbees.height) || 5,
+        } } : {}),
       }
       await api.patch('/settings', payload, { auth: true })
       await refresh()
@@ -378,6 +398,91 @@ export function AdminSettings() {
                 </Btn>
                 {dlTest && !dlTest.loading && (
                   <span className="text-sm font-medium" style={{ color: dlTest.ok ? '#15803d' : '#b91c1c' }}>{dlTest.msg}</span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>
+            </>
+          )}
+        </div>
+      </Section>
+      )}
+
+      {tab === 'payments' && (
+      <Section title="Xpressbees Shipping (direct)" subtitle="Book Xpressbees waybills directly with your Xpressbees account. One call books the order and returns the label PDF instantly. Credentials are private and never shown on the website.">
+        <div className="rounded-xl p-4 mb-5 text-sm leading-relaxed" style={{ background: 'color-mix(in srgb, var(--gold) 10%, transparent)', color: 'var(--ink)' }}>
+          <p className="font-semibold mb-1.5">How it works</p>
+          <ul className="list-disc ml-5 space-y-1 text-zinc-600 text-[13px]">
+            <li>Login uses your <b>shipment.xpressbees.com</b> account email + password (a short-lived token is cached server-side).</li>
+            <li>Booking sends your pickup address inline — no warehouse pre-registration needed.</li>
+            <li>The <b>label PDF</b> comes back with the booking; the ship dialog shows every service with its rate.</li>
+          </ul>
+        </div>
+
+        <div className="space-y-4">
+          <Field field={{ label: 'Enable Xpressbees integration', type: 'toggle' }} value={!!s.xpressbees?.enabled} onChange={(v) => setXb('enabled', v)} />
+
+          {s.xpressbees?.enabled && (
+            <>
+              <Field field={{ label: 'Automation policy', type: 'select', options: [
+                { value: 'manual', label: 'Manual — I press the button per order' },
+                { value: 'all', label: 'All orders' },
+                { value: 'cod', label: 'COD orders only' },
+                { value: 'prepaid', label: 'Prepaid orders only' },
+              ] }} value={s.xpressbees?.policy || 'manual'} onChange={(v) => setXb('policy', v)} />
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Field field={{ label: 'Account email', placeholder: 'you@example.com' }} value={s.xpressbees?.email || ''} onChange={(v) => setXb('email', v.trim())} />
+                <Field field={{ label: 'Password', type: 'password', help: 'Your shipment.xpressbees.com login. Kept private — never sent to the storefront.' }} value={s.xpressbees?.password || ''} onChange={(v) => setXb('password', v)} />
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Pickup address (sent with every booking)</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <Field field={{ label: 'Warehouse name', placeholder: 'Primary', help: 'A short internal name for this pickup point.' }} value={s.xpressbees?.warehouseName || ''} onChange={(v) => setXb('warehouseName', v)} />
+                  <Field field={{ label: 'Contact name' }} value={s.xpressbees?.pickupName || ''} onChange={(v) => setXb('pickupName', v)} />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <Field field={{ label: 'Pickup phone' }} value={s.xpressbees?.pickupPhone || ''} onChange={(v) => setXb('pickupPhone', v)} />
+                  <Field field={{ label: 'Pickup PIN' }} value={s.xpressbees?.pickupPin || ''} onChange={(v) => setXb('pickupPin', v)} />
+                </div>
+                <Field field={{ label: 'Pickup address' }} value={s.xpressbees?.pickupAddress || ''} onChange={(v) => setXb('pickupAddress', v)} />
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <Field field={{ label: 'Pickup city' }} value={s.xpressbees?.pickupCity || ''} onChange={(v) => setXb('pickupCity', v)} />
+                  <Field field={{ label: 'Pickup state' }} value={s.xpressbees?.pickupState || ''} onChange={(v) => setXb('pickupState', v)} />
+                </div>
+              </div>
+
+              <Field field={{ label: 'Request auto-pickup on booking', type: 'toggle', help: 'Asks Xpressbees to schedule the pickup automatically with every booking. Off = arrange pickups from their panel.' }} value={!!s.xpressbees?.autoPickup} onChange={(v) => setXb('autoPickup', v)} />
+
+              <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Status webhook (auto-deliver)</p>
+                <p className="text-xs text-zinc-500 -mt-1">Ask your Xpressbees account manager to push tracking updates to the URL below with the <b>x-api-key</b> header set to your token — orders then mark themselves Delivered (and COD flips to paid) automatically.</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 min-w-0 truncate text-[12px] bg-zinc-50 rounded-lg px-3 py-2 text-zinc-600">{`${window.location.origin}/api/orders/courier-webhook`}</code>
+                  <Btn variant="outline" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/api/orders/courier-webhook`)}>Copy</Btn>
+                </div>
+                <Field field={{ label: 'Webhook token (x-api-key)', type: 'password', placeholder: 'Any long random string', help: 'Must match the token Xpressbees sends. Leave empty to keep the webhook disabled.' }} value={s.xpressbees?.webhookToken || ''} onChange={(v) => setXb('webhookToken', v.trim())} />
+                {!s.xpressbees?.webhookToken && (
+                  <Btn variant="outline" onClick={() => setXb('webhookToken', (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)))}>Generate token</Btn>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 p-3.5 space-y-3">
+                <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Default parcel</p>
+                <Field field={{ label: 'Default weight per item (grams)', type: 'number', placeholder: '100', help: 'Used when a product has no weight. Multiplied by total quantity.' }} value={s.xpressbees?.defaultWeightGrams ?? ''} onChange={(v) => setXb('defaultWeightGrams', v === '' ? '' : Number(v))} />
+                <div className="grid grid-cols-3 gap-3">
+                  <Field field={{ label: 'Length (cm)', type: 'number' }} value={s.xpressbees?.length ?? ''} onChange={(v) => setXb('length', v === '' ? '' : Number(v))} />
+                  <Field field={{ label: 'Breadth (cm)', type: 'number' }} value={s.xpressbees?.breadth ?? ''} onChange={(v) => setXb('breadth', v === '' ? '' : Number(v))} />
+                  <Field field={{ label: 'Height (cm)', type: 'number' }} value={s.xpressbees?.height ?? ''} onChange={(v) => setXb('height', v === '' ? '' : Number(v))} />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <Btn variant="outline" onClick={testXpressbees} disabled={xbTest?.loading || !s.xpressbees?.email || !s.xpressbees?.password}>
+                  {xbTest?.loading ? 'Checking…' : 'Test connection'}
+                </Btn>
+                {xbTest && !xbTest.loading && (
+                  <span className="text-sm font-medium" style={{ color: xbTest.ok ? '#15803d' : '#b91c1c' }}>{xbTest.msg}</span>
                 )}
               </div>
               <p className="text-xs text-zinc-400">The test saves your current values first. Remember to hit <b>Save Changes</b> up top to keep them.</p>

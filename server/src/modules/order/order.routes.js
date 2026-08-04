@@ -12,6 +12,7 @@ import { sendOrderConfirmation, sendOrderShipped, sendOrderCancelled } from '../
 import { reconcileOrderStock, checkAvailability, reserveProducts, releaseProducts } from './orderStock.js';
 import * as shiprocket from '../../utils/shiprocket.js';
 import * as delhivery from '../../utils/delhivery.js';
+import * as xpressbees from '../../utils/xpressbees.js';
 import validate from '../../middleware/validate.js';
 import requireAdmin from '../../middleware/auth.js';
 import { optionalCustomer } from '../../middleware/customerAuth.js';
@@ -265,7 +266,7 @@ router.patch(
 
 // Customer-facing tracking note auto-filled when a courier waybill is booked.
 function shipmentTrackingMessage(provider, waybill, url) {
-  const label = provider === 'delhivery' ? 'Delhivery' : 'Shiprocket';
+  const label = provider === 'delhivery' ? 'Delhivery' : provider === 'xpressbees' ? 'Xpressbees' : 'Shiprocket';
   return `Shipped via ${label}. Tracking ID: ${waybill}\nTrack your parcel: ${url}`;
 }
 
@@ -387,8 +388,51 @@ router.post(
   })
 );
 
+// ADMIN — book an Xpressbees shipment (single call: order + AWB + label), then mark Shipped.
+router.post(
+  '/:id/ship-xpressbees',
+  requireAdmin,
+  validate({
+    params: Joi.object({ id: objectId.required() }),
+    body: Joi.object({
+      weight: Joi.number().integer().min(1).max(50000).optional(), // grams
+      courierId: Joi.alternatives().try(Joi.string(), Joi.number()).optional(), // force a service (from serviceability list)
+    }).default({}),
+  }),
+  asyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id);
+    if (!order) throw ApiError.notFound('Order not found');
+    if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
+    if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
+
+    const settings = await getSettings();
+    if (!xpressbees.xpressbeesReady(xpressbees.xpressbeesConfig(settings))) {
+      throw ApiError.badRequest('Xpressbees is not fully configured. Add the email, password and pickup details in Settings.');
+    }
+    const { result, attempt } = await bookWithRetry(order, (ref) =>
+      xpressbees.createShipment(settings, order.toObject(), { weight: req.body.weight, courierId: req.body.courierId, orderRef: ref }));
+    if (!result.ok) throw ApiError.badRequest(result.error || 'Xpressbees could not book this shipment.');
+
+    const wasShipped = order.status === 'shipped';
+    order.shipmentAttempts = attempt;
+    await applyBooking(order, settings, {
+      provider: 'xpressbees',
+      waybill: result.awb,
+      shipmentId: result.shipmentId,
+      courierName: result.courierName,
+      trackingUrl: result.trackingUrl,
+      mode: result.mode,
+      codAmount: result.codAmount || 0,
+      weightGrams: result.weightGrams || 0,
+      labelUrl: result.labelUrl || '',
+    }, wasShipped);
+
+    res.json({ success: true, data: order });
+  })
+);
+
 // ADMIN — bulk-book a courier for many orders at once (provider = shiprocket |
-// delhivery, default shiprocket). Uses each order's default weight, books
+// delhivery | xpressbees, default shiprocket). Uses each order's default weight, books
 // sequentially (avoids assignment races/rate limits); Shiprocket then clubs ONE
 // pickup request for the batch when auto-pickup is on (Delhivery has no clubbed
 // pickup — arrange it from the panel). Partial success is normal: failures are
@@ -398,15 +442,20 @@ router.post(
   requireAdmin,
   validate({ body: Joi.object({
     ids: Joi.array().items(objectId).min(1).max(50).required(),
-    provider: Joi.string().valid('shiprocket', 'delhivery').default('shiprocket'),
+    provider: Joi.string().valid('shiprocket', 'delhivery', 'xpressbees').default('shiprocket'),
   }) }),
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
     const provider = req.body.provider;
     const isDel = provider === 'delhivery';
+    const isXb = provider === 'xpressbees';
     if (isDel) {
       if (!delhivery.delhiveryReady(delhivery.delhiveryConfig(settings))) {
         throw ApiError.badRequest('Delhivery is not fully configured. Add the API token and pickup warehouse in Settings.');
+      }
+    } else if (isXb) {
+      if (!xpressbees.xpressbeesReady(xpressbees.xpressbeesConfig(settings))) {
+        throw ApiError.badRequest('Xpressbees is not fully configured. Add the email, password and pickup details in Settings.');
       }
     } else if (!shiprocket.shiprocketReady(shiprocket.shiprocketConfig(settings))) {
       throw ApiError.badRequest('Shiprocket is not fully configured. Add the email, API password and pickup location in Settings.');
@@ -425,7 +474,9 @@ router.post(
       const { result, attempt } = await bookWithRetry(order, (ref) =>
         isDel
           ? delhivery.createShipment(settings, order.toObject(), { orderRef: ref })
-          : shiprocket.createShipment(settings, order.toObject(), { orderRef: ref, skipPickup: true }));
+          : isXb
+            ? xpressbees.createShipment(settings, order.toObject(), { orderRef: ref })
+            : shiprocket.createShipment(settings, order.toObject(), { orderRef: ref, skipPickup: true }));
       if (!result.ok) { failed.push({ orderNo: order.orderNo, error: result.error || 'Booking failed' }); continue; }
 
       const wasShipped = order.status === 'shipped';
@@ -439,26 +490,39 @@ router.post(
             codAmount: result.codAmount || 0,
             weightGrams: result.weight || 0,
           }
-        : {
-            provider: 'shiprocket',
-            waybill: result.awb,
-            shipmentId: result.shipmentId,
-            srOrderId: result.srOrderId,
-            courierName: result.courierName,
-            trackingUrl: result.trackingUrl,
-            mode: result.mode,
-            codAmount: result.codAmount || 0,
-            weightGrams: Math.round((result.weightKg || 0) * 1000),
-            labelUrl: result.labelUrl || '',
-          };
+        : isXb
+          ? {
+              provider: 'xpressbees',
+              waybill: result.awb,
+              shipmentId: result.shipmentId,
+              courierName: result.courierName,
+              trackingUrl: result.trackingUrl,
+              mode: result.mode,
+              codAmount: result.codAmount || 0,
+              weightGrams: result.weightGrams || 0,
+              labelUrl: result.labelUrl || '',
+            }
+          : {
+              provider: 'shiprocket',
+              waybill: result.awb,
+              shipmentId: result.shipmentId,
+              srOrderId: result.srOrderId,
+              courierName: result.courierName,
+              trackingUrl: result.trackingUrl,
+              mode: result.mode,
+              codAmount: result.codAmount || 0,
+              weightGrams: Math.round((result.weightKg || 0) * 1000),
+              labelUrl: result.labelUrl || '',
+            };
       await applyBooking(order, settings, shipment, wasShipped);
-      booked.push({ orderNo: order.orderNo, awb: shipment.waybill, courierName: shipment.courierName || (isDel ? 'Delhivery' : '') });
-      if (!isDel && result.shipmentId) shipmentIds.push(result.shipmentId);
+      booked.push({ orderNo: order.orderNo, awb: shipment.waybill, courierName: shipment.courierName || (isDel ? 'Delhivery' : isXb ? 'Xpressbees' : '') });
+      if (!isDel && !isXb && result.shipmentId) shipmentIds.push(result.shipmentId);
     }
 
-    // One clubbed pickup request for everything booked (Shiprocket auto-pickup only).
+    // One clubbed pickup request for everything booked (Shiprocket auto-pickup only —
+    // Xpressbees pickups ride on request_auto_pickup per booking).
     let pickupScheduled = false;
-    if (!isDel && shiprocket.shiprocketConfig(settings).autoPickup && shipmentIds.length) {
+    if (!isDel && !isXb && shiprocket.shiprocketConfig(settings).autoPickup && shipmentIds.length) {
       const p = await shiprocket.schedulePickup(settings, shipmentIds);
       pickupScheduled = !!p.ok;
     }
@@ -480,15 +544,19 @@ router.post(
 
     const settings = await getSettings();
     const isDel = sh.provider === 'delhivery';
+    const isXb = sh.provider === 'xpressbees';
     const [t, l] = await Promise.all([
-      isDel ? delhivery.trackShipment(settings, sh.waybill) : shiprocket.trackShipment(settings, sh.waybill),
-      sh.labelUrl
+      isDel ? delhivery.trackShipment(settings, sh.waybill)
+        : isXb ? xpressbees.trackShipment(settings, sh.waybill)
+          : shiprocket.trackShipment(settings, sh.waybill),
+      // Xpressbees labels come from the booking response — nothing to refresh.
+      (sh.labelUrl || isXb)
         ? Promise.resolve({ ok: false })
         : (isDel ? delhivery.labelLink(settings, sh.waybill) : shiprocket.labelLink(settings, sh.shipmentId)),
     ]);
     if (t.ok) {
       order.shipment.status = t.status || sh.status;
-      // Delhivery returns status type + location separately; Shiprocket pre-joins statusDetail.
+      // Delhivery returns status type + location separately; Shiprocket/Xpressbees pre-join statusDetail.
       order.shipment.statusDetail = isDel
         ? [t.statusType, t.location].filter(Boolean).join(' · ')
         : (t.statusDetail || '');
@@ -525,7 +593,9 @@ router.post(
     const settings = await getSettings();
     const r = sh.provider === 'delhivery'
       ? await delhivery.cancelShipment(settings, sh.waybill)
-      : await shiprocket.cancelShipment(settings, sh.srOrderId);
+      : sh.provider === 'xpressbees'
+        ? await xpressbees.cancelShipment(settings, sh.waybill)
+        : await shiprocket.cancelShipment(settings, sh.srOrderId);
     if (!r.ok) throw ApiError.badRequest(r.error || 'Courier could not cancel this shipment.');
 
     if (req.body.revert) {
@@ -559,6 +629,11 @@ router.get(
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
     const settings = await getSettings();
+    // Xpressbees hands the label out at booking time — serve the stored URL.
+    if (sh.provider === 'xpressbees') {
+      if (!sh.labelUrl) throw ApiError.badRequest('No label stored for this shipment — it should have arrived with the booking.');
+      return res.json({ success: true, data: { url: sh.labelUrl } });
+    }
     const r = sh.provider === 'delhivery'
       ? await delhivery.labelLink(settings, sh.waybill)
       : await shiprocket.labelLink(settings, sh.shipmentId);
@@ -586,7 +661,9 @@ router.post(
       } else {
         skipped.push({
           orderNo: o.orderNo,
-          reason: sh?.provider === 'delhivery' ? 'Delhivery — open its label from the order' : 'No Shiprocket shipment',
+          reason: sh?.provider === 'delhivery' ? 'Delhivery — open its label from the order'
+            : sh?.provider === 'xpressbees' ? 'Xpressbees — open its label from the order'
+              : 'No Shiprocket shipment',
         });
       }
     }
@@ -644,6 +721,31 @@ router.get(
   })
 );
 
+// ADMIN — Xpressbees serviceability + rate card (pickup PIN → delivery PIN).
+// Returns their courier services with freight/COD/total charges, cheapest first;
+// pass a service's `id` back as `courierId` when booking to force it.
+router.get(
+  '/xpressbees/serviceability',
+  requireAdmin,
+  validate({ query: Joi.object({
+    pin: Joi.string().pattern(/^\d{6}$/).required(),
+    weight: Joi.number().integer().min(1).max(50000).optional(), // grams
+    cod: Joi.boolean().default(false),
+    amount: Joi.number().min(0).optional(), // order value (rate inputs)
+  }) }),
+  asyncHandler(async (req, res) => {
+    const settings = await getSettings();
+    const r = await xpressbees.checkServiceability(settings, {
+      deliveryPin: req.query.pin,
+      weightGrams: req.query.weight,
+      cod: req.query.cod,
+      orderAmount: req.query.amount,
+    });
+    if (!r.ok) throw ApiError.badRequest(r.error || 'Could not check serviceability');
+    res.json({ success: true, data: r });
+  })
+);
+
 // PUBLIC (token-verified) — Shiprocket status webhook. Configure in Shiprocket →
 // Settings → API → Webhooks with URL {site}/api/orders/courier-webhook and
 // NOTE: Shiprocket forbids the words shiprocket/kartrocket/sr/kr in webhook
@@ -655,31 +757,40 @@ router.get(
 // possibly without custom headers) and refuses the URL on any non-200 — so
 // this endpoint always answers 200. Unauthorized calls are silently IGNORED
 // (nothing is updated), which keeps spoofing harmless.
+// The same endpoint also serves the Xpressbees status webhook: share
+// settings.xpressbees.webhookToken with Xpressbees when they configure your push
+// URL — the matched token decides which provider's shipments the push may touch,
+// so one courier's token can never update another courier's orders.
 router.get('/courier-webhook', (_req, res) => res.json({ success: true }));
 router.post(
   '/courier-webhook',
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
-    const expected = settings.shiprocket?.webhookToken || '';
     const got = req.headers['x-api-key'] || req.headers['x-webhook-token'] || '';
+    const srToken = settings.shiprocket?.webhookToken || '';
+    const xbToken = settings.xpressbees?.webhookToken || '';
     // No token configured = webhook disabled; wrong/missing token = ACK but
     // ignore. Never process unauthenticated status pushes.
-    if (!expected || got !== expected) return res.json({ success: true, data: { ignored: true } });
+    const provider = (srToken && got === srToken) ? 'shiprocket'
+      : (xbToken && got === xbToken) ? 'xpressbees'
+        : null;
+    if (!got || !provider) return res.json({ success: true, data: { ignored: true } });
 
     const b = req.body || {};
-    const awb = String(b.awb || b.awb_code || '').trim();
-    const status = String(b.current_status || b.shipment_status || b.status || '').trim();
+    const awb = String(b.awb || b.awb_code || b.awb_number || '').trim();
+    const status = String(b.current_status || b.shipment_status || b.status || b.status_code || '').trim();
     if (!awb || !status) return res.json({ success: true, data: { ignored: true } });
 
-    const order = await Order.findOne({ 'shipment.provider': 'shiprocket', 'shipment.waybill': awb });
+    const order = await Order.findOne({ 'shipment.provider': provider, 'shipment.waybill': awb });
     if (!order) return res.json({ success: true, data: { ignored: true } }); // unknown AWB — ack anyway (no retries)
 
     order.shipment.status = status;
-    order.shipment.statusDetail = [b.current_status_body || '', b.location || b.current_location || ''].filter(Boolean).join(' · ');
+    order.shipment.statusDetail = [b.current_status_body || b.message || '', b.location || b.current_location || ''].filter(Boolean).join(' · ');
     order.shipment.lastSyncedAt = new Date();
 
     // "Delivered" (but NOT "RTO Delivered" — that's the parcel coming back to us).
-    const delivered = /delivered/i.test(status) && !/rto/i.test(status);
+    // Xpressbees may push the short status code "DLV" instead of the word.
+    const delivered = (/delivered/i.test(status) || /^dlv$/i.test(status)) && !/rto/i.test(status);
     if (delivered && order.status === 'shipped') {
       order.status = 'delivered';
       if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
