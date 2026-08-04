@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox, MessageCircle, Mail, Copy, Printer, FlaskConical } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
@@ -1247,6 +1247,12 @@ function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, prefCourier, onClose, onD
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {err && (
+              <div className="rounded-2xl px-4 py-3.5 bg-red-50 ring-2 ring-red-300">
+                <p className="flex items-center gap-2 text-[13px] font-extrabold text-red-700"><XCircle size={16} className="shrink-0" /> Bulk booking failed</p>
+                <p className="text-[13px] font-semibold text-red-600 mt-1">{err}</p>
+              </div>
+            )}
             {result ? (
               <>
                 {result.booked?.length > 0 && (
@@ -1334,7 +1340,6 @@ function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, prefCourier, onClose, onD
                 </div>
               </>
             )}
-            {err && <p className="text-[13px] font-semibold text-red-600 px-1">{err}</p>}
           </div>
 
           {/* Footer */}
@@ -1441,6 +1446,7 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [realBooking, setRealBooking] = useState(false) // 🧪 test orders: actually call the courier API
+  const bodyRef = useRef(null) // scroll target so booking errors surface at the top
 
   // Fetch the courier list (with rates) when the Shiprocket tab is active.
   // Re-fetches (debounced) when the weight changes — rates depend on weight.
@@ -1520,7 +1526,12 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
         updated = await api.post(`/orders/${order._id}/ship-shiprocket`, body, { auth: true })
       }
       onShipped(updated)
-    } catch (e) { setErr(e.message || 'Could not book this shipment'); setSaving(false) }
+    } catch (e) {
+      setErr(e.message || 'Could not book this shipment')
+      setSaving(false)
+      // Bring the error banner (top of the body) into view — it must never hide below the fold.
+      requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' }))
+    }
   }
 
   const activeReady = method === 'delhivery' ? delReady : method === 'xpressbees' ? xbReady : method === 'shiprocket' ? srReady : true
@@ -1586,7 +1597,19 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div ref={bodyRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+            {/* Booking failure — loud, on top, auto-scrolled into view */}
+            {err && (
+              <div className="rounded-2xl px-4 py-3.5 bg-red-50 ring-2 ring-red-300">
+                <p className="flex items-center gap-2 text-[13px] font-extrabold text-red-700">
+                  <XCircle size={16} className="shrink-0" /> Booking failed
+                </p>
+                <p className="text-[13px] font-semibold text-red-600 mt-1">{err}</p>
+                {/wallet/i.test(err) && (
+                  <p className="text-[12px] text-red-500/90 mt-1">Recharge the courier wallet in their panel, then try again.</p>
+                )}
+              </div>
+            )}
             {order.isTest && method !== 'manual' && (
               <div className={`rounded-2xl px-4 py-3 text-[12px] ring-1 ${realBooking ? 'bg-red-50 ring-red-200' : 'bg-amber-50 ring-amber-200'}`}>
                 <p className={`font-semibold ${realBooking ? 'text-red-700' : 'text-amber-800'}`}>
@@ -1793,7 +1816,6 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
                 </div>
               </>
             )}
-            {err && <p className="text-[13px] font-semibold text-red-600 px-1">{err}</p>}
           </div>
 
           {/* Footer — one full-width action */}
