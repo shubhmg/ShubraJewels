@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet, useNavigate, useLocation } from 'react-route
 import {
   LayoutDashboard, Home as HomeIcon, Package, Boxes, Tags, Crown, Megaphone, Video, Star, Image as ImageIcon,
   ShoppingCart, Settings, ChevronLeft, ChevronRight, ExternalLink, LogOut, Menu, X, Eye, Ticket, BarChart3, Users,
+  Moon, Sun,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
@@ -34,6 +35,9 @@ const NAV = [
 export function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Admin-only dark mode: class on <html> so portalled menus/modals follow too;
+  // removed on unmount so the storefront is never affected.
+  const [dark, setDark] = useState(() => localStorage.getItem('sj-admin-theme') === 'dark')
   const settings = useSettings()
   const navigate = useNavigate()
   const location = useLocation()
@@ -41,6 +45,11 @@ export function AdminLayout() {
 
   useEffect(() => { if (getToken()) fetchMe() }, []) // eslint-disable-line
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
+  useEffect(() => {
+    document.documentElement.classList.toggle('admin-dark', dark)
+    localStorage.setItem('sj-admin-theme', dark ? 'dark' : 'light')
+    return () => document.documentElement.classList.remove('admin-dark')
+  }, [dark])
 
   if (!getToken()) return <Navigate to="/admin/login" replace />
   const doLogout = () => { logout(); navigate('/admin/login') }
@@ -86,6 +95,9 @@ export function AdminLayout() {
         </nav>
 
         <div className="px-2.5 pb-3 pt-2 space-y-0.5 border-t border-white/5">
+          <button onClick={() => setDark((d) => !d)} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition w-full cursor-pointer ${collapsed ? 'justify-center' : ''}`} title={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
+            {dark ? <Sun size={17} /> : <Moon size={17} />}{!collapsed && <span>{dark ? 'Light mode' : 'Dark mode'}</span>}
+          </button>
           <a href="/" target="_blank" rel="noreferrer" className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition ${collapsed ? 'justify-center' : ''}`} title="View store">
             <ExternalLink size={17} />{!collapsed && <span>View store</span>}
           </a>
