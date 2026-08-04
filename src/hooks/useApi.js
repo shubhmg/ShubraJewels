@@ -4,7 +4,12 @@ import { api, normalizeProduct } from '../lib/api.js'
 // Module-level cache. On back-navigation a page re-renders instantly at full
 // height from cache (then revalidates in the background) — without this the
 // page mounts empty/short and browser scroll-restoration lands on the footer.
+// Entries fetched within FRESH_MS are served WITHOUT a revalidation request —
+// e.g. the products grid re-using the filter sheet's count fetch on "Show"
+// (same URL seconds apart) renders instantly with zero extra network.
 const _cache = new Map()
+const _cacheTs = new Map()
+const FRESH_MS = 30 * 1000
 
 /**
  * Generic GET hook. Returns { data, loading, error, refresh }.
@@ -20,6 +25,7 @@ export function useFetch(path, { transform } = {}) {
       const res = await api.get(path)
       const val = transform ? transform(res) : res
       _cache.set(path, val)
+      _cacheTs.set(path, Date.now())
       return { val }
     } catch (e) {
       return { err: e }
@@ -33,8 +39,11 @@ export function useFetch(path, { transform } = {}) {
   useEffect(() => {
     if (!path) { setData(null); setLoading(false); return }
     let alive = true
-    if (_cache.has(path)) { setData(_cache.get(path)); setLoading(false) }
-    else { setData(null); setLoading(true) }
+    if (_cache.has(path)) {
+      setData(_cache.get(path)); setLoading(false)
+      // Fresh enough → no revalidation round-trip at all.
+      if (Date.now() - (_cacheTs.get(path) || 0) < FRESH_MS) return () => { alive = false }
+    } else { setData(null); setLoading(true) }
     fetchPath().then(({ val, err }) => {
       if (!alive) return
       if (err) setError(err)
@@ -56,8 +65,10 @@ export function useFetch(path, { transform } = {}) {
 
 const asProducts = (arr) => (arr || []).map(normalizeProduct)
 
+// query: '' = all products, '?category=…' etc. Pass NULL to skip fetching
+// entirely (e.g. the filter sheet's staged-count fetch when the sheet is closed).
 export const useProducts = (query = '') =>
-  useFetch(`/products${query}`, { transform: asProducts })
+  useFetch(query === null ? null : `/products${query}`, { transform: asProducts })
 
 export const useProduct = (idOrSlug) =>
   useFetch(idOrSlug ? `/products/${idOrSlug}` : null, { transform: normalizeProduct })

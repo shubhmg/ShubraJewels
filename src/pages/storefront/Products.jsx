@@ -4,7 +4,7 @@ import { SlidersHorizontal, X } from 'lucide-react'
 import { ProductCard } from '../../components/product/ProductCard.jsx'
 import { Mandala, Motif } from '../../components/decor/Decor.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
-import { useProducts, useCategories, useCollections, useFetch } from '../../hooks/useApi.js'
+import { useProducts, useCategories, useCollections } from '../../hooks/useApi.js'
 import { useSettings } from '../../lib/SettingsProvider.jsx'
 import { resolveContent } from '../../lib/siteContent.js'
 
@@ -101,17 +101,19 @@ export function Products() {
   }
 
   // Live count for the STAGED selection — fetched only while the sheet is open
-  // (null path = no request), so the button can say "Show 23 pieces" truthfully.
-  const draftPath = useMemo(() => {
+  // (null = no request). Uses useProducts (same transform + cache key as the
+  // grid) so pressing "Show" re-uses THIS response: no second API call, no
+  // skeleton flash — the grid renders instantly from the fresh cache.
+  const draftQuery = useMemo(() => {
     if (!draft) return null
     const q = new URLSearchParams()
     if (draft.category !== 'all') q.set('category', draft.category)
     if (draft.collection !== 'all') q.set('collection', draft.collection)
     if (draft.under599) q.set('under599', '1')
     const s = q.toString()
-    return `/products${s ? `?${s}` : ''}`
+    return s ? `?${s}` : ''
   }, [draft])
-  const { data: draftProducts, loading: draftLoading } = useFetch(draftPath)
+  const { data: draftProducts, loading: draftLoading } = useProducts(draftQuery)
   const draftCount = draft ? (draftProducts || []).filter((p) => !draft.inStock || p.inStock !== false).length : 0
 
   // Lock the page behind the mobile filter sheet (desktop sidebar must NOT lock).
