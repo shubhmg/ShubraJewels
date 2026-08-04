@@ -84,7 +84,8 @@ export function Products() {
   const hindi = activeCat?.hindiName || activeCol?.hindiName || (under599 ? pc.hindiUnder599 : pc.hindiAll)
 
   return (
-    <div className="min-h-dvh" style={{ background: 'var(--cream)' }}>
+    // ~5% ink mixed into the cream so the near-white product cards separate from the page
+    <div className="min-h-dvh" style={{ background: 'color-mix(in srgb, var(--cream) 95%, var(--ink))' }}>
       <div className="relative overflow-hidden" style={{ background: 'var(--maroon-dark)' }}>
         <Mandala size={300} className="hidden md:block absolute right-0 md:right-8 top-16 md:top-24 opacity-15 pointer-events-none" />
         <div className="container-wide pt-24 md:pt-32 pb-12 md:pb-14 relative text-center">
@@ -95,18 +96,18 @@ export function Products() {
       </div>
 
       <div className="container-wide py-8">
-        <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowFilter((f) => !f)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer"
-              style={{ borderColor: 'color-mix(in srgb, var(--gold) 40%, transparent)', color: 'var(--ink)' }}
-            >
-              <SlidersHorizontal size={14} /> Filters
-            </button>
-            <span className="text-sm text-stone-500">{loading ? '…' : `${list.length} items`}</span>
-          </div>
-          <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} />
+        {/* One row, never wraps: the item count is the flexible piece (truncates on
+            narrow phones) so the sort dropdown can't fall to a second line. */}
+        <div className="flex items-center mb-6 gap-3">
+          <button
+            onClick={() => setShowFilter((f) => !f)}
+            className="flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer shrink-0"
+            style={{ borderColor: 'color-mix(in srgb, var(--gold) 40%, transparent)', color: 'var(--ink)' }}
+          >
+            <SlidersHorizontal size={14} /> Filters
+          </button>
+          <span className="text-sm text-stone-500 flex-1 min-w-0 truncate">{loading ? '…' : `${list.length} items`}</span>
+          <div className="shrink-0"><Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} /></div>
         </div>
 
         <div className="md:flex md:gap-8">
