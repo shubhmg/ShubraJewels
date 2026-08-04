@@ -136,6 +136,9 @@ const settingSchema = new mongoose.Schema(
     //   prepaid = the reverse · manual = no recommendation, ask every time.
     // '' = unset (falls back to shiprocket.policy, then 'manual').
     shippingRouting: { type: String, enum: ['', 'all', 'cod', 'prepaid', 'manual'], default: '' },
+    // Which courier the routing recommendation points at ('' = auto: first ready
+    // courier in shiprocket → delhivery → xpressbees order).
+    preferredCourier: { type: String, enum: ['', 'shiprocket', 'delhivery', 'xpressbees'], default: '' },
 
     // Shiprocket courier aggregator. `email`/`password` are SECRET (used to mint
     // the JWT via the login API; stripped from the public GET /settings). `token`

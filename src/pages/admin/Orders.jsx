@@ -136,6 +136,7 @@ export function AdminOrders() {
   const [srCfg, setSrCfg] = useState(null)     // Shiprocket config (enabled/policy/ready)
   const [delCfg, setDelCfg] = useState(null)   // Delhivery config (enabled/policy/ready)
   const [xbCfg, setXbCfg] = useState(null)     // Xpressbees config (enabled/policy/ready)
+  const [prefCourier, setPrefCourier] = useState('') // routing recommendation target ('' = auto)
 
   // Courier config drives the ship flow (auto-book vs manual). Read from the
   // admin settings endpoint (the tokens/passwords stay server-side).
@@ -162,6 +163,7 @@ export function AdminOrders() {
           ready: !!(d.enabled && d.token && d.pickupName),
           defaultWeightGrams: Number(d.defaultWeightGrams) || 100,
         })
+        setPrefCourier(s?.preferredCourier || '')
         const x = s?.xpressbees || {}
         setXbCfg({
           enabled: !!x.enabled,
@@ -291,7 +293,7 @@ export function AdminOrders() {
         </button>
       </div>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
-      {shipFor && <ShipModal order={shipFor} srCfg={srCfg} delCfg={delCfg} xbCfg={xbCfg} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
+      {shipFor && <ShipModal order={shipFor} srCfg={srCfg} delCfg={delCfg} xbCfg={xbCfg} prefCourier={prefCourier} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
 
       {/* ── Pipeline — live work gets the big cards; Delivered/Cancelled are
              quiet archive pills so they never pull focus ─────── */}
@@ -528,6 +530,7 @@ export function AdminOrders() {
           srCfg={srCfg}
           delCfg={delCfg}
           xbCfg={xbCfg}
+          prefCourier={prefCourier}
           onClose={() => setBulkOpen(false)}
           onDone={() => { setBulkOpen(false); setSelected([]); load() }}
         />
@@ -1050,7 +1053,7 @@ function CancelSheet({ o, onClose, onConfirm }) {
 // server-side (Shiprocket also clubs a single pickup); partial failures stay in
 // To Ship with their reasons shown here. When both couriers are enabled the
 // admin picks which one at the top of the sheet.
-function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, onClose, onDone }) {
+function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, prefCourier, onClose, onDone }) {
   const [show, setShow] = useState(false)
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null) // { booked, failed, pickupScheduled }
@@ -1062,7 +1065,11 @@ function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, onClose, onDone }) {
   if (srCfg?.enabled) providers.push('shiprocket')
   if (delCfg?.enabled) providers.push('delhivery')
   if (xbCfg?.enabled) providers.push('xpressbees')
-  const [provider, setProvider] = useState(srReady ? 'shiprocket' : delReady ? 'delhivery' : xbReady ? 'xpressbees' : (providers[0] || 'shiprocket'))
+  const bulkReadyByProvider = { shiprocket: srReady, delhivery: delReady, xpressbees: xbReady }
+  const [provider, setProvider] = useState(
+    (prefCourier && bulkReadyByProvider[prefCourier]) ? prefCourier
+      : srReady ? 'shiprocket' : delReady ? 'delhivery' : xbReady ? 'xpressbees' : (providers[0] || 'shiprocket')
+  )
   const isDel = provider === 'delhivery'
   const isXb = provider === 'xpressbees'
   const activeReady = isDel ? delReady : isXb ? xbReady : srReady
@@ -1265,7 +1272,7 @@ function BulkShipSheet({ orders, srCfg, delCfg, xbCfg, onClose, onDone }) {
 // Ship an order. When Shiprocket is configured, book a waybill via its API
 // (auto-fills the customer tracking message); otherwise (or by choice) paste a
 // manual tracking note the customer will see.
-function ShipModal({ order, srCfg, delCfg, xbCfg, onClose, onShipped }) {
+function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShipped }) {
   const alreadyShipped = order.status === 'shipped' || order.status === 'delivered'
   const mode = paymentMode(order)
   const totalQty = (order.items || []).reduce((a, i) => a + (i.qty || 0), 0) || 1
@@ -1282,21 +1289,26 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, onClose, onShipped }) {
   if (!alreadyShipped && xbCfg?.enabled) tabs.push({ v: 'xpressbees', label: 'Xpressbees' })
   tabs.push({ v: 'manual', label: 'Manual note' })
 
-  // The store's shipping-routing preference RECOMMENDS Shiprocket for this order
-  // (badge + preselect); the admin can always tap another tab.
-  //   all → Shiprocket for everything · cod → Shiprocket for COD, manual for
-  //   prepaid · prepaid → the reverse · manual → no recommendation.
+  // The store's shipping-routing preference RECOMMENDS the preferred courier for
+  // this order (badge + preselect); the admin can always tap another tab.
+  //   all → courier for everything · cod → courier for COD, manual for prepaid ·
+  //   prepaid → the reverse · manual → no recommendation.
+  // The courier it points at is settings.preferredCourier ('' = auto: first
+  // READY courier in shiprocket → delhivery → xpressbees order).
+  const readyByProvider = { shiprocket: srReady, delhivery: delReady, xpressbees: xbReady }
+  const preferredReady = (prefCourier && readyByProvider[prefCourier]) ? prefCourier
+    : (srReady ? 'shiprocket' : delReady ? 'delhivery' : xbReady ? 'xpressbees' : null)
   const recommended = (() => {
     const pol = srCfg?.routing || 'manual'
-    if (!srReady || pol === 'manual') return null
-    if (pol === 'all') return 'shiprocket'
-    if (pol === 'cod') return mode === 'COD' ? 'shiprocket' : 'manual'
-    if (pol === 'prepaid') return mode === 'Prepaid' ? 'shiprocket' : 'manual'
+    if (!preferredReady || pol === 'manual') return null
+    if (pol === 'all') return preferredReady
+    if (pol === 'cod') return mode === 'COD' ? preferredReady : 'manual'
+    if (pol === 'prepaid') return mode === 'Prepaid' ? preferredReady : 'manual'
     return null
   })()
-  // Default tab: routing recommendation → first ready courier → manual.
+  // Default tab: routing recommendation → preferred/first ready courier → manual.
   const defaultMethod = !alreadyShipped
-    ? (recommended || (srReady ? 'shiprocket' : delReady ? 'delhivery' : xbReady ? 'xpressbees' : 'manual'))
+    ? (recommended || preferredReady || 'manual')
     : 'manual'
   const [method, setMethod] = useState(defaultMethod)
 

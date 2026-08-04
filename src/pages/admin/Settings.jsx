@@ -315,12 +315,12 @@ export function AdminSettings() {
       )}
 
       {tab === 'couriers' && (
-      <Section title="Shipping Routing" subtitle="How each order should be shipped. The ship dialog opens on the recommended option and tags it — you can always switch on any specific order.">
+      <Section title="Shipping Routing" subtitle="How each order should be shipped. The ship dialog opens on the recommended courier and tags it — you can always switch on any specific order.">
         <div className="grid sm:grid-cols-2 gap-2.5">
           {[
-            { v: 'all', title: 'Courier for everything', desc: 'Every order recommends Shiprocket.' },
-            { v: 'cod', title: 'Courier for COD only', desc: 'COD → Shiprocket. Prepaid → manual note.' },
-            { v: 'prepaid', title: 'Courier for prepaid only', desc: 'Prepaid → Shiprocket. COD → manual note.' },
+            { v: 'all', title: 'Courier for everything', desc: 'Every order recommends your preferred courier.' },
+            { v: 'cod', title: 'Courier for COD only', desc: 'COD → preferred courier. Prepaid → manual note.' },
+            { v: 'prepaid', title: 'Courier for prepaid only', desc: 'Prepaid → preferred courier. COD → manual note.' },
             { v: 'manual', title: 'No recommendation', desc: 'Ask on every order, nothing preselected.' },
           ].map(({ v, title, desc }) => {
             const on = (s.shippingRouting || s.shiprocket?.policy || 'manual') === v
@@ -342,6 +342,32 @@ export function AdminSettings() {
             )
           })}
         </div>
+
+        {/* Which courier the recommendation points at */}
+        <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mt-6 mb-2">Preferred courier</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { v: '', label: 'Auto (first ready)' },
+            { v: 'shiprocket', label: 'Shiprocket' },
+            { v: 'delhivery', label: 'Delhivery' },
+            { v: 'xpressbees', label: 'Xpressbees' },
+          ].map(({ v, label }) => {
+            const on = (s.preferredCourier || '') === v
+            return (
+              <button
+                key={v || 'auto'}
+                onClick={() => set('preferredCourier', v)}
+                className="px-3.5 py-2 rounded-full text-[12px] font-bold cursor-pointer transition-colors"
+                style={on
+                  ? { background: 'color-mix(in srgb, var(--maroon) 10%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
+                  : { background: '#fff', color: '#71717a', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-[11px] text-zinc-400 mt-2">Auto recommends the first fully-configured courier (Shiprocket → Delhivery → Xpressbees). If the preferred courier isn't set up, Auto order applies.</p>
       </Section>
       )}
 
