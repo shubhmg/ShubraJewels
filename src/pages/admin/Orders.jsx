@@ -1374,7 +1374,9 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
   const xbReady = !!xbCfg?.ready
 
   // Tabs: each enabled courier (incomplete setup shows what's missing) + a
-  // Manual note fallback.
+  // Manual note fallback. 🧪 test orders see the SAME tabs — the full booking
+  // UI (rates, service picker) works normally; only the final booking is
+  // simulated server-side (fake TEST AWB, no real courier call, no charges).
   const tabs = []
   if (!alreadyShipped && srCfg?.enabled) tabs.push({ v: 'shiprocket', label: 'Shiprocket' })
   if (!alreadyShipped && delCfg?.enabled) tabs.push({ v: 'delhivery', label: 'Delhivery' })
@@ -1573,6 +1575,11 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {order.isTest && method !== 'manual' && (
+              <div className="rounded-2xl px-4 py-2.5 text-[12px] font-semibold bg-amber-50 ring-1 ring-amber-200 text-amber-800">
+                🧪 Test order — booking is <b>simulated</b>: fake TEST waybill, no real courier, nothing charged. Rates shown are real quotes.
+              </div>
+            )}
             {method === 'manual' ? (
               <div className="bg-white rounded-2xl ring-1 ring-zinc-100 p-4">
                 <Field field={{ label: 'Tracking message', type: 'textarea', placeholder: 'e.g. Shipped via India Post. Tracking: 1234567890 — https://…' }} value={message} onChange={setMessage} />

@@ -327,6 +327,28 @@ async function applyBooking(order, settings, shipment, wasShipped) {
   }
 }
 
+// Book a SIMULATED shipment on a 🧪 test order — rides the exact applyBooking
+// path a real booking uses (booking lock, Shipped transition, tracking note,
+// shipped email) but with a fake TEST waybill and NO courier API call, so the
+// admin can rehearse any courier tab without spending money.
+async function simulateBooking(order, provider, weightGrams = 200) {
+  if (!(await claimBookingSlot(order._id))) throw ApiError.badRequest('A booking for this order is already in progress or done. Refresh and check.');
+  const settings = await getSettings();
+  const mode = xpressbees.orderPaymentMode(order); // identical logic across all courier utils
+  const wasShipped = order.status === 'shipped';
+  const label = { shiprocket: 'Shiprocket', delhivery: 'Delhivery', xpressbees: 'Xpressbees' }[provider] || provider;
+  await applyBooking(order, settings, {
+    provider,
+    waybill: `TEST${Date.now()}`,
+    courierName: `Simulated · ${label}`,
+    trackingUrl: '',
+    mode,
+    codAmount: mode === 'COD' ? Math.max(0, (order.total || 0) - (order.advancePaid || 0)) : 0,
+    weightGrams: Math.max(1, Math.round(weightGrams)),
+    labelUrl: '',
+  }, wasShipped);
+}
+
 // ADMIN — book a Shiprocket shipment (create order → assign AWB), then mark Shipped.
 router.post(
   '/:id/ship-shiprocket',
@@ -343,6 +365,7 @@ router.post(
     if (!order) throw ApiError.notFound('Order not found');
     if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
     if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
+    if (order.isTest) { await simulateBooking(order, 'shiprocket', Math.round((Number(req.body.weight) || 0.3) * 1000)); return res.json({ success: true, data: order }); }
 
     const settings = await getSettings();
     if (!shiprocket.shiprocketReady(shiprocket.shiprocketConfig(settings))) {
@@ -393,6 +416,7 @@ router.post(
     if (!order) throw ApiError.notFound('Order not found');
     if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
     if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
+    if (order.isTest) { await simulateBooking(order, 'delhivery', Number(req.body.weight) || 200); return res.json({ success: true, data: order }); }
 
     const settings = await getSettings();
     if (!delhivery.delhiveryReady(delhivery.delhiveryConfig(settings))) {
@@ -440,6 +464,7 @@ router.post(
     if (!order) throw ApiError.notFound('Order not found');
     if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
     if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
+    if (order.isTest) { await simulateBooking(order, 'xpressbees', Number(req.body.weight) || 200); return res.json({ success: true, data: order }); }
 
     const settings = await getSettings();
     if (!xpressbees.xpressbeesReady(xpressbees.xpressbeesConfig(settings))) {
@@ -513,6 +538,7 @@ router.post(
       if (!order) { failed.push({ orderNo: String(id), error: 'Order not found' }); continue; }
       if (order.status === 'cancelled') { failed.push({ orderNo: order.orderNo, error: 'Order is cancelled' }); continue; }
       if (order.shipment?.waybill) { failed.push({ orderNo: order.orderNo, error: `Already booked (AWB ${order.shipment.waybill})` }); continue; }
+      if (order.isTest) { await simulateBooking(order, provider); booked.push({ orderNo: order.orderNo, awb: order.shipment.waybill, courierName: order.shipment.courierName }); continue; }
       if (!(await claimBookingSlot(order._id))) { failed.push({ orderNo: order.orderNo, error: 'Booking already in progress elsewhere' }); continue; }
 
       const { result, attempt } = await bookWithRetry(order, (ref) =>
@@ -941,20 +967,7 @@ router.post(
 
     if (req.body.action === 'book') {
       if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel & reset first.`);
-      if (!(await claimBookingSlot(order._id))) throw ApiError.badRequest('A booking for this order is already in progress.');
-      const settings = await getSettings();
-      const mode = xpressbees.orderPaymentMode(order);
-      const wasShipped = order.status === 'shipped';
-      await applyBooking(order, settings, {
-        provider: 'xpressbees',
-        waybill: `TEST${Date.now()}`,
-        courierName: 'Simulated Courier',
-        trackingUrl: '',
-        mode,
-        codAmount: mode === 'COD' ? Math.max(0, (order.total || 0) - (order.advancePaid || 0)) : 0,
-        weightGrams: 200,
-        labelUrl: '',
-      }, wasShipped);
+      await simulateBooking(order, 'xpressbees');
       return res.json({ success: true, data: order });
     }
 
