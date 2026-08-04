@@ -343,15 +343,17 @@ export function AdminSettings() {
           })}
         </div>
 
-        {/* Which courier the recommendation points at */}
+        {/* Which courier the recommendation points at — only ENABLED couriers are
+            offered (a disabled one can't be preferred; if the saved preference was
+            disabled later it stays visible, marked "off", so the state isn't hidden). */}
         <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold mt-6 mb-2">Preferred courier</p>
         <div className="flex flex-wrap gap-2">
           {[
-            { v: '', label: 'Auto (first ready)' },
-            { v: 'shiprocket', label: 'Shiprocket' },
-            { v: 'delhivery', label: 'Delhivery' },
-            { v: 'xpressbees', label: 'Xpressbees' },
-          ].map(({ v, label }) => {
+            { v: '', label: 'Auto (first ready)', show: true },
+            { v: 'shiprocket', label: 'Shiprocket', show: !!s.shiprocket?.enabled },
+            { v: 'delhivery', label: 'Delhivery', show: !!s.delhivery?.enabled },
+            { v: 'xpressbees', label: 'Xpressbees', show: !!s.xpressbees?.enabled },
+          ].filter((o) => o.show || (s.preferredCourier || '') === o.v).map(({ v, label, show }) => {
             const on = (s.preferredCourier || '') === v
             return (
               <button
@@ -362,12 +364,12 @@ export function AdminSettings() {
                   ? { background: 'color-mix(in srgb, var(--maroon) 10%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }
                   : { background: '#fff', color: '#71717a', boxShadow: 'inset 0 0 0 1px #e4e4e7' }}
               >
-                {label}
+                {label}{!show && ' (off)'}
               </button>
             )
           })}
         </div>
-        <p className="text-[11px] text-zinc-400 mt-2">Auto recommends the first fully-configured courier (Shiprocket → Delhivery → Xpressbees). If the preferred courier isn't set up, Auto order applies.</p>
+        <p className="text-[11px] text-zinc-400 mt-2">Only enabled couriers are listed. Auto recommends the first fully-configured one (Shiprocket → Delhivery → Xpressbees) — and if the preferred courier isn't set up, the Auto order applies.</p>
       </Section>
       )}
 
