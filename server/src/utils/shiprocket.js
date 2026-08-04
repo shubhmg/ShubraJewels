@@ -33,11 +33,13 @@ export function shiprocketReady(cfg) {
   return cfg.enabled && !!cfg.email && !!cfg.password && !!cfg.pickupLocation;
 }
 
-// Prepaid vs COD from the order's payment method/status.
+// Prepaid vs COD from the order's payment method/status. A COD order whose
+// advance already covers the full total has nothing left to collect → Prepaid.
 export function orderPaymentMode(order) {
   const paid = order.paymentStatus === 'paid';
   const isCod = ['cod', 'cash'].includes(order.paymentMethod);
-  return paid || !isCod ? 'Prepaid' : 'COD';
+  const advanceCoversAll = Number(order.advancePaid || 0) >= Number(order.total || 0);
+  return paid || !isCod || advanceCoversAll ? 'Prepaid' : 'COD';
 }
 
 export function shouldAutoShip(cfg, order) {
@@ -246,7 +248,8 @@ export async function trackShipment(settingDoc, awb) {
     ok: true,
     status,
     statusDetail: [track.current_status_body, track.destination].filter(Boolean).join(' · '),
-    delivered: /delivered/i.test(status),
+    // \b + explicit exclusions so "Undelivered" / "RTO Delivered" never count as delivered.
+    delivered: /\bdelivered\b/i.test(status) && !/rto|undeliver|not[\s-]*deliver|non[\s-]*deliver/i.test(status),
   };
 }
 

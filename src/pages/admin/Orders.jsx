@@ -165,12 +165,13 @@ export function AdminOrders() {
         })
         setPrefCourier(s?.preferredCourier || '')
         const x = s?.xpressbees || {}
+        const xbPickupOk = !!(x.pickupAddress && x.pickupPin && x.pickupPhone && x.pickupCity && x.pickupState)
         setXbCfg({
           enabled: !!x.enabled,
           policy: x.policy || 'manual',
           hasCreds: !!(x.email && x.password),
-          hasPickup: !!(x.pickupAddress && x.pickupPin && x.pickupPhone),
-          ready: !!(x.enabled && x.email && x.password && x.pickupAddress && x.pickupPin && x.pickupPhone),
+          hasPickup: xbPickupOk,
+          ready: !!(x.enabled && x.email && x.password && xbPickupOk),
           defaultWeightGrams: Number(x.defaultWeightGrams) || 100,
         })
       })
@@ -1421,7 +1422,7 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
   const missingMsg = method === 'delhivery'
     ? [!delCfg?.hasToken && 'API token', !delCfg?.hasPickup && 'pickup warehouse name'].filter(Boolean).join(' & ')
     : method === 'xpressbees'
-      ? [!xbCfg?.hasCreds && 'email + password', !xbCfg?.hasPickup && 'pickup address/PIN/phone'].filter(Boolean).join(' & ')
+      ? [!xbCfg?.hasCreds && 'email + password', !xbCfg?.hasPickup && 'full pickup address (incl. city/state/PIN/phone)'].filter(Boolean).join(' & ')
       : [!srCfg?.hasCreds && 'email + API password', !srCfg?.hasPickup && 'pickup location'].filter(Boolean).join(' & ')
   const courierLabel = PROVIDER_LABEL[method] || 'Shiprocket'
   const pickedCourier = courierId != null ? (serv?.couriers || []).find((c) => c.id === courierId) : null
@@ -1464,7 +1465,7 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
                   return (
                     <button
                       key={v}
-                      onClick={() => { setMethod(v); setErr('') }}
+                      onClick={() => { setMethod(v); setErr(''); setCourierId(null); setServ(null) }}
                       className="py-2 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-colors"
                       style={on
                         ? { background: 'color-mix(in srgb, var(--maroon) 10%, white)', color: 'var(--maroon)', boxShadow: 'inset 0 0 0 1.5px var(--maroon)' }

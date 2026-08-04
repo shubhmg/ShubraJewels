@@ -40,14 +40,18 @@ export function xpressbeesConfig(settings) {
 
 export function xpressbeesReady(cfg) {
   return cfg.enabled && !!cfg.email && !!cfg.password
-    && !!cfg.pickup.address && !!cfg.pickup.pin && !!cfg.pickup.phone;
+    && !!cfg.pickup.address && !!cfg.pickup.pin && !!cfg.pickup.phone
+    && !!cfg.pickup.city && !!cfg.pickup.state; // booking sends these inline — empty gets rejected
 }
 
-// Prepaid vs COD from the order's payment method/status.
+// Prepaid vs COD from the order's payment method/status. A COD order whose
+// advance already covers the full total has nothing left to collect — book it
+// Prepaid (a cod-mode booking with ₹0 collectable invites COD surcharges/rejects).
 export function orderPaymentMode(order) {
   const paid = order.paymentStatus === 'paid';
   const isCod = ['cod', 'cash'].includes(order.paymentMethod);
-  return paid || !isCod ? 'Prepaid' : 'COD';
+  const advanceCoversAll = Number(order.advancePaid || 0) >= Number(order.total || 0);
+  return paid || !isCod || advanceCoversAll ? 'Prepaid' : 'COD';
 }
 
 export function shouldAutoShip(cfg, order) {
@@ -117,16 +121,31 @@ export async function ensureToken(settingDoc) {
   return { ok: true, token };
 }
 
+// Authed request with a single retry on 401 — a cached JWT can be invalidated
+// server-side (password change in the XB panel) long before our expiry guess;
+// without this, everything fails opaquely for up to 2.5h.
+async function xbAuthed(settingDoc, method, path, body, timeout) {
+  let auth = await ensureToken(settingDoc);
+  if (!auth.ok) return { auth, r: null };
+  let r = await xbFetch(auth.token, method, path, body, timeout);
+  if (r.status === 401) {
+    settingDoc.xpressbees.token = '';
+    settingDoc.xpressbees.tokenExpiry = null;
+    auth = await ensureToken(settingDoc);
+    if (!auth.ok) return { auth, r: null };
+    r = await xbFetch(auth.token, method, path, body, timeout);
+  }
+  return { auth, r };
+}
+
 // Serviceability + rates between the pickup PIN and a delivery PIN. Returns
 // { ok, serviceable, couriers: [{ id, name, rate, codCharges, chargeableWeightGrams }], cheapest }.
 // Pass a courier `id` back as `courierId` when booking to force that service.
 export async function checkServiceability(settingDoc, { deliveryPin, weightGrams, cod, orderAmount }) {
   const cfg = xpressbeesConfig(settingDoc);
   if (!cfg.pickup.pin) return { ok: false, error: 'Set the Xpressbees pickup PIN first' };
-  const auth = await ensureToken(settingDoc);
-  if (!auth.ok) return { ok: false, error: auth.error };
 
-  const r = await xbFetch(auth.token, 'POST', '/courier/serviceability', {
+  const { auth, r } = await xbAuthed(settingDoc, 'POST', '/courier/serviceability', {
     origin: String(cfg.pickup.pin),
     destination: String(deliveryPin || ''),
     payment_type: cod ? 'cod' : 'prepaid',
@@ -136,6 +155,7 @@ export async function checkServiceability(settingDoc, { deliveryPin, weightGrams
     breadth: String(cfg.dims.breadth),
     height: String(cfg.dims.height),
   }, 12000);
+  if (!auth.ok) return { ok: false, error: auth.error };
   if (r.error) return { ok: false, error: r.error };
   const list = Array.isArray(r.data?.data) ? r.data.data : [];
   if (!r.data?.status || !list.length) return { ok: true, serviceable: false, couriers: [] };
@@ -157,9 +177,7 @@ export async function checkServiceability(settingDoc, { deliveryPin, weightGrams
 // trackingUrl, mode, codAmount, weightGrams, error }.
 export async function createShipment(settingDoc, order, { weight, orderRef, courierId } = {}) {
   const cfg = xpressbeesConfig(settingDoc);
-  if (!xpressbeesReady(cfg)) return { ok: false, error: 'Xpressbees is not fully configured (email, password + pickup address/PIN/phone required).' };
-  const auth = await ensureToken(settingDoc);
-  if (!auth.ok) return { ok: false, error: `Xpressbees login failed: ${auth.error}` };
+  if (!xpressbeesReady(cfg)) return { ok: false, error: 'Xpressbees is not fully configured (email, password + full pickup address required).' };
 
   const addr = order.address || {};
   const mode = orderPaymentMode(order);
@@ -199,6 +217,7 @@ export async function createShipment(settingDoc, order, { weight, orderRef, cour
       pincode: String(cfg.pickup.pin),
       phone: cfg.pickup.phone,
     },
+    is_rto_different: 'no', // returns come back to the pickup address
     order_items: (order.items || []).map((it, i) => ({
       name: it.name,
       qty: String(it.qty || 1),
@@ -209,12 +228,14 @@ export async function createShipment(settingDoc, order, { weight, orderRef, cour
     collectable_amount: String(cod),
   };
 
-  const r = await xbFetch(auth.token, 'POST', '/shipments2', payload, 20000);
+  const { auth, r } = await xbAuthed(settingDoc, 'POST', '/shipments2', payload, 20000);
+  if (!auth.ok) return { ok: false, error: `Xpressbees login failed: ${auth.error}` };
   const d = r.data?.data || {};
   const awb = d.awb_number;
   if (!r.data?.status || !awb) {
     const err = r.data?.message
       || (r.data?.data && typeof r.data.data === 'string' ? r.data.data : '')
+      || r.error
       || (r.httpOk ? 'Xpressbees rejected the shipment' : `HTTP ${r.status}`);
     return { ok: false, error: typeof err === 'string' ? err : JSON.stringify(err), raw: r.data };
   }
@@ -237,9 +258,8 @@ export async function createShipment(settingDoc, order, { weight, orderRef, cour
 
 // Live status by AWB. Returns { ok, status, statusDetail, delivered, error }.
 export async function trackShipment(settingDoc, awb) {
-  const auth = await ensureToken(settingDoc);
+  const { auth, r } = await xbAuthed(settingDoc, 'GET', `/shipments2/track/${encodeURIComponent(awb)}`, null, 10000);
   if (!auth.ok) return { ok: false, error: auth.error };
-  const r = await xbFetch(auth.token, 'GET', `/shipments2/track/${encodeURIComponent(awb)}`, null, 10000);
   if (r.error) return { ok: false, error: r.error };
   const d = r.data?.data || {};
   const status = d.status || '';
@@ -249,25 +269,27 @@ export async function trackShipment(settingDoc, awb) {
     ok: true,
     status,
     statusDetail: [latest.message, latest.location].filter(Boolean).join(' · '),
-    delivered: /delivered/i.test(status) && !/rto/i.test(status),
+    // \b so "Undelivered" (a failed-delivery NDR status) can NEVER read as delivered.
+    delivered: /\bdelivered\b/i.test(status) && !/rto|undeliver|not[\s-]*deliver|non[\s-]*deliver/i.test(status),
   };
 }
 
 // Cancel a shipment by AWB. Returns { ok, error }.
+// STRICT success check: only status:true counts. Matching the message text is a
+// trap — refusals like "Shipment cannot be cancelled (in transit)" contain the
+// word "cancel" and must NOT be mistaken for success (that would revert the
+// order while a live parcel is still out collecting COD).
 export async function cancelShipment(settingDoc, awb) {
-  const auth = await ensureToken(settingDoc);
+  const { auth, r } = await xbAuthed(settingDoc, 'POST', '/shipments2/cancel', { awb: String(awb) });
   if (!auth.ok) return { ok: false, error: auth.error };
-  const r = await xbFetch(auth.token, 'POST', '/shipments2/cancel', { awb: String(awb) });
-  const ok = r.data?.status === true || /cancel/i.test(String(r.data?.message || ''));
-  if (!ok) return { ok: false, error: r.data?.message || 'Could not cancel', raw: r.data };
+  if (r.data?.status !== true) return { ok: false, error: r.data?.message || r.error || 'Could not cancel', raw: r.data };
   return { ok: true, raw: r.data };
 }
 
 // Manifest / pickup sheet for a batch of AWBs. Returns { ok, url, error }.
 export async function generateManifest(settingDoc, awbs) {
-  const auth = await ensureToken(settingDoc);
+  const { auth, r } = await xbAuthed(settingDoc, 'POST', '/shipments2/manifest', { awbs: awbs.map(String) });
   if (!auth.ok) return { ok: false, error: auth.error };
-  const r = await xbFetch(auth.token, 'POST', '/shipments2/manifest', { awbs: awbs.map(String) });
   const url = typeof r.data?.data === 'string' ? r.data.data : (r.data?.data?.manifest || r.data?.manifest || '');
   if (!r.data?.status || !url) return { ok: false, error: r.data?.message || 'Manifest not ready', raw: r.data };
   return { ok: true, url };

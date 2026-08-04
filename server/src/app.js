@@ -117,7 +117,12 @@ app.use('/api/customer/register', loginLimiter);
 app.use('/api/customer/check-email', loginLimiter);
 app.use('/api/analytics/track', postOnly(writeLimiter));
 app.use('/api/coupons/validate', writeLimiter);
-app.use('/api/orders', postOnly(writeLimiter));
+// The courier status webhook is exempt from the strict write limiter: couriers
+// push every status change (bursty on dispatch days), time out at 5s, and
+// auto-disable the webhook after repeated non-2xx — a 429 here silently kills
+// live tracking. It stays behind the generous 300/min apiLimiter.
+app.use('/api/orders', (req, res, next) =>
+  (req.method === 'POST' && req.path !== '/courier-webhook' ? writeLimiter(req, res, next) : next()));
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -277,7 +277,7 @@ function shipmentTrackingMessage(provider, waybill, url) {
 async function bookWithRetry(order, bookFn) {
   const base = order.orderNo;
   const mkRef = (n) => (n <= 1 ? base : `${base}-R${n}`);
-  const dup = (e) => /already (assigned|exist|manifest)|duplicate|order.*(exist|already)/i.test(e || '');
+  const dup = (e) => /already (assigned|exist|manifest|booked)|duplicate|unique|order.*(exist|already)/i.test(e || '');
   let attempt = (order.shipmentAttempts || 0) + 1;
   let result = await bookFn(mkRef(attempt));
   let guard = 0;
@@ -286,6 +286,27 @@ async function bookWithRetry(order, bookFn) {
     result = await bookFn(mkRef(attempt));
   }
   return { result, attempt };
+}
+
+// Atomically claim the right to book a courier for this order. Two concurrent
+// ship requests (double-submit, or bulk overlapping a single ship) both pass a
+// plain `if (order.shipment?.waybill)` read — this findOneAndUpdate makes only
+// ONE of them win. Returns true if the claim was taken. ALWAYS release on
+// failure (applyBooking's full-shipment replace clears the lock on success).
+async function claimBookingSlot(orderId) {
+  const r = await Order.updateOne(
+    {
+      _id: orderId,
+      status: { $ne: 'cancelled' },
+      $or: [{ 'shipment.waybill': '' }, { 'shipment.waybill': null }],
+      'shipment.bookingLock': { $ne: true },
+    },
+    { $set: { 'shipment.bookingLock': true } }
+  );
+  return r.modifiedCount === 1;
+}
+async function releaseBookingSlot(orderId) {
+  await Order.updateOne({ _id: orderId }, { $set: { 'shipment.bookingLock': false } }).catch(() => {});
 }
 
 // After a courier booking succeeds, stamp the shipment onto the order, mark it
@@ -327,9 +348,16 @@ router.post(
     if (!shiprocket.shiprocketReady(shiprocket.shiprocketConfig(settings))) {
       throw ApiError.badRequest('Shiprocket is not fully configured. Add the email, API password and pickup location in Settings.');
     }
-    const { result, attempt } = await bookWithRetry(order, (ref) =>
-      shiprocket.createShipment(settings, order.toObject(), { weightKg: req.body.weight, courierId: req.body.courierId, orderRef: ref }));
-    if (!result.ok) throw ApiError.badRequest(result.error || 'Shiprocket could not book this shipment.');
+    if (!(await claimBookingSlot(order._id))) throw ApiError.badRequest('A booking for this order is already in progress or done. Refresh and check.');
+    let result, attempt;
+    try {
+      ({ result, attempt } = await bookWithRetry(order, (ref) =>
+        shiprocket.createShipment(settings, order.toObject(), { weightKg: req.body.weight, courierId: req.body.courierId, orderRef: ref })));
+      if (!result.ok) throw ApiError.badRequest(result.error || 'Shiprocket could not book this shipment.');
+    } catch (e) {
+      await releaseBookingSlot(order._id);
+      throw e;
+    }
 
     const wasShipped = order.status === 'shipped';
     order.shipmentAttempts = attempt;
@@ -370,9 +398,16 @@ router.post(
     if (!delhivery.delhiveryReady(delhivery.delhiveryConfig(settings))) {
       throw ApiError.badRequest('Delhivery is not fully configured. Add the API token and pickup warehouse in Settings.');
     }
-    const { result, attempt } = await bookWithRetry(order, (ref) =>
-      delhivery.createShipment(settings, order.toObject(), { weight: req.body.weight, orderRef: ref }));
-    if (!result.ok) throw ApiError.badRequest(result.error || 'Delhivery could not book this shipment.');
+    if (!(await claimBookingSlot(order._id))) throw ApiError.badRequest('A booking for this order is already in progress or done. Refresh and check.');
+    let result, attempt;
+    try {
+      ({ result, attempt } = await bookWithRetry(order, (ref) =>
+        delhivery.createShipment(settings, order.toObject(), { weight: req.body.weight, orderRef: ref })));
+      if (!result.ok) throw ApiError.badRequest(result.error || 'Delhivery could not book this shipment.');
+    } catch (e) {
+      await releaseBookingSlot(order._id);
+      throw e;
+    }
 
     const wasShipped = order.status === 'shipped';
     order.shipmentAttempts = attempt;
@@ -408,11 +443,18 @@ router.post(
 
     const settings = await getSettings();
     if (!xpressbees.xpressbeesReady(xpressbees.xpressbeesConfig(settings))) {
-      throw ApiError.badRequest('Xpressbees is not fully configured. Add the email, password and pickup details in Settings.');
+      throw ApiError.badRequest('Xpressbees is not fully configured. Add the email, password and full pickup address in Settings.');
     }
-    const { result, attempt } = await bookWithRetry(order, (ref) =>
-      xpressbees.createShipment(settings, order.toObject(), { weight: req.body.weight, courierId: req.body.courierId, orderRef: ref }));
-    if (!result.ok) throw ApiError.badRequest(result.error || 'Xpressbees could not book this shipment.');
+    if (!(await claimBookingSlot(order._id))) throw ApiError.badRequest('A booking for this order is already in progress or done. Refresh and check.');
+    let result, attempt;
+    try {
+      ({ result, attempt } = await bookWithRetry(order, (ref) =>
+        xpressbees.createShipment(settings, order.toObject(), { weight: req.body.weight, courierId: req.body.courierId, orderRef: ref })));
+      if (!result.ok) throw ApiError.badRequest(result.error || 'Xpressbees could not book this shipment.');
+    } catch (e) {
+      await releaseBookingSlot(order._id);
+      throw e;
+    }
 
     const wasShipped = order.status === 'shipped';
     order.shipmentAttempts = attempt;
@@ -471,6 +513,7 @@ router.post(
       if (!order) { failed.push({ orderNo: String(id), error: 'Order not found' }); continue; }
       if (order.status === 'cancelled') { failed.push({ orderNo: order.orderNo, error: 'Order is cancelled' }); continue; }
       if (order.shipment?.waybill) { failed.push({ orderNo: order.orderNo, error: `Already booked (AWB ${order.shipment.waybill})` }); continue; }
+      if (!(await claimBookingSlot(order._id))) { failed.push({ orderNo: order.orderNo, error: 'Booking already in progress elsewhere' }); continue; }
 
       const { result, attempt } = await bookWithRetry(order, (ref) =>
         isDel
@@ -478,7 +521,7 @@ router.post(
           : isXb
             ? xpressbees.createShipment(settings, order.toObject(), { orderRef: ref })
             : shiprocket.createShipment(settings, order.toObject(), { orderRef: ref, skipPickup: true }));
-      if (!result.ok) { failed.push({ orderNo: order.orderNo, error: result.error || 'Booking failed' }); continue; }
+      if (!result.ok) { await releaseBookingSlot(order._id); failed.push({ orderNo: order.orderNo, error: result.error || 'Booking failed' }); continue; }
 
       const wasShipped = order.status === 'shipped';
       order.shipmentAttempts = attempt;
@@ -562,10 +605,12 @@ router.post(
         ? [t.statusType, t.location].filter(Boolean).join(' · ')
         : (t.statusDetail || '');
     }
-    // Auto-advance to Delivered when the courier confirms delivery.
+    // Auto-advance to Delivered when the courier confirms delivery. Payment flips
+    // to paid ONLY for COD shipments — delivery of a prepaid-mode parcel says
+    // nothing about money having been received (e.g. an unpaid-online order).
     if (t.ok && t.delivered && order.status === 'shipped') {
       order.status = 'delivered';
-      if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
+      if (order.paymentStatus === 'unpaid' && sh.mode === 'COD') order.paymentStatus = 'paid';
       await reconcileOrderStock(order);
     }
     if (l.ok) order.shipment.labelUrl = l.url;
@@ -773,20 +818,25 @@ router.post(
   '/courier-webhook',
   asyncHandler(async (req, res) => {
     const settings = await getSettings();
-    const got = req.headers['x-api-key'] || req.headers['x-webhook-token'] || '';
+    const got = String(req.headers['x-api-key'] || req.headers['x-webhook-token'] || '');
     const hmacSig = String(req.headers['x-hmac-sha256'] || '');
     const srToken = settings.shiprocket?.webhookToken || '';
     const xbToken = settings.xpressbees?.webhookToken || '';
     // No auth configured = webhook disabled; bad/missing auth = ACK but ignore.
     // Never process unauthenticated status pushes.
-    let provider = (srToken && got && got === srToken) ? 'shiprocket'
-      : (xbToken && got && got === xbToken) ? 'xpressbees'
-        : null;
+    // Shiprocket authenticates with a plain x-api-key (timing-safe compare);
+    // Xpressbees ONLY via its HMAC signature — its shared secret must never be
+    // accepted as a plain header (Xpressbees never sends it that way; accepting
+    // it would just widen the forgery surface).
+    const safeEq = (a, b) => {
+      const ba = Buffer.from(String(a));
+      const bb = Buffer.from(String(b));
+      return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+    };
+    let provider = (srToken && got && safeEq(got, srToken)) ? 'shiprocket' : null;
     if (!provider && xbToken && hmacSig && req.rawBody) {
       const expected = crypto.createHmac('sha256', xbToken).update(req.rawBody).digest('base64');
-      const a = Buffer.from(hmacSig);
-      const b = Buffer.from(expected);
-      if (a.length === b.length && crypto.timingSafeEqual(a, b)) provider = 'xpressbees';
+      if (safeEq(hmacSig, expected)) provider = 'xpressbees';
     }
     if (!provider) return res.json({ success: true, data: { ignored: true } });
 
@@ -802,12 +852,14 @@ router.post(
     order.shipment.statusDetail = [b.current_status_body || b.message || '', b.location || b.current_location || ''].filter(Boolean).join(' · ');
     order.shipment.lastSyncedAt = new Date();
 
-    // "Delivered" (but NOT "RTO Delivered" — that's the parcel coming back to us).
-    // Xpressbees may push the short status code "DLV" instead of the word.
-    const delivered = (/delivered/i.test(status) || /^dlv$/i.test(status)) && !/rto/i.test(status);
+    // "Delivered" — but NOT "RTO Delivered" (parcel coming back) and NOT
+    // "Undelivered" (a FAILED delivery attempt; contains the substring). \b plus
+    // explicit exclusions. Xpressbees may push the short code "DLV".
+    const delivered = (/\bdelivered\b/i.test(status) || /^dlv$/i.test(status)) && !/rto|undeliver|not[\s-]*deliver|non[\s-]*deliver/i.test(status);
     if (delivered && order.status === 'shipped') {
       order.status = 'delivered';
-      if (order.paymentStatus === 'unpaid') order.paymentStatus = 'paid';
+      // COD only — a delivered prepaid-mode parcel proves nothing about payment.
+      if (order.paymentStatus === 'unpaid' && order.shipment.mode === 'COD') order.paymentStatus = 'paid';
       await reconcileOrderStock(order);
     }
     await order.save();

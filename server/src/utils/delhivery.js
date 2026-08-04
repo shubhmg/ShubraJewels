@@ -51,7 +51,8 @@ export function orderPaymentMode(order) {
   // Fully paid (online/UPI/advance covering all) → Prepaid; else COD.
   const paid = order.paymentStatus === 'paid';
   const isCod = ['cod', 'cash'].includes(order.paymentMethod);
-  return paid || !isCod ? 'Prepaid' : 'COD';
+  const advanceCoversAll = Number(order.advancePaid || 0) >= Number(order.total || 0);
+  return paid || !isCod || advanceCoversAll ? 'Prepaid' : 'COD';
 }
 
 // Does the policy say THIS order should auto-ship via Delhivery?

@@ -68,6 +68,9 @@ const orderSchema = new mongoose.Schema(
       labelUrl: { type: String, default: '' },         // packing-slip PDF link
       bookedAt: { type: Date, default: null },
       lastSyncedAt: { type: Date, default: null },
+      // Atomic claim taken while a courier booking is in flight — blocks a second
+      // concurrent booking (double-submit / bulk overlap) from producing two AWBs.
+      bookingLock: { type: Boolean, default: false },
     },
     // How many times a courier waybill has been booked for this order. Couriers
     // key on the order reference and reject a re-used one (even after cancel), so

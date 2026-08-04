@@ -451,7 +451,7 @@ export function AdminSettings() {
         title="Xpressbees"
         tagline="Direct — one call books the order and returns the label PDF"
         enabled={!!s.xpressbees?.enabled}
-        ready={!!(s.xpressbees?.enabled && s.xpressbees?.email && s.xpressbees?.password && s.xpressbees?.pickupAddress && s.xpressbees?.pickupPin && s.xpressbees?.pickupPhone)}
+        ready={!!(s.xpressbees?.enabled && s.xpressbees?.email && s.xpressbees?.password && s.xpressbees?.pickupAddress && s.xpressbees?.pickupPin && s.xpressbees?.pickupPhone && s.xpressbees?.pickupCity && s.xpressbees?.pickupState)}
         open={openCourier === 'xpressbees'}
         onOpen={setOpenCourier}
       >
