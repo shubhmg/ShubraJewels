@@ -358,6 +358,7 @@ router.post(
     body: Joi.object({
       weight: Joi.number().min(0.01).max(50).optional(), // kg
       courierId: Joi.number().integer().positive().optional(), // force a specific courier (from serviceability list)
+      real: Joi.boolean().default(false), // 🧪 test orders: true = ACTUAL courier booking (else simulated)
     }).default({}),
   }),
   asyncHandler(async (req, res) => {
@@ -365,7 +366,7 @@ router.post(
     if (!order) throw ApiError.notFound('Order not found');
     if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
     if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
-    if (order.isTest) { await simulateBooking(order, 'shiprocket', Math.round((Number(req.body.weight) || 0.3) * 1000)); return res.json({ success: true, data: order }); }
+    if (order.isTest && !req.body.real) { await simulateBooking(order, 'shiprocket', Math.round((Number(req.body.weight) || 0.3) * 1000)); return res.json({ success: true, data: order }); }
 
     const settings = await getSettings();
     if (!shiprocket.shiprocketReady(shiprocket.shiprocketConfig(settings))) {
@@ -409,6 +410,7 @@ router.post(
     params: Joi.object({ id: objectId.required() }),
     body: Joi.object({
       weight: Joi.number().integer().min(1).max(50000).optional(), // grams
+      real: Joi.boolean().default(false), // 🧪 test orders: true = ACTUAL courier booking (else simulated)
     }).default({}),
   }),
   asyncHandler(async (req, res) => {
@@ -416,7 +418,7 @@ router.post(
     if (!order) throw ApiError.notFound('Order not found');
     if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
     if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
-    if (order.isTest) { await simulateBooking(order, 'delhivery', Number(req.body.weight) || 200); return res.json({ success: true, data: order }); }
+    if (order.isTest && !req.body.real) { await simulateBooking(order, 'delhivery', Number(req.body.weight) || 200); return res.json({ success: true, data: order }); }
 
     const settings = await getSettings();
     if (!delhivery.delhiveryReady(delhivery.delhiveryConfig(settings))) {
@@ -457,6 +459,7 @@ router.post(
     body: Joi.object({
       weight: Joi.number().integer().min(1).max(50000).optional(), // grams
       courierId: Joi.alternatives().try(Joi.string(), Joi.number()).optional(), // force a service (from serviceability list)
+      real: Joi.boolean().default(false), // 🧪 test orders: true = ACTUAL courier booking (else simulated)
     }).default({}),
   }),
   asyncHandler(async (req, res) => {
@@ -464,7 +467,7 @@ router.post(
     if (!order) throw ApiError.notFound('Order not found');
     if (order.status === 'cancelled') throw ApiError.badRequest('Order is cancelled');
     if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel it first to rebook.`);
-    if (order.isTest) { await simulateBooking(order, 'xpressbees', Number(req.body.weight) || 200); return res.json({ success: true, data: order }); }
+    if (order.isTest && !req.body.real) { await simulateBooking(order, 'xpressbees', Number(req.body.weight) || 200); return res.json({ success: true, data: order }); }
 
     const settings = await getSettings();
     if (!xpressbees.xpressbeesReady(xpressbees.xpressbeesConfig(settings))) {
@@ -612,7 +615,7 @@ router.post(
     const sh = order.shipment;
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
-    if (order.isTest) throw ApiError.badRequest('Simulated shipment — drive it with the Simulate buttons instead.');
+    if (order.isTest && sh.waybill.startsWith('TEST')) throw ApiError.badRequest('Simulated shipment — drive it with the Simulate buttons instead.');
 
     const settings = await getSettings();
     const isDel = sh.provider === 'delhivery';
@@ -666,7 +669,7 @@ router.post(
 
     const settings = await getSettings();
     // Test orders carry a simulated shipment — nothing to cancel with a courier.
-    const r = order.isTest ? { ok: true }
+    const r = (order.isTest && sh.waybill.startsWith('TEST')) ? { ok: true }
       : sh.provider === 'delhivery'
         ? await delhivery.cancelShipment(settings, sh.waybill)
         : sh.provider === 'xpressbees'
@@ -704,7 +707,7 @@ router.get(
     const sh = order.shipment;
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
-    if (order.isTest) throw ApiError.badRequest('Simulated shipment — no label exists for a test booking.');
+    if (order.isTest && sh.waybill.startsWith('TEST')) throw ApiError.badRequest('Simulated shipment — no label exists for a test booking.');
     const settings = await getSettings();
     // Xpressbees hands the label out at booking time — serve the stored URL.
     if (sh.provider === 'xpressbees') {
@@ -913,14 +916,34 @@ async function applyCourierStatus(order, status, detail) {
 router.post(
   '/test-order',
   requireAdmin,
-  validate({ body: Joi.object({ payment: Joi.string().valid('cod', 'prepaid').default('cod') }).default({}) }),
+  validate({ body: Joi.object({
+    payment: Joi.string().valid('cod', 'prepaid').default('cod'),
+    // Use the shop's configured pickup address as the delivery address — a REAL,
+    // deliverable address, which makes the test order safe to book for real.
+    useMyAddress: Joi.boolean().default(false),
+  }).default({}) }),
   asyncHandler(async (req, res) => {
     const prepaid = req.body.payment === 'prepaid';
+    let customer = { name: '🧪 TEST ORDER', phone: '9999999999', email: req.admin?.email || 'test@example.com' };
+    let address = { line1: '1 Test Street', line2: '', landmark: '', city: 'New Delhi', state: 'Delhi', pincode: '110001' };
+    if (req.body.useMyAddress) {
+      const st = await getSettings();
+      const xb = st.xpressbees || {};
+      const dl = st.delhivery || {};
+      const pick = (xb.pickupAddress && xb.pickupPin)
+        ? { name: xb.pickupName, phone: xb.pickupPhone, line1: xb.pickupAddress, city: xb.pickupCity, state: xb.pickupState, pin: xb.pickupPin }
+        : (dl.pickupAddress && dl.pickupPin)
+          ? { name: dl.pickupName, phone: dl.pickupPhone, line1: dl.pickupAddress, city: dl.pickupCity, state: dl.pickupState, pin: dl.pickupPin }
+          : null;
+      if (!pick) throw ApiError.badRequest('No full pickup address configured (Xpressbees or Delhivery card) — fill one in Settings → Couriers first.');
+      customer = { name: `🧪 TEST · ${pick.name || 'self'}`, phone: pick.phone || '9999999999', email: req.admin?.email || 'test@example.com' };
+      address = { line1: pick.line1, line2: '', landmark: '', city: pick.city || '', state: pick.state || '', pincode: pick.pin };
+    }
     const order = new Order({
       orderNo: await nextOrderNo(),
       items: [{ productId: null, name: '🧪 Test item (not a real product)', image: '', price: 499, qty: 1 }],
-      customer: { name: '🧪 TEST ORDER', phone: '9999999999', email: req.admin?.email || 'test@example.com' },
-      address: { line1: '1 Test Street', line2: '', landmark: '', city: 'New Delhi', state: 'Delhi', pincode: '110001' },
+      customer,
+      address,
       subtotal: 499, shipping: 0, codFee: 0, discount: 0, total: 499,
       channel: 'web',
       paymentMethod: prepaid ? 'razorpay' : 'cod',
@@ -961,6 +984,11 @@ router.post(
     if (!order.isTest) throw ApiError.badRequest('Simulation is only allowed on 🧪 test orders.');
 
     if (req.body.action === 'delete') {
+      // A REAL live booking must be cancelled with the courier first — deleting
+      // the order would orphan an active shipment.
+      if (order.shipment?.waybill && !order.shipment.waybill.startsWith('TEST') && order.shipment.status !== 'Cancelled') {
+        throw ApiError.badRequest('This test order has a REAL courier booking — use Cancel & reset first so the shipment is cancelled with the courier.');
+      }
       await Order.deleteOne({ _id: order._id });
       return res.json({ success: true, data: { deleted: true } });
     }

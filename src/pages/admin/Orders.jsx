@@ -131,6 +131,7 @@ export function AdminOrders() {
   const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
   const [testMenuOpen, setTestMenuOpen] = useState(false)
+  const [testUseAddr, setTestUseAddr] = useState(false)
   const [shipFor, setShipFor] = useState(null) // order being marked shipped (tracking form)
   const [selected, setSelected] = useState([])  // order ids picked for bulk shipping (To Ship tab)
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -317,7 +318,7 @@ export function AdminOrders() {
             {testMenuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setTestMenuOpen(false)} />
-                <div className="absolute right-0 top-11 z-50 w-52 bg-white rounded-xl shadow-xl ring-1 ring-zinc-200 p-1.5">
+                <div className="absolute right-0 top-11 z-50 w-60 bg-white rounded-xl shadow-xl ring-1 ring-zinc-200 p-1.5">
                   <p className="px-2.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Create test order</p>
                   {[{ v: 'cod', label: 'COD test order', hint: 'unpaid — collect on delivery' }, { v: 'prepaid', label: 'Prepaid test order', hint: 'already paid online' }].map(({ v, label, hint }) => (
                     <button
@@ -325,7 +326,7 @@ export function AdminOrders() {
                       onClick={async () => {
                         setTestMenuOpen(false)
                         try {
-                          await api.post('/orders/test-order', { payment: v }, { auth: true })
+                          await api.post('/orders/test-order', { payment: v, useMyAddress: testUseAddr }, { auth: true })
                           setFilter('pending'); setPage(1); load()
                         } catch (e) { window.alert(e?.message || 'Could not create the test order') }
                       }}
@@ -335,6 +336,13 @@ export function AdminOrders() {
                       <span className="block text-[11px] text-zinc-400">{hint}</span>
                     </button>
                   ))}
+                  <label className="flex items-start gap-2 px-2.5 py-2 mt-0.5 border-t border-zinc-100 cursor-pointer select-none">
+                    <input type="checkbox" checked={testUseAddr} onChange={(e) => setTestUseAddr(e.target.checked)} className="mt-0.5 accent-[var(--maroon)]" />
+                    <span>
+                      <span className="block text-[12px] font-semibold text-zinc-700">Use my address</span>
+                      <span className="block text-[11px] text-zinc-400 leading-snug">Delivery = your configured pickup address (real & deliverable) — needed for a REAL courier booking test.</span>
+                    </span>
+                  </label>
                 </div>
               </>
             )}
@@ -723,20 +731,22 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
               <p className="text-[12px] text-amber-700/80 mt-0.5">
                 {!sh?.waybill
                   ? 'Manage it like a real order (Confirm, Mark Shipped…) or book a fake shipment below and push statuses to watch the pipeline react.'
-                  : 'Push a status — Delivered auto-completes the order (and flips COD to paid); Undelivered must NOT.'}
+                  : sh.waybill.startsWith('TEST')
+                    ? 'Push a status — Delivered auto-completes the order (and flips COD to paid); Undelivered must NOT.'
+                    : 'This test order carries a REAL booking — use Track / Sync / Cancel & reset like a live shipment. Remember to cancel it before pickup.'}
               </p>
               <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
                 {!sh?.waybill ? (
                   <button onClick={() => onSimulate(o._id, { action: 'book' })} disabled={busy === `${o._id}:sim`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-amber-800 text-xs font-semibold ring-1 ring-amber-200 hover:bg-amber-100 cursor-pointer disabled:opacity-50">
                     <Truck size={12} /> Book test shipment
                   </button>
-                ) : (
+                ) : sh.waybill.startsWith('TEST') ? (
                   ['In transit', 'Out for delivery', 'Undelivered', 'Delivered', 'RTO Delivered'].map((st) => (
                     <button key={st} onClick={() => onSimulate(o._id, { action: 'status', status: st })} disabled={busy === `${o._id}:sim`} className="px-2.5 py-1.5 rounded-lg bg-white text-amber-800 text-xs font-semibold ring-1 ring-amber-200 hover:bg-amber-100 cursor-pointer disabled:opacity-50">
                       {st}
                     </button>
                   ))
-                )}
+                ) : null}
                 <button
                   onClick={() => { if (window.confirm('Delete this test order? It disappears completely.')) onSimulate(o._id, { action: 'delete' }) }}
                   disabled={busy === `${o._id}:sim`}
@@ -1430,6 +1440,7 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
   const [courierId, setCourierId] = useState(null) // null = let the courier pick
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const [realBooking, setRealBooking] = useState(false) // 🧪 test orders: actually call the courier API
 
   // Fetch the courier list (with rates) when the Shiprocket tab is active.
   // Re-fetches (debounced) when the weight changes — rates depend on weight.
@@ -1492,18 +1503,19 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
     setSaving(true); setErr('')
     try {
       let updated
+      const realFlag = order.isTest && realBooking ? { real: true } : {}
       if (method === 'delhivery') {
         const g = Math.round(Number(gWeight))
-        const body = g > 0 ? { weight: g } : {}
+        const body = { ...(g > 0 ? { weight: g } : {}), ...realFlag }
         updated = await api.post(`/orders/${order._id}/ship-delhivery`, body, { auth: true })
       } else if (method === 'xpressbees') {
         const g = Math.round(Number(xWeight))
-        const body = g > 0 ? { weight: g } : {}
+        const body = { ...(g > 0 ? { weight: g } : {}), ...realFlag }
         if (courierId) body.courierId = courierId
         updated = await api.post(`/orders/${order._id}/ship-xpressbees`, body, { auth: true })
       } else {
         const w = Number(kWeight)
-        const body = w > 0 ? { weight: w } : {}
+        const body = { ...(w > 0 ? { weight: w } : {}), ...realFlag }
         if (courierId) body.courierId = courierId
         updated = await api.post(`/orders/${order._id}/ship-shiprocket`, body, { auth: true })
       }
@@ -1576,8 +1588,19 @@ function ShipModal({ order, srCfg, delCfg, xbCfg, prefCourier, onClose, onShippe
           {/* Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {order.isTest && method !== 'manual' && (
-              <div className="rounded-2xl px-4 py-2.5 text-[12px] font-semibold bg-amber-50 ring-1 ring-amber-200 text-amber-800">
-                🧪 Test order — booking is <b>simulated</b>: fake TEST waybill, no real courier, nothing charged. Rates shown are real quotes.
+              <div className={`rounded-2xl px-4 py-3 text-[12px] ring-1 ${realBooking ? 'bg-red-50 ring-red-200' : 'bg-amber-50 ring-amber-200'}`}>
+                <p className={`font-semibold ${realBooking ? 'text-red-700' : 'text-amber-800'}`}>
+                  {realBooking
+                    ? '⚠ REAL booking — the courier API will be called, an actual AWB created, freight may apply. Cancel & reset before pickup to avoid charges.'
+                    : '🧪 Test order — booking is simulated: fake TEST waybill, no real courier, nothing charged. Rates shown are real quotes.'}
+                </p>
+                <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={realBooking} onChange={(e) => setRealBooking(e.target.checked)} className="accent-red-600" />
+                  <span className={`text-[12px] font-semibold ${realBooking ? 'text-red-700' : 'text-amber-800'}`}>Book for REAL (verify the courier integration)</span>
+                </label>
+                {realBooking && order.address?.line1 === '1 Test Street' && (
+                  <p className="text-[11px] text-red-600/80 mt-1.5">This test order uses the FAKE address — the courier may reject it. Create a new test order with “Use my address” instead.</p>
+                )}
               </div>
             )}
             {method === 'manual' ? (
