@@ -7,7 +7,9 @@ import { ChevronDown, Check } from 'lucide-react'
  * The menu renders in a portal with fixed positioning so it never gets clipped
  * by an `overflow-hidden` ancestor (cards, modals, etc.).
  */
-export function Dropdown({ value, onChange, options, className = '', align = 'right' }) {
+// variant: 'outline' (default — admin forms) | 'modern' (storefront: borderless
+// elevated pill, press feedback). prefixLabel renders a muted lead-in ("Sort ·").
+export function Dropdown({ value, onChange, options, className = '', align = 'right', variant = 'outline', prefixLabel }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState(null)
   const btnRef = useRef(null)
@@ -47,12 +49,19 @@ export function Dropdown({ value, onChange, options, className = '', align = 'ri
         ref={btnRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between gap-2 min-w-[9.5rem] w-full px-4 py-2 rounded-full border bg-white text-sm font-medium cursor-pointer transition-colors shadow-sm"
-        style={{ borderColor: 'color-mix(in srgb, var(--gold) 45%, transparent)', color: 'var(--ink)' }}
+        className={variant === 'modern'
+          ? 'flex items-center justify-between gap-2 w-full px-5 py-2.5 rounded-full bg-white text-[13px] font-semibold cursor-pointer transition-all active:scale-[0.98]'
+          : 'flex items-center justify-between gap-2 min-w-[9.5rem] w-full px-4 py-2 rounded-full border bg-white text-sm font-medium cursor-pointer transition-colors shadow-sm'}
+        style={variant === 'modern'
+          ? { color: 'var(--ink)', boxShadow: '0 1px 2px rgba(40,20,15,0.06), 0 10px 28px -14px color-mix(in srgb, var(--maroon) 45%, transparent)' }
+          : { borderColor: 'color-mix(in srgb, var(--gold) 45%, transparent)', color: 'var(--ink)' }}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="truncate">{current?.label || 'Select'}</span>
+        <span className="truncate">
+          {prefixLabel && <span className="font-normal mr-1" style={{ color: '#a8a29e' }}>{prefixLabel} ·</span>}
+          {current?.label || 'Select'}
+        </span>
         <ChevronDown size={15} className={`transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--maroon)' }} />
       </button>
 
@@ -60,13 +69,13 @@ export function Dropdown({ value, onChange, options, className = '', align = 'ri
         <div
           ref={menuRef}
           role="listbox"
-          className="fixed z-[80] rounded-2xl bg-white shadow-xl border overflow-hidden animate-slide-up max-h-72 overflow-y-auto"
+          className="fixed z-[80] rounded-2xl bg-white/95 backdrop-blur-md shadow-xl border overflow-hidden animate-slide-up max-h-72 overflow-y-auto p-1.5"
           style={{
             top: pos.top,
             ...(align === 'right' ? { right: pos.right } : { left: pos.left }),
             minWidth: pos.width,
             maxWidth: '18rem',
-            borderColor: 'color-mix(in srgb, var(--gold) 30%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--gold) 25%, transparent)',
           }}
         >
           {options.map((o) => {
@@ -77,7 +86,7 @@ export function Dropdown({ value, onChange, options, className = '', align = 'ri
                 role="option"
                 aria-selected={active}
                 onClick={() => { onChange(o.value); setOpen(false) }}
-                className="flex items-center justify-between gap-3 w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-[color-mix(in_srgb,var(--gold)_12%,transparent)]"
+                className="flex items-center justify-between gap-3 w-full text-left px-3.5 py-2.5 text-sm rounded-xl transition-colors hover:bg-[color-mix(in_srgb,var(--gold)_12%,transparent)]"
                 style={{ color: 'var(--ink)', background: active ? 'color-mix(in srgb, var(--maroon) 8%, transparent)' : 'transparent' }}
               >
                 <span className={active ? 'font-semibold' : ''}>{o.label}</span>

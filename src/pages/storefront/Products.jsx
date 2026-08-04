@@ -107,14 +107,14 @@ export function Products() {
         <div className="grid grid-cols-2 gap-2.5 md:flex md:items-center md:justify-between mb-6">
           <button
             onClick={() => setShowFilter((f) => !f)}
-            className="flex items-center justify-center md:justify-start gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer shadow-sm"
+            className="flex items-center justify-center md:justify-start gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold transition-all cursor-pointer active:scale-[0.98]"
             style={showFilter
-              ? { background: 'var(--maroon)', borderColor: 'var(--maroon)', color: '#fff' }
-              : { background: '#fff', borderColor: 'color-mix(in srgb, var(--gold) 45%, transparent)', color: 'var(--ink)' }}
+              ? { background: 'var(--maroon)', color: '#fff', boxShadow: '0 10px 28px -12px color-mix(in srgb, var(--maroon) 60%, transparent)' }
+              : { background: '#fff', color: 'var(--ink)', boxShadow: '0 1px 2px rgba(40,20,15,0.06), 0 10px 28px -14px color-mix(in srgb, var(--maroon) 45%, transparent)' }}
           >
             <SlidersHorizontal size={14} style={showFilter ? undefined : { color: 'var(--maroon)' }} /> Filters
           </button>
-          <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} className="md:w-auto" />
+          <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} variant="modern" prefixLabel="Sort" className="md:w-auto md:min-w-[12rem]" />
         </div>
 
         <div className="md:flex md:gap-8">
