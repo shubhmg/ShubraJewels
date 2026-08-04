@@ -80,6 +80,10 @@ const orderSchema = new mongoose.Schema(
     // Why the order was cancelled (admin-picked preset or custom text). Shown
     // to the customer in the cancellation email and in the admin drawer.
     cancelReason: { type: String, default: '' },
+    // Admin-created practice order (the "test order" flow tool). Rides the normal
+    // pipeline UI but uses a synthetic item (productId null → stock untouched),
+    // is excluded from analytics, and can be simulated + hard-deleted.
+    isTest: { type: Boolean, default: false },
     // true once this order's items have been deducted from stock (on delivery).
     stockApplied: { type: Boolean, default: false },
     // Payment. Two real store methods (razorpay = paid online at checkout,

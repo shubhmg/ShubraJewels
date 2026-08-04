@@ -586,6 +586,8 @@ router.post(
     const sh = order.shipment;
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
+    if (order.isTest) throw ApiError.badRequest('Simulated shipment — drive it with the Simulate buttons instead.');
+
     const settings = await getSettings();
     const isDel = sh.provider === 'delhivery';
     const isXb = sh.provider === 'xpressbees';
@@ -637,11 +639,13 @@ router.post(
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
     const settings = await getSettings();
-    const r = sh.provider === 'delhivery'
-      ? await delhivery.cancelShipment(settings, sh.waybill)
-      : sh.provider === 'xpressbees'
-        ? await xpressbees.cancelShipment(settings, sh.waybill)
-        : await shiprocket.cancelShipment(settings, sh.srOrderId);
+    // Test orders carry a simulated shipment — nothing to cancel with a courier.
+    const r = order.isTest ? { ok: true }
+      : sh.provider === 'delhivery'
+        ? await delhivery.cancelShipment(settings, sh.waybill)
+        : sh.provider === 'xpressbees'
+          ? await xpressbees.cancelShipment(settings, sh.waybill)
+          : await shiprocket.cancelShipment(settings, sh.srOrderId);
     if (!r.ok) throw ApiError.badRequest(r.error || 'Courier could not cancel this shipment.');
 
     if (req.body.revert) {
@@ -674,6 +678,7 @@ router.get(
     const sh = order.shipment;
     if (!sh?.waybill || sh.provider === 'manual') throw ApiError.badRequest('No courier shipment on this order.');
 
+    if (order.isTest) throw ApiError.badRequest('Simulated shipment — no label exists for a test booking.');
     const settings = await getSettings();
     // Xpressbees hands the label out at booking time — serve the stored URL.
     if (sh.provider === 'xpressbees') {
@@ -848,22 +853,117 @@ router.post(
     const order = await Order.findOne({ 'shipment.provider': provider, 'shipment.waybill': awb });
     if (!order) return res.json({ success: true, data: { ignored: true } }); // unknown AWB — ack anyway (no retries)
 
-    order.shipment.status = status;
-    order.shipment.statusDetail = [b.current_status_body || b.message || '', b.location || b.current_location || ''].filter(Boolean).join(' · ');
-    order.shipment.lastSyncedAt = new Date();
-
-    // "Delivered" — but NOT "RTO Delivered" (parcel coming back) and NOT
-    // "Undelivered" (a FAILED delivery attempt; contains the substring). \b plus
-    // explicit exclusions. Xpressbees may push the short code "DLV".
-    const delivered = (/\bdelivered\b/i.test(status) || /^dlv$/i.test(status)) && !/rto|undeliver|not[\s-]*deliver|non[\s-]*deliver/i.test(status);
-    if (delivered && order.status === 'shipped') {
-      order.status = 'delivered';
-      // COD only — a delivered prepaid-mode parcel proves nothing about payment.
-      if (order.paymentStatus === 'unpaid' && order.shipment.mode === 'COD') order.paymentStatus = 'paid';
-      await reconcileOrderStock(order);
-    }
-    await order.save();
+    const delivered = await applyCourierStatus(order, status, [b.current_status_body || b.message || '', b.location || b.current_location || ''].filter(Boolean).join(' · '));
     res.json({ success: true, data: { orderNo: order.orderNo, status, delivered } });
+  })
+);
+
+// Apply a courier status update to an order — the ONE place the delivered rules
+// live (used by the webhook above and the test-order simulator below, so the
+// simulator exercises exactly the production transition logic).
+// "Delivered" — but NOT "RTO Delivered" (parcel coming back) and NOT
+// "Undelivered" (a FAILED delivery attempt; contains the substring). \b plus
+// explicit exclusions. Xpressbees may push the short code "DLV".
+// Payment flips to paid ONLY for COD-mode shipments.
+async function applyCourierStatus(order, status, detail) {
+  order.shipment.status = status;
+  order.shipment.statusDetail = detail || '';
+  order.shipment.lastSyncedAt = new Date();
+  const delivered = (/\bdelivered\b/i.test(status) || /^dlv$/i.test(status)) && !/rto|undeliver|not[\s-]*deliver|non[\s-]*deliver/i.test(status);
+  if (delivered && order.status === 'shipped') {
+    order.status = 'delivered';
+    if (order.paymentStatus === 'unpaid' && order.shipment.mode === 'COD') order.paymentStatus = 'paid';
+    await reconcileOrderStock(order);
+  }
+  await order.save();
+  return delivered;
+}
+
+// ADMIN — create a PRACTICE order (🧪) to rehearse the whole flow by hand.
+// Rides the normal pipeline: shows in To Ship, can be confirmed, "shipped" with
+// a simulated courier, walked through statuses, and finally deleted. Uses a
+// synthetic line item (productId null) so stock is never touched, and the
+// admin's own email so the customer emails land in YOUR inbox.
+router.post(
+  '/test-order',
+  requireAdmin,
+  validate({ body: Joi.object({ payment: Joi.string().valid('cod', 'prepaid').default('cod') }).default({}) }),
+  asyncHandler(async (req, res) => {
+    const prepaid = req.body.payment === 'prepaid';
+    const order = new Order({
+      orderNo: await nextOrderNo(),
+      items: [{ productId: null, name: '🧪 Test item (not a real product)', image: '', price: 499, qty: 1 }],
+      customer: { name: '🧪 TEST ORDER', phone: '9999999999', email: req.admin?.email || 'test@example.com' },
+      address: { line1: '1 Test Street', line2: '', landmark: '', city: 'New Delhi', state: 'Delhi', pincode: '110001' },
+      subtotal: 499, shipping: 0, codFee: 0, discount: 0, total: 499,
+      channel: 'web',
+      paymentMethod: prepaid ? 'razorpay' : 'cod',
+      paymentStatus: prepaid ? 'paid' : 'unpaid',
+      status: 'pending',
+      stockApplied: true, // synthetic item — nothing to reserve
+      isTest: true,
+      notes: 'Practice order created from the admin panel. Simulate courier updates from the order drawer, then delete.',
+    });
+    await order.save();
+    sendOrderConfirmation(order.toObject(), await getSettings())
+      .then((r) => { if (!r.ok) console.error('[mailer] test-order email failed:', r.error); })
+      .catch(() => {});
+    res.status(201).json({ success: true, data: order });
+  })
+);
+
+// ADMIN — drive a test order through the courier lifecycle by hand.
+// action: 'book'    → fake shipment (TEST AWB, simulated courier) via the same
+//                     applyBooking used by real bookings (sends the shipped email)
+//         'status'  → apply a courier status through applyCourierStatus (the
+//                     REAL webhook transition logic — Undelivered, Delivered,
+//                     RTO etc. behave exactly as a live push would)
+//         'delete'  → remove the practice order entirely
+router.post(
+  '/:id/simulate',
+  requireAdmin,
+  validate({
+    params: Joi.object({ id: objectId.required() }),
+    body: Joi.object({
+      action: Joi.string().valid('book', 'status', 'delete').required(),
+      status: Joi.string().max(60).when('action', { is: 'status', then: Joi.required() }),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const order = await Order.findById(req.params.id);
+    if (!order) throw ApiError.notFound('Order not found');
+    if (!order.isTest) throw ApiError.badRequest('Simulation is only allowed on 🧪 test orders.');
+
+    if (req.body.action === 'delete') {
+      await Order.deleteOne({ _id: order._id });
+      return res.json({ success: true, data: { deleted: true } });
+    }
+
+    if (req.body.action === 'book') {
+      if (order.shipment?.waybill) throw ApiError.badRequest(`Already booked (AWB ${order.shipment.waybill}). Cancel & reset first.`);
+      if (!(await claimBookingSlot(order._id))) throw ApiError.badRequest('A booking for this order is already in progress.');
+      const settings = await getSettings();
+      const mode = xpressbees.orderPaymentMode(order);
+      const wasShipped = order.status === 'shipped';
+      await applyBooking(order, settings, {
+        provider: 'xpressbees',
+        waybill: `TEST${Date.now()}`,
+        courierName: 'Simulated Courier',
+        trackingUrl: '',
+        mode,
+        codAmount: mode === 'COD' ? Math.max(0, (order.total || 0) - (order.advancePaid || 0)) : 0,
+        weightGrams: 200,
+        labelUrl: '',
+      }, wasShipped);
+      return res.json({ success: true, data: order });
+    }
+
+    // action === 'status'
+    if (!order.shipment?.waybill || !order.shipment.waybill.startsWith('TEST')) {
+      throw ApiError.badRequest('Book the simulated shipment first.');
+    }
+    const delivered = await applyCourierStatus(order, req.body.status, 'Simulated status push');
+    res.json({ success: true, data: order, meta: { delivered } });
   })
 );
 

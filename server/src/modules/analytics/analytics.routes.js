@@ -116,7 +116,7 @@ router.get(
         // Exclude cancelled orders — they must not inflate order count or revenue
         // (same convention as the /sales report).
         Order.aggregate([
-          { $match: { createdAt: { $gte: since }, status: { $ne: 'cancelled' } } },
+          { $match: { createdAt: { $gte: since }, status: { $ne: 'cancelled' }, isTest: { $ne: true } } },
           { $group: { _id: null, orders: { $sum: 1 }, revenue: { $sum: '$total' } } },
         ]),
       ]);
@@ -168,6 +168,7 @@ router.get(
     // "Sales" excludes cancelled orders unless a specific status is requested.
     if (req.query.status) match.status = req.query.status;
     else match.status = { $ne: 'cancelled' };
+    match.isTest = { $ne: true }; // practice orders never count as sales
     if (req.query.paymentMethod) match.paymentMethod = req.query.paymentMethod;
 
     const [agg = {}] = await Order.aggregate([

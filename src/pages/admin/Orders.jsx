@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox, MessageCircle, Mail, Copy, Printer } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Phone, Plus, Minus, Trash2, Check, Search, Truck, PackageCheck, ExternalLink, RefreshCw, XCircle, FileText, Package, MapPin, X, Inbox, MessageCircle, Mail, Copy, Printer, FlaskConical } from 'lucide-react'
 import { api } from '../../lib/api.js'
 import { Btn, Modal, Field } from '../../components/admin/AdminUI.jsx'
 import { Dropdown } from '../../components/ui/Dropdown.jsx'
@@ -130,6 +130,7 @@ export function AdminOrders() {
   const [search, setSearch] = useState('')
   const [q, setQ] = useState('')
   const [newOpen, setNewOpen] = useState(false)
+  const [testMenuOpen, setTestMenuOpen] = useState(false)
   const [shipFor, setShipFor] = useState(null) // order being marked shipped (tracking form)
   const [selected, setSelected] = useState([])  // order ids picked for bulk shipping (To Ship tab)
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -243,6 +244,25 @@ export function AdminOrders() {
       setBusy(null)
     }
   }
+  // Drive a 🧪 test order through the courier lifecycle (book fake AWB / push status / delete).
+  const simulate = async (id, body) => {
+    setBusy(`${id}:sim`)
+    try {
+      const r = await api.post(`/orders/${id}/simulate`, body, { auth: true })
+      if (body.action === 'delete') {
+        setDrawer(null)
+        setOrders((os) => os.filter((o) => o._id !== id))
+        load({ silent: true })
+      } else if (r?._id) {
+        reconcileOrder(r)
+      }
+    } catch (e) {
+      window.alert(e?.message || 'Simulation failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   // One merged PDF with every selected order's Shiprocket label (bulk print).
   const printLabels = async (ids) => {
     setBusy('bulk:labels')
@@ -283,15 +303,52 @@ export function AdminOrders() {
             <span className="text-zinc-300 mx-1.5">·</span>{counts.all || 0} total
           </p>
         </div>
-        <button
-          onClick={() => setNewOpen(true)}
-          aria-label="New order"
-          title="New order"
-          className="w-10 h-10 grid place-items-center rounded-xl text-white shadow-sm cursor-pointer transition-all hover:brightness-110 active:scale-95 shrink-0"
-          style={{ background: 'var(--maroon)' }}
-        >
-          <Plus size={19} strokeWidth={2.5} />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Practice order — rehearse the full pipeline without a real customer/courier */}
+          <div className="relative">
+            <button
+              onClick={() => setTestMenuOpen((v) => !v)}
+              aria-label="Create test order"
+              title="Create a 🧪 test order to practice the flow"
+              className="w-10 h-10 grid place-items-center rounded-xl bg-white ring-1 ring-zinc-200 text-zinc-500 hover:text-zinc-700 hover:ring-zinc-300 cursor-pointer transition-all active:scale-95"
+            >
+              <FlaskConical size={17} />
+            </button>
+            {testMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setTestMenuOpen(false)} />
+                <div className="absolute right-0 top-11 z-50 w-52 bg-white rounded-xl shadow-xl ring-1 ring-zinc-200 p-1.5">
+                  <p className="px-2.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Create test order</p>
+                  {[{ v: 'cod', label: 'COD test order', hint: 'unpaid — collect on delivery' }, { v: 'prepaid', label: 'Prepaid test order', hint: 'already paid online' }].map(({ v, label, hint }) => (
+                    <button
+                      key={v}
+                      onClick={async () => {
+                        setTestMenuOpen(false)
+                        try {
+                          await api.post('/orders/test-order', { payment: v }, { auth: true })
+                          setFilter('pending'); setPage(1); load()
+                        } catch (e) { window.alert(e?.message || 'Could not create the test order') }
+                      }}
+                      className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                    >
+                      <span className="block text-[13px] font-semibold text-zinc-800">🧪 {label}</span>
+                      <span className="block text-[11px] text-zinc-400">{hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            onClick={() => setNewOpen(true)}
+            aria-label="New order"
+            title="New order"
+            className="w-10 h-10 grid place-items-center rounded-xl text-white shadow-sm cursor-pointer transition-all hover:brightness-110 active:scale-95"
+            style={{ background: 'var(--maroon)' }}
+          >
+            <Plus size={19} strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} onCreated={() => { setPage(1); load() }} />}
       {shipFor && <ShipModal order={shipFor} srCfg={srCfg} delCfg={delCfg} xbCfg={xbCfg} prefCourier={prefCourier} onClose={() => setShipFor(null)} onShipped={(u) => { reconcileOrder(u); setShipFor(null) }} />}
@@ -446,6 +503,7 @@ export function AdminOrders() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                     <span className="font-bold text-[13px] sm:text-[14px] text-zinc-900 tracking-tight truncate">{o.orderNo}</span>
+                    {o.isTest && <span className="shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-amber-100 text-amber-700">🧪 Test</span>}
                     <span className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide ${pb.cls}`}>{pb.label}</span>
                     {o.shipment?.waybill && o.shipment.provider !== 'manual' && (
                       <span className="hidden sm:inline shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">{PROVIDER_LABEL[o.shipment.provider] || 'Courier'}</span>
@@ -549,6 +607,7 @@ export function AdminOrders() {
           onShipEdit={setShipFor}
           onShipmentAction={shipmentAction}
           onOpenLabel={openLabel}
+          onSimulate={simulate}
         />
       )}
     </div>
@@ -557,7 +616,7 @@ export function AdminOrders() {
 
 // Slide-over panel with the complete order: progress, courier shipment,
 // items + money breakdown, customer, payment. All actions live here.
-function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShipEdit, onShipmentAction, onOpenLabel }) {
+function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShipEdit, onShipmentAction, onOpenLabel, onSimulate }) {
   const [show, setShow] = useState(false)
   const [preview, setPreview] = useState(null) // item image opened full-screen
   const [moreMethods, setMoreMethods] = useState(false) // reveal Cash/UPI/Bank chips
@@ -656,6 +715,38 @@ function OrderDrawer({ o, busy, onClose, onAdvance, onPatch, onSetStatus, onShip
         <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
           {/* Progress */}
           <div className="bg-white rounded-2xl p-4 ring-1 ring-zinc-100"><Stepper status={o.status} /></div>
+
+          {/* 🧪 Test order — simulate the courier side by hand */}
+          {o.isTest && (
+            <div className="rounded-2xl px-4 py-3.5 text-sm bg-amber-50 ring-1 ring-amber-200">
+              <p className="font-semibold text-amber-800 flex items-center gap-1.5">🧪 Test order — simulate the courier</p>
+              <p className="text-[12px] text-amber-700/80 mt-0.5">
+                {!sh?.waybill
+                  ? 'Manage it like a real order (Confirm, Mark Shipped…) or book a fake shipment below and push statuses to watch the pipeline react.'
+                  : 'Push a status — Delivered auto-completes the order (and flips COD to paid); Undelivered must NOT.'}
+              </p>
+              <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
+                {!sh?.waybill ? (
+                  <button onClick={() => onSimulate(o._id, { action: 'book' })} disabled={busy === `${o._id}:sim`} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-amber-800 text-xs font-semibold ring-1 ring-amber-200 hover:bg-amber-100 cursor-pointer disabled:opacity-50">
+                    <Truck size={12} /> Book test shipment
+                  </button>
+                ) : (
+                  ['In transit', 'Out for delivery', 'Undelivered', 'Delivered', 'RTO Delivered'].map((st) => (
+                    <button key={st} onClick={() => onSimulate(o._id, { action: 'status', status: st })} disabled={busy === `${o._id}:sim`} className="px-2.5 py-1.5 rounded-lg bg-white text-amber-800 text-xs font-semibold ring-1 ring-amber-200 hover:bg-amber-100 cursor-pointer disabled:opacity-50">
+                      {st}
+                    </button>
+                  ))
+                )}
+                <button
+                  onClick={() => { if (window.confirm('Delete this test order? It disappears completely.')) onSimulate(o._id, { action: 'delete' }) }}
+                  disabled={busy === `${o._id}:sim`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-red-600 text-xs font-semibold ring-1 ring-red-200 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 size={12} /> Delete test order
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Courier shipment — waybill, live status, label + actions */}
           {sh?.provider && sh.provider !== 'manual' && sh?.waybill && (
