@@ -92,22 +92,29 @@ export function Products() {
           <div className="eyebrow justify-center flex"><Motif size={18} />{pc.eyebrow}</div>
           <p className="font-hindi text-[var(--gold-light)] text-lg mt-2">{hindi}</p>
           <h1 className="font-display text-white text-4xl md:text-5xl">{title}</h1>
+          {/* Item count lives HERE (not squeezed into the toolbar) — nbsp keeps the
+              line height stable while loading so the hero never jumps. */}
+          <p className="text-[11px] uppercase tracking-[0.2em] mt-3" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            {loading ? ' ' : `${list.length} piece${list.length === 1 ? '' : 's'}`}
+          </p>
         </div>
       </div>
 
       <div className="container-wide py-8">
-        {/* One row, never wraps: the item count is the flexible piece (truncates on
-            narrow phones) so the sort dropdown can't fall to a second line. */}
-        <div className="flex items-center mb-6 gap-3">
+        {/* Toolbar: two MATCHING white pills — half-width each on mobile (nothing
+            can wrap or truncate), natural widths on desktop. The Filters pill
+            flips to maroon while the panel is open so its state is visible. */}
+        <div className="grid grid-cols-2 gap-2.5 md:flex md:items-center md:justify-between mb-6">
           <button
             onClick={() => setShowFilter((f) => !f)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer shrink-0"
-            style={{ borderColor: 'color-mix(in srgb, var(--gold) 40%, transparent)', color: 'var(--ink)' }}
+            className="flex items-center justify-center md:justify-start gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer shadow-sm"
+            style={showFilter
+              ? { background: 'var(--maroon)', borderColor: 'var(--maroon)', color: '#fff' }
+              : { background: '#fff', borderColor: 'color-mix(in srgb, var(--gold) 45%, transparent)', color: 'var(--ink)' }}
           >
-            <SlidersHorizontal size={14} /> Filters
+            <SlidersHorizontal size={14} style={showFilter ? undefined : { color: 'var(--maroon)' }} /> Filters
           </button>
-          <span className="text-sm text-stone-500 flex-1 min-w-0 truncate">{loading ? '…' : `${list.length} items`}</span>
-          <div className="shrink-0"><Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} /></div>
+          <Dropdown value={sort} onChange={setSort} options={SORT_OPTIONS} className="md:w-auto" />
         </div>
 
         <div className="md:flex md:gap-8">

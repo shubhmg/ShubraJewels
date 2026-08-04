@@ -47,7 +47,7 @@ export function Dropdown({ value, onChange, options, className = '', align = 'ri
         ref={btnRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between gap-2 min-w-[9.5rem] w-full px-4 py-2 rounded-full border bg-white text-sm font-medium cursor-pointer transition-colors"
+        className="flex items-center justify-between gap-2 min-w-[9.5rem] w-full px-4 py-2 rounded-full border bg-white text-sm font-medium cursor-pointer transition-colors shadow-sm"
         style={{ borderColor: 'color-mix(in srgb, var(--gold) 45%, transparent)', color: 'var(--ink)' }}
         aria-haspopup="listbox"
         aria-expanded={open}
